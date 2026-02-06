@@ -11,6 +11,8 @@ import { sourcesRoutes } from './routes/sources';
 import { briefingsRoutes } from './routes/briefings';
 import { healthRoutes } from './routes/health';
 import { ingestionRoutes } from './routes/ingestion';
+import { contentRoutes } from './routes/content';
+import { verificationRoutes } from './routes/verification';
 
 const app = new Hono();
 
@@ -28,6 +30,8 @@ app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/briefings', briefingsRoutes);
 app.route('/api/ingestion', ingestionRoutes);
+app.route('/api/content', contentRoutes);
+app.route('/api/verification', verificationRoutes);
 
 // Root
 app.get('/', (c) => {
