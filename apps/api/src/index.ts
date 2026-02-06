@@ -15,6 +15,7 @@ import { contentRoutes } from './routes/content';
 import { verificationRoutes } from './routes/verification';
 import { deliveryRoutes } from './routes/delivery';
 import { apiV1Routes } from './routes/api-v1';
+import { factcheckRoutes } from './routes/factcheck';
 
 const app = new Hono();
 
@@ -36,6 +37,7 @@ app.route('/api/content', contentRoutes);
 app.route('/api/verification', verificationRoutes);
 app.route('/api/delivery', deliveryRoutes);
 app.route('/api/v1', apiV1Routes);
+app.route('/api/factcheck', factcheckRoutes);
 
 // Root
 app.get('/', (c) => {
