@@ -47,10 +47,10 @@
 
 ### Domain Configuration (DOM)
 - [ ] **DOM-01**: User can select which domains to monitor
-- [ ] **DOM-02**: System provides 20 starter domains
-- [ ] **DOM-03**: Cyber domain available with specialized sources
-- [ ] **DOM-04**: Crypto domain available with specialized sources
-- [ ] **DOM-05**: User can create custom domains
+- [ ] **DOM-02**: System provides 20 starter domains (Cyber, Crypto, Geopolitics, US Politics, China, Russia/Ukraine, Middle East, Financial Markets, Energy, AI/Tech, Climate, Defense, Supply Chain, Biotech, Space, Trade/Sanctions, Elections, Terrorism, Latin America, Africa)
+- [ ] **DOM-03**: Cyber domain includes threat intel feeds, CVE sources, security researchers
+- [ ] **DOM-04**: Crypto domain includes on-chain data, project feeds, CT influencers
+- [ ] **DOM-05**: User can create custom domain → AI auto-generates curated starter sources
 
 ### API & Integration (API)
 - [ ] **API-01**: System exposes REST API for all intelligence data

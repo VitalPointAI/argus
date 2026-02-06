@@ -43,17 +43,19 @@
 
 ---
 
-### Phase 3: Source Management
-**Goal:** Users can create and manage source lists with AI assistance
+### Phase 3: Source & Domain Management
+**Goal:** Users can create and manage source lists and domains with AI assistance
 
 **Requirements:**
 - MGT-01: Create source lists
 - MGT-02: Add/remove sources
 - MGT-03: AI source suggestions
 - MGT-04: Domain categorization
-- MGT-05: 20 domain templates
+- MGT-05: 20 domain templates (Cyber, Crypto, Geopolitics, etc.)
 - MGT-06: Clone architecture (hooks only)
 - MGT-07: Rating architecture (hooks only)
+- DOM-01: Domain selection UI
+- DOM-05: Custom domain creation with AI-generated starter sources
 
 **Success Criteria:**
 1. User can create named source list
@@ -62,6 +64,8 @@
 4. Sources tagged by domain
 5. Pre-built templates for 20 domains
 6. Clone/rating DB fields exist (not exposed in UI yet)
+7. User can toggle which domains to monitor
+8. User can create custom domain → AI generates curated starter sources automatically
 
 ---
 
@@ -128,15 +132,10 @@
 
 ---
 
-### Phase 7: Domains + API
-**Goal:** Domain presets and Bastion integration
+### Phase 7: API + Admin
+**Goal:** Bastion integration and platform administration
 
 **Requirements:**
-- DOM-01: Domain selection UI
-- DOM-02: 20 starter domains
-- DOM-03: Cyber domain
-- DOM-04: Crypto domain
-- DOM-05: Custom domains
 - API-01: REST API
 - API-02: Auth + rate limiting
 - API-03: Webhooks
@@ -145,14 +144,12 @@
 - PLT-05: Admin dashboard
 
 **Success Criteria:**
-1. User can toggle domains on/off
-2. All 20 domains have curated starter sources
-3. Cyber domain includes threat intel feeds
-4. Crypto domain includes on-chain data sources
-5. User can create "My Custom Domain"
-6. All data accessible via REST API
-7. Bastion successfully ingests Argus feed
-8. API docs auto-generated at /docs
+1. All intelligence data accessible via REST API
+2. API keys with rate limiting work
+3. Webhooks fire on new briefings/alerts
+4. Bastion successfully ingests Argus feed
+5. API docs auto-generated at /docs
+6. Admin can monitor system health
 
 ---
 
@@ -162,11 +159,11 @@
 |-------|-------------|--------|
 | 1 | Foundation | 1-2 weeks |
 | 2 | Source Ingestion | 2-3 weeks |
-| 3 | Source Management | 1-2 weeks |
+| 3 | Source & Domain Management | 2-3 weeks |
 | 4 | Verification Engine | 2-3 weeks |
 | 5 | Intelligence Synthesis | 1-2 weeks |
 | 6 | Delivery Channels | 1-2 weeks |
-| 7 | Domains + API | 1-2 weeks |
+| 7 | API + Admin | 1 week |
 
 **Total: ~10-16 weeks to MVP**
 
@@ -179,9 +176,9 @@
 | PLT-01 through PLT-04 | 1 |
 | SRC-01 through SRC-08 | 1, 2 |
 | MGT-01 through MGT-07 | 3 |
+| DOM-01 through DOM-05 | 3 |
 | VER-01 through VER-07 | 4 |
 | INT-01 through INT-05 | 5 |
 | DEL-01 through DEL-06 | 6 |
-| DOM-01 through DOM-05 | 7 |
 | API-01 through API-05 | 7 |
 | PLT-05 | 7 |
