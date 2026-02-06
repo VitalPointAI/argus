@@ -1,0 +1,21 @@
+{
+  "name": "argus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Strategic intelligence platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @argus/api",
+    "dev:web": "npm run dev -w @argus/web",
+    "build": "npm run build --workspaces",
+    "db:generate": "npm run db:generate -w @argus/api",
+    "db:migrate": "npm run db:migrate -w @argus/api",
+    "db:studio": "npm run db:studio -w @argus/api"
+  },
+  "keywords": ["osint", "intelligence", "verification"],
+  "author": "Jim <jimmy.agent@vitalpoint.ai>",
+  "license": "MIT"
+}

@@ -1,0 +1,46 @@
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import 'dotenv/config';
+
+// Route imports
+import { authRoutes } from './routes/auth';
+import { domainsRoutes } from './routes/domains';
+import { sourcesRoutes } from './routes/sources';
+import { briefingsRoutes } from './routes/briefings';
+import { healthRoutes } from './routes/health';
+
+const app = new Hono();
+
+// Middleware
+app.use('*', logger());
+app.use('*', cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+
+// Routes
+app.route('/health', healthRoutes);
+app.route('/api/auth', authRoutes);
+app.route('/api/domains', domainsRoutes);
+app.route('/api/sources', sourcesRoutes);
+app.route('/api/briefings', briefingsRoutes);
+
+// Root
+app.get('/', (c) => {
+  return c.json({
+    name: 'Argus API',
+    version: '0.1.0',
+    status: 'operational',
+  });
+});
+
+const port = parseInt(process.env.PORT || '3001');
+
+console.log(`🦚 Argus API starting on port ${port}`);
+
+serve({
+  fetch: app.fetch,
+  port,
+});
