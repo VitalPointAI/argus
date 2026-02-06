@@ -1,12 +1,16 @@
 /**
  * Fact-Check Service
  * Extracts claims, searches for evidence, generates verdicts with citations
+ * Uses NEAR AI for LLM inference (TEE-based private processing)
  */
 
 import { db, content, sources, domains } from '../../db';
 import { eq, sql, desc } from 'drizzle-orm';
 import { generateEmbedding, formatForPgVector } from '../embeddings';
+import { extractClaimsNearAI, analyzeEvidenceNearAI } from '../nearai';
 
+// Feature flag: use NEAR AI or fallback to Anthropic
+const USE_NEAR_AI = process.env.USE_NEAR_AI !== 'false';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export interface Claim {
@@ -36,11 +40,22 @@ export interface FactCheckResult {
 }
 
 /**
- * Extract verifiable claims from an article using Claude
+ * Extract verifiable claims from an article
+ * Uses NEAR AI (preferred) or falls back to Claude
  */
 export async function extractClaims(title: string, body: string): Promise<Claim[]> {
+  // Try NEAR AI first
+  if (USE_NEAR_AI && process.env.NEAR_AI_API_KEY) {
+    try {
+      return await extractClaimsNearAI(title, body);
+    } catch (error) {
+      console.warn('NEAR AI extraction failed, falling back to Claude:', error);
+    }
+  }
+
+  // Fallback to Claude
   if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+    throw new Error('No AI provider configured (set NEAR_AI_API_KEY or ANTHROPIC_API_KEY)');
   }
 
   const prompt = `Analyze this article and extract specific, verifiable factual claims. 
@@ -85,10 +100,8 @@ Respond in JSON format:
   const text = data.content[0].text;
   
   try {
-    // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return [];
-    
     const parsed = JSON.parse(jsonMatch[0]);
     return parsed.claims || [];
   } catch {
@@ -135,16 +148,13 @@ export async function searchEvidence(claim: string, limit: number = 10): Promise
 }
 
 /**
- * Analyze evidence and generate verdict using Claude
+ * Analyze evidence and generate verdict
+ * Uses NEAR AI (preferred) or falls back to Claude
  */
 export async function analyzeEvidence(
   claim: string,
   evidence: Evidence[]
 ): Promise<{ verdict: 'true' | 'false' | 'mixed' | 'unverified'; confidence: number; reasoning: string; supporting: Evidence[]; contradicting: Evidence[] }> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
-  }
-
   if (evidence.length === 0) {
     return {
       verdict: 'unverified',
@@ -155,8 +165,55 @@ export async function analyzeEvidence(
     };
   }
 
+  // Try NEAR AI first
+  if (USE_NEAR_AI && process.env.NEAR_AI_API_KEY) {
+    try {
+      const analysis = await analyzeEvidenceNearAI(claim, evidence.slice(0, 5).map(e => ({
+        sourceName: e.sourceName,
+        title: e.title,
+        quote: e.quote,
+        sourceReliability: e.sourceReliability,
+      })));
+
+      // Classify evidence based on analysis
+      const supporting: Evidence[] = [];
+      const contradicting: Evidence[] = [];
+      
+      if (analysis.sourceAnalysis) {
+        for (const sa of analysis.sourceAnalysis) {
+          const idx = sa.sourceIndex - 1;
+          if (idx >= 0 && idx < evidence.length) {
+            const e = { ...evidence[idx] };
+            if (sa.stance === 'supports') {
+              e.supports = true;
+              supporting.push(e);
+            } else if (sa.stance === 'contradicts') {
+              e.supports = false;
+              contradicting.push(e);
+            }
+          }
+        }
+      }
+
+      return {
+        verdict: analysis.verdict,
+        confidence: analysis.confidence,
+        reasoning: analysis.reasoning,
+        supporting,
+        contradicting,
+      };
+    } catch (error) {
+      console.warn('NEAR AI analysis failed, falling back to Claude:', error);
+    }
+  }
+
+  // Fallback to Claude
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('No AI provider configured');
+  }
+
   const evidenceText = evidence
-    .slice(0, 5) // Top 5 most relevant
+    .slice(0, 5)
     .map((e, i) => `
 [Source ${i + 1}]: ${e.sourceName} (Reliability: ${e.sourceReliability}%)
 Title: ${e.title}
@@ -171,12 +228,6 @@ CLAIM TO VERIFY:
 
 EVIDENCE FROM NEWS SOURCES:
 ${evidenceText}
-
-Analyze the evidence and determine:
-1. Does each source SUPPORT, CONTRADICT, or have NO CLEAR STANCE on the claim?
-2. Overall verdict: true, false, mixed, or unverified
-3. Confidence level (0-100) based on evidence quality and agreement
-4. Brief reasoning
 
 Respond in JSON:
 {
@@ -216,7 +267,6 @@ Respond in JSON:
     
     const parsed = JSON.parse(jsonMatch[0]);
     
-    // Classify evidence based on analysis
     const supporting: Evidence[] = [];
     const contradicting: Evidence[] = [];
     
