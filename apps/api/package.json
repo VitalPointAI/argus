@@ -21,6 +21,7 @@
     "@lucia-auth/adapter-drizzle": "^1.1.0",
     "dotenv": "^16.4.7",
     "zod": "^3.24.1",
+    "rss-parser": "^3.13.0",
     "@argus/shared": "*"
   },
   "devDependencies": {

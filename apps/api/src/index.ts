@@ -10,6 +10,7 @@ import { domainsRoutes } from './routes/domains';
 import { sourcesRoutes } from './routes/sources';
 import { briefingsRoutes } from './routes/briefings';
 import { healthRoutes } from './routes/health';
+import { ingestionRoutes } from './routes/ingestion';
 
 const app = new Hono();
 
@@ -26,6 +27,7 @@ app.route('/api/auth', authRoutes);
 app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/briefings', briefingsRoutes);
+app.route('/api/ingestion', ingestionRoutes);
 
 // Root
 app.get('/', (c) => {
