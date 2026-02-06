@@ -5,22 +5,7 @@ import { eq, sql } from 'drizzle-orm';
 
 export const verificationRoutes = new Hono();
 
-// Verify a specific content item
-verificationRoutes.post('/:contentId', async (c) => {
-  const contentId = c.req.param('contentId');
-
-  try {
-    const result = await verifyContent(contentId);
-    return c.json({ success: true, data: result });
-  } catch (error) {
-    return c.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }, 500);
-  }
-});
-
-// Batch verify unverified content
+// Batch verify unverified content (must be before :contentId route)
 verificationRoutes.post('/batch', async (c) => {
   const limit = parseInt(c.req.query('limit') || '50');
 
@@ -35,8 +20,23 @@ verificationRoutes.post('/batch', async (c) => {
   }
 });
 
+// Verify a specific content item
+verificationRoutes.post('/content/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    const result = await verifyContent(contentId);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
 // Get verification details for a content item
-verificationRoutes.get('/:contentId', async (c) => {
+verificationRoutes.get('/content/:contentId', async (c) => {
   const contentId = c.req.param('contentId');
 
   const [item] = await db
