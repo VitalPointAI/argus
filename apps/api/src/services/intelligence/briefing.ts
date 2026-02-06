@@ -1,5 +1,6 @@
 import { db, content, sources, domains, briefings, userDomains } from '../../db';
 import { eq, desc, gte, and, inArray, sql } from 'drizzle-orm';
+import { llm } from './llm';
 
 export interface BriefingContent {
   summary: string;
@@ -57,7 +58,19 @@ export async function generateBriefing(
   // Get recent content
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   
-  let query = db
+  // Build the where condition
+  const whereCondition = useAllDomains
+    ? and(
+        gte(content.publishedAt, since),
+        gte(content.confidenceScore, minConfidence)
+      )
+    : and(
+        gte(content.publishedAt, since),
+        gte(content.confidenceScore, minConfidence),
+        inArray(sources.domainId, domainIds)
+      );
+  
+  const items = await db
     .select({
       id: content.id,
       title: content.title,
@@ -72,26 +85,9 @@ export async function generateBriefing(
     .from(content)
     .leftJoin(sources, eq(content.sourceId, sources.id))
     .leftJoin(domains, eq(sources.domainId, domains.id))
-    .where(
-      and(
-        gte(content.publishedAt, since),
-        gte(content.confidenceScore, minConfidence)
-      )
-    )
+    .where(whereCondition)
     .orderBy(desc(content.confidenceScore), desc(content.publishedAt))
     .limit(maxItems);
-
-  if (!useAllDomains) {
-    query = query.where(
-      and(
-        gte(content.publishedAt, since),
-        gte(content.confidenceScore, minConfidence),
-        inArray(sources.domainId, domainIds)
-      )
-    ) as typeof query;
-  }
-
-  const items = await query;
 
   if (items.length === 0) {
     return {
@@ -112,14 +108,59 @@ export async function generateBriefing(
     return acc;
   }, {} as Record<string, typeof items>);
 
-  // Generate summary (in production, this would be LLM-generated)
-  const summary = generateSummary(byDomain);
-  
-  // Identify significant changes
-  const changes = identifyChanges(items);
-  
-  // Generate forecasts (placeholder - would be LLM-generated)
-  const forecasts = generateForecasts(byDomain);
+  // Check if LLM is available
+  const useLLM = !!process.env.NEARAI_API_KEY;
+
+  let summary: string;
+  let changes: Change[];
+  let forecasts: Forecast[];
+
+  if (useLLM) {
+    try {
+      // Use LLM for intelligent analysis
+      const articles = items.map(item => ({
+        title: item.title,
+        body: item.body || '',
+        domain: item.domainName || 'Unknown',
+        source: item.sourceName || 'Unknown',
+      }));
+
+      // Generate LLM summary
+      summary = await llm.summarizeArticles(articles, 'executive');
+
+      // Analyze changes with LLM
+      const llmChanges = await llm.analyzeChanges(articles);
+      changes = llmChanges.map((c, i) => ({
+        domain: articles[i]?.domain || 'Unknown',
+        description: c.description,
+        significance: c.significance,
+        contentId: items[i]?.id || '',
+      }));
+
+      // Generate LLM forecasts
+      const domainNames = [...new Set(items.map(i => i.domainName).filter(Boolean))] as string[];
+      const developments = items.slice(0, 10).map(i => i.title);
+      const llmForecasts = await llm.generateForecasts(developments, domainNames);
+      forecasts = llmForecasts.map(f => ({
+        event: f.event,
+        probability: f.probability,
+        timeframe: f.timeframe,
+        reasoning: f.reasoning,
+        confidence: Math.round(f.probability * 0.8), // Calibration factor
+      }));
+    } catch (error) {
+      console.error('LLM analysis failed, falling back to basic:', error);
+      // Fallback to basic analysis
+      summary = generateSummary(byDomain);
+      changes = identifyChanges(items);
+      forecasts = generateForecasts(byDomain);
+    }
+  } else {
+    // Fallback to basic analysis
+    summary = generateSummary(byDomain);
+    changes = identifyChanges(items);
+    forecasts = generateForecasts(byDomain);
+  }
 
   return {
     summary,

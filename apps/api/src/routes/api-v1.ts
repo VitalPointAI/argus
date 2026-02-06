@@ -34,18 +34,23 @@ apiV1Routes.get('/', (c) => {
  */
 apiV1Routes.get('/intelligence', async (c) => {
   const since = c.req.query('since'); // ISO timestamp
-  const domain = c.req.query('domain'); // domain slug
+  const domainSlug = c.req.query('domain'); // domain slug
   const minConfidence = parseInt(c.req.query('minConfidence') || '50');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
   const offset = parseInt(c.req.query('offset') || '0');
 
-  const conditions = [gte(content.confidenceScore, minConfidence)];
+  // Build all conditions first
+  const conditions: any[] = [gte(content.confidenceScore, minConfidence)];
 
   if (since) {
     conditions.push(gte(content.fetchedAt, new Date(since)));
   }
 
-  let query = db
+  if (domainSlug) {
+    conditions.push(eq(domains.slug, domainSlug));
+  }
+
+  const items = await db
     .select({
       id: content.id,
       title: content.title,
@@ -74,18 +79,15 @@ apiV1Routes.get('/intelligence', async (c) => {
     .limit(limit)
     .offset(offset);
 
-  if (domain) {
-    conditions.push(eq(domains.slug, domain));
-    query = query.where(and(...conditions)) as typeof query;
-  }
-
-  const items = await query;
-
-  // Get total count
-  const [countResult] = await db
+  // Get total count with same conditions
+  let countQuery = db
     .select({ count: sql<number>`count(*)` })
     .from(content)
+    .leftJoin(sources, eq(content.sourceId, sources.id))
+    .leftJoin(domains, eq(sources.domainId, domains.id))
     .where(and(...conditions));
+
+  const [countResult] = await countQuery;
 
   return c.json({
     success: true,
@@ -230,6 +232,36 @@ apiV1Routes.get('/sources', async (c) => {
 
   const allSources = await query;
   return c.json({ success: true, data: allSources });
+});
+
+/**
+ * Generate LLM-powered briefing
+ */
+apiV1Routes.post('/briefings/generate', async (c) => {
+  // Import dynamically to avoid circular deps
+  const { generateLLMBriefing } = await import('../services/intelligence/llm-briefing');
+  
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    type = 'morning', 
+    hoursBack = 12, 
+    minConfidence = 50,
+  } = body;
+
+  try {
+    const result = await generateLLMBriefing({
+      type,
+      hoursBack,
+      minConfidence,
+    });
+
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Briefing generation failed',
+    }, 500);
+  }
 });
 
 /**

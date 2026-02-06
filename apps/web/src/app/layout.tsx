@@ -27,6 +27,7 @@ export default function RootLayout({
                 </div>
                 <div className="flex gap-6">
                   <a href="/" className="hover:text-argus-300">Dashboard</a>
+                  <a href="/search" className="hover:text-argus-300">Search</a>
                   <a href="/domains" className="hover:text-argus-300">Domains</a>
                   <a href="/sources" className="hover:text-argus-300">Sources</a>
                   <a href="/briefings" className="hover:text-argus-300">Briefings</a>

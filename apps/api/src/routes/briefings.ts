@@ -2,8 +2,136 @@ import { Hono } from 'hono';
 import { db, briefings, users } from '../db';
 import { eq, desc, sql } from 'drizzle-orm';
 import { generateBriefing, createBriefing } from '../services/intelligence/briefing';
+import { generateLLMBriefing, generateFactCheckedBriefing } from '../services/intelligence/llm-briefing';
 
 export const briefingsRoutes = new Hono();
+
+// Generate LLM-powered briefing (new!)
+briefingsRoutes.post('/llm', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    type = 'morning', 
+    hoursBack = 12, 
+    minConfidence = 50,
+    maxArticles = 50,
+    save = false,
+    userId,
+  } = body;
+
+  try {
+    console.log(`Generating ${type} LLM briefing...`);
+    
+    const result = await generateLLMBriefing({
+      type,
+      hoursBack,
+      minConfidence,
+      maxArticles,
+    });
+
+    // Optionally save to database
+    if (save && userId) {
+      const [saved] = await db.insert(briefings).values({
+        userId,
+        type,
+        summary: result.content, // LLM briefing returns 'content' as summary
+        changes: [],
+        forecasts: [],
+        contentIds: [],
+        deliveryChannels: ['web'],
+      }).returning();
+
+      return c.json({ 
+        success: true, 
+        data: {
+          ...result,
+          saved: true,
+          briefingId: saved.id,
+        }
+      });
+    }
+
+    return c.json({ 
+      success: true, 
+      data: result,
+    });
+  } catch (error) {
+    console.error('LLM briefing error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Generate fact-checked briefing with review capability
+briefingsRoutes.post('/factcheck', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    type = 'morning', 
+    hoursBack = 12, 
+    minConfidence = 50,
+  } = body;
+
+  try {
+    console.log(`Generating fact-checked ${type} briefing...`);
+    
+    const result = await generateFactCheckedBriefing({
+      type,
+      hoursBack,
+      minConfidence,
+    });
+
+    return c.json({ 
+      success: true, 
+      data: {
+        ...result,
+        // Include review instructions
+        reviewInstructions: {
+          description: 'Review each claim and mark as approved/disputed/needs_more_sources',
+          endpoint: 'POST /api/briefings/review',
+          actions: ['approve', 'dispute', 'needs_more_sources', 'remove'],
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Fact-checked briefing error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Review/approve claims in a briefing
+briefingsRoutes.post('/review', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { briefingId, actions } = body;
+  
+  // Actions format: [{ claimId: string, action: 'approve'|'dispute'|'remove', note?: string }]
+  
+  if (!actions || !Array.isArray(actions)) {
+    return c.json({ success: false, error: 'actions array required' }, 400);
+  }
+
+  // In a full implementation, this would update the database
+  // For now, return the processed actions
+  const processed = actions.map((a: any) => ({
+    claimId: a.claimId,
+    action: a.action,
+    status: 'processed',
+    note: a.note,
+  }));
+
+  return c.json({ 
+    success: true, 
+    data: {
+      briefingId,
+      reviewedAt: new Date().toISOString(),
+      actionsProcessed: processed.length,
+      actions: processed,
+    }
+  });
+});
 
 // Generate a briefing preview (without saving)
 briefingsRoutes.post('/preview', async (c) => {
