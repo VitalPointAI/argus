@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { verifyContent, verifyUnverifiedContent } from '../services/verification/engine';
 import { llmVerifyContent, llmBatchVerify } from '../services/verification/llm-verify';
-import { db, verifications, content } from '../db';
+import { db, verifications, content, articleClaims } from '../db';
 import { eq, sql } from 'drizzle-orm';
 
 export const verificationRoutes = new Hono();
@@ -94,6 +94,50 @@ verificationRoutes.get('/content/:contentId', async (c) => {
       contentId,
       contentTitle: item.title,
       verification,
+    },
+  });
+});
+
+// Get claims for a content item
+verificationRoutes.get('/claims/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  // Get content info
+  const [item] = await db
+    .select({
+      id: content.id,
+      title: content.title,
+      confidenceScore: content.confidenceScore,
+    })
+    .from(content)
+    .where(eq(content.id, contentId));
+
+  if (!item) {
+    return c.json({ success: false, error: 'Content not found' }, 404);
+  }
+
+  // Get claims
+  const claims = await db
+    .select()
+    .from(articleClaims)
+    .where(eq(articleClaims.contentId, contentId));
+
+  return c.json({
+    success: true,
+    data: {
+      contentId,
+      contentTitle: item.title,
+      overallConfidence: item.confidenceScore,
+      claims: claims.map(claim => ({
+        id: claim.id,
+        text: claim.claimText,
+        confidence: claim.confidence,
+        status: claim.verificationStatus,
+        method: claim.verificationMethod,
+        verifiedBy: claim.verifiedBy,
+        contradictedBy: claim.contradictedBy,
+        extractedAt: claim.extractedAt,
+      })),
     },
   });
 });

@@ -4,7 +4,7 @@
  * Uses AI to analyze content for reliability, bias, and factual accuracy.
  */
 
-import { db, content as contentTable, sources, verifications } from '../../db';
+import { db, content as contentTable, sources, verifications, articleClaims } from '../../db';
 import { eq } from 'drizzle-orm';
 
 const NEARAI_API_KEY = process.env.NEARAI_API_KEY;
@@ -65,7 +65,7 @@ export async function llmVerifyContent(contentId: string): Promise<LLMVerificati
     return getHeuristicVerification(item);
   }
 
-  const prompt = `Analyze this news article for reliability and factual accuracy.
+  const prompt = `Analyze this news article for reliability and factual accuracy. Extract all key factual claims.
 
 TITLE: ${item.title}
 SOURCE: ${item.sourceName || 'Unknown'}
@@ -91,14 +91,22 @@ Analyze and respond with JSON:
   },
   "factualClaims": [
     {
-      "claim": "specific claim from article",
+      "claim": "A specific, standalone factual claim from the article",
       "verifiable": true,
-      "confidence": 85
+      "confidence": 85,
+      "verificationMethod": "How this could be verified (e.g., 'can be cross-referenced with official sources', 'quote from named expert', 'statistical claim needs data source')",
+      "status": "verified|partially_verified|unverified|contradicted"
     }
   ],
   "summary": "One sentence summary of what this article claims",
   "reasoning": "Brief explanation of why you gave this confidence score"
 }
+
+IMPORTANT for factualClaims:
+- Extract 3-7 key factual claims from the article
+- Each claim should be a specific, verifiable statement
+- Assess if the article provides evidence for each claim
+- Status: "verified" if sourced/evidenced, "partially_verified" if some evidence, "unverified" if no evidence, "contradicted" if self-contradicting
 
 Be objective. Focus on factual accuracy, not political agreement.`;
 
@@ -112,10 +120,10 @@ Be objective. Focus on factual accuracy, not political agreement.`;
       body: JSON.stringify({
         model: 'deepseek-ai/DeepSeek-V3.1',
         messages: [
-          { role: 'system', content: 'You are a fact-checking analyst. Be objective and precise.' },
+          { role: 'system', content: 'You are a fact-checking analyst. Be objective and precise. Always extract specific factual claims from articles.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 1500,
+        max_tokens: 2000,
         temperature: 0.1,
       }),
     });
@@ -126,10 +134,10 @@ Be objective. Focus on factual accuracy, not political agreement.`;
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    const llmContent = data.choices?.[0]?.message?.content || '';
     
     // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = llmContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
@@ -137,6 +145,27 @@ Be objective. Focus on factual accuracy, not political agreement.`;
       await db.update(contentTable)
         .set({ confidenceScore: parsed.confidenceScore })
         .where(eq(contentTable.id, contentId));
+      
+      // Store extracted claims in the database
+      if (parsed.factualClaims && Array.isArray(parsed.factualClaims)) {
+        // Delete existing claims for this content (to allow re-verification)
+        await db.delete(articleClaims).where(eq(articleClaims.contentId, contentId));
+        
+        // Insert new claims
+        for (const claim of parsed.factualClaims) {
+          if (claim.claim && claim.claim.length > 10) {
+            await db.insert(articleClaims).values({
+              contentId,
+              claimText: claim.claim,
+              confidence: claim.confidence || 50,
+              verificationStatus: claim.status || 'unverified',
+              verificationMethod: claim.verificationMethod || null,
+              verifiedBy: claim.verifiedBy || [],
+              contradictedBy: claim.contradictedBy || [],
+            });
+          }
+        }
+      }
       
       return parsed as LLMVerificationResult;
     }

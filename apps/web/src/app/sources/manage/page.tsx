@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -14,6 +15,10 @@ interface Source {
   isActive: boolean;
   lastFetchedAt: string | null;
   createdAt: string;
+  createdBy: string | null;
+  isGlobal: boolean;
+  isOwner: boolean;
+  canEdit: boolean;
 }
 
 interface Domain {
@@ -22,46 +27,87 @@ interface Domain {
   slug: string;
 }
 
+interface SourceList {
+  id: string;
+  name: string;
+  description: string;
+  isPublic: boolean;
+  itemCount: number;
+}
+
 const SOURCE_TYPES = ['rss', 'youtube', 'web', 'twitter', 'telegram', 'podcast', 'government'];
 
 export default function SourceManagePage() {
+  const { user, token, loading: authLoading } = useAuth();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [sourceLists, setSourceLists] = useState<SourceList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'sources' | 'lists'>('sources');
   
-  // Form state
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
+  // Source form state
+  const [showSourceForm, setShowSourceForm] = useState(false);
+  const [sourceFormData, setSourceFormData] = useState({
     name: '',
     url: '',
     type: 'rss',
     domainId: '',
     reliabilityScore: 50,
+    asGlobal: false,
   });
   const [submitting, setSubmitting] = useState(false);
   
+  // List form state
+  const [showListForm, setShowListForm] = useState(false);
+  const [listFormData, setListFormData] = useState({
+    name: '',
+    description: '',
+    isPublic: false,
+  });
+  
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteListId, setDeleteListId] = useState<string | null>(null);
   
   // Fetch data
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [token, authLoading]);
   
   const fetchData = async () => {
     try {
-      const [sourcesRes, domainsRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/sources`, { cache: 'no-store' }),
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const [sourcesRes, domainsRes, userInfoRes] = await Promise.all([
+        fetch(`${API_URL}/api/sources`, { headers, cache: 'no-store' }),
         fetch(`${API_URL}/api/v1/domains`, { cache: 'no-store' }),
+        fetch(`${API_URL}/api/sources/user/info`, { headers }),
       ]);
       
       const sourcesData = await sourcesRes.json();
       const domainsData = await domainsRes.json();
+      const userInfo = await userInfoRes.json();
       
       setSources(sourcesData.data || []);
       setDomains(domainsData.data || []);
+      setIsAdmin(userInfo.data?.isAdmin || false);
+      
+      // Fetch source lists if authenticated
+      if (token) {
+        const listsRes = await fetch(`${API_URL}/api/sources/lists/my`, { headers });
+        const listsData = await listsRes.json();
+        if (listsData.success) {
+          setSourceLists(listsData.data || []);
+        }
+      }
     } catch (err) {
       setError('Failed to load data');
     } finally {
@@ -74,28 +120,41 @@ export default function SourceManagePage() {
     setTimeout(() => setSuccessMessage(''), 3000);
   };
   
+  // Filter sources to only show editable ones
+  const editableSources = sources.filter(s => s.canEdit);
+  const globalSources = sources.filter(s => s.isGlobal);
+  const mySources = sources.filter(s => s.isOwner);
+  
   // Create source
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitSource = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) {
+      setError('Please log in to add sources');
+      return;
+    }
+    
     setSubmitting(true);
     setError('');
     
     try {
       const res = await fetch(`${API_URL}/api/sources`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          ...formData,
-          domainId: formData.domainId || null,
+          ...sourceFormData,
+          domainId: sourceFormData.domainId || null,
         }),
       });
       
       const data = await res.json();
       
       if (data.success) {
-        setSources([data.data, ...sources]);
-        setFormData({ name: '', url: '', type: 'rss', domainId: '', reliabilityScore: 50 });
-        setShowForm(false);
+        setSources([{ ...data.data, isGlobal: sourceFormData.asGlobal, isOwner: !sourceFormData.asGlobal, canEdit: true }, ...sources]);
+        setSourceFormData({ name: '', url: '', type: 'rss', domainId: '', reliabilityScore: 50, asGlobal: false });
+        setShowSourceForm(false);
         showSuccess('Source added successfully!');
       } else {
         setError(data.error || 'Failed to add source');
@@ -107,20 +166,65 @@ export default function SourceManagePage() {
     }
   };
   
+  // Create source list
+  const handleSubmitList = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) {
+      setError('Please log in to create lists');
+      return;
+    }
+    
+    setSubmitting(true);
+    setError('');
+    
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(listFormData),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setSourceLists([{ ...data.data, itemCount: 0 }, ...sourceLists]);
+        setListFormData({ name: '', description: '', isPublic: false });
+        setShowListForm(false);
+        showSuccess('Source list created!');
+      } else {
+        setError(data.error || 'Failed to create list');
+      }
+    } catch (err) {
+      setError('Failed to create list');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
   // Toggle active status
   const toggleActive = async (source: Source) => {
+    if (!token) return;
+    
     try {
       const res = await fetch(`${API_URL}/api/sources/${source.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ isActive: !source.isActive }),
       });
       
       const data = await res.json();
       
       if (data.success) {
-        setSources(sources.map(s => s.id === source.id ? data.data : s));
+        setSources(sources.map(s => s.id === source.id ? { ...s, ...data.data } : s));
         showSuccess(`Source ${data.data.isActive ? 'activated' : 'deactivated'}`);
+      } else {
+        setError(data.error || 'Access denied');
       }
     } catch (err) {
       setError('Failed to update source');
@@ -129,17 +233,22 @@ export default function SourceManagePage() {
   
   // Update reliability score
   const updateReliability = async (source: Source, score: number) => {
+    if (!token) return;
+    
     try {
       const res = await fetch(`${API_URL}/api/sources/${source.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ reliabilityScore: score }),
       });
       
       const data = await res.json();
       
       if (data.success) {
-        setSources(sources.map(s => s.id === source.id ? data.data : s));
+        setSources(sources.map(s => s.id === source.id ? { ...s, ...data.data } : s));
       }
     } catch (err) {
       setError('Failed to update reliability');
@@ -147,12 +256,13 @@ export default function SourceManagePage() {
   };
   
   // Delete source
-  const confirmDelete = async () => {
-    if (!deleteId) return;
+  const confirmDeleteSource = async () => {
+    if (!deleteId || !token) return;
     
     try {
       const res = await fetch(`${API_URL}/api/sources/${deleteId}`, {
         method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
       });
       
       const data = await res.json();
@@ -170,6 +280,31 @@ export default function SourceManagePage() {
     }
   };
   
+  // Delete list
+  const confirmDeleteList = async () => {
+    if (!deleteListId || !token) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/${deleteListId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setSourceLists(sourceLists.filter(l => l.id !== deleteListId));
+        showSuccess('Source list deleted');
+      } else {
+        setError(data.error || 'Failed to delete list');
+      }
+    } catch (err) {
+      setError('Failed to delete list');
+    } finally {
+      setDeleteListId(null);
+    }
+  };
+  
   // Get domain name by ID
   const getDomainName = (domainId: string | null) => {
     if (!domainId) return '—';
@@ -177,10 +312,27 @@ export default function SourceManagePage() {
     return domain?.name || 'Unknown';
   };
   
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-slate-500">Loading sources...</div>
+        <div className="text-slate-500">Loading...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center">
+        <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
+          Please log in to manage your sources and source lists.
+        </p>
+        <a
+          href="/login"
+          className="px-6 py-3 bg-argus-600 hover:bg-argus-700 text-white rounded-lg inline-block"
+        >
+          Log In
+        </a>
       </div>
     );
   }
@@ -194,7 +346,8 @@ export default function SourceManagePage() {
             Manage Sources
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Add, edit, and manage intelligence sources
+            {isAdmin && <span className="text-argus-600 font-medium">Admin Mode • </span>}
+            Manage your sources and source lists
           </p>
         </div>
         <div className="flex gap-3">
@@ -202,14 +355,8 @@ export default function SourceManagePage() {
             href="/sources" 
             className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
           >
-            View Sources
+            View All Sources
           </a>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
-          >
-            {showForm ? 'Cancel' : '+ Add Source'}
-          </button>
         </div>
       </div>
       
@@ -227,176 +374,339 @@ export default function SourceManagePage() {
         </div>
       )}
       
-      {/* Add Form */}
-      {showForm && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Add New Source</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                  placeholder="Source name"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">URL *</label>
-                <input
-                  type="url"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                  placeholder="https://..."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Type *</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                >
-                  {SOURCE_TYPES.map(type => (
-                    <option key={type} value={type}>{type.toUpperCase()}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Domain</label>
-                <select
-                  value={formData.domainId}
-                  onChange={(e) => setFormData({ ...formData, domainId: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                >
-                  <option value="">Select a domain...</option>
-                  {domains.map(domain => (
-                    <option key={domain.id} value={domain.id}>{domain.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">
-                  Reliability Score: {formData.reliabilityScore}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={formData.reliabilityScore}
-                  onChange={(e) => setFormData({ ...formData, reliabilityScore: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
-                  <span>0 - Unreliable</span>
-                  <span>50 - Moderate</span>
-                  <span>100 - Highly Reliable</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
-              >
-                {submitting ? 'Adding...' : 'Add Source'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      
-      {/* Sources Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-slate-700">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Domain</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Reliability</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-            {sources.map((source) => (
-              <tr key={source.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => toggleActive(source)}
-                    className={`w-10 h-6 rounded-full relative transition-colors ${
-                      source.isActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        source.isActive ? 'left-5' : 'left-1'
-                      }`}
-                    />
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium">{source.name}</div>
-                  <div className="text-xs text-slate-500 truncate max-w-xs">{source.url}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <TypeBadge type={source.type} />
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {getDomainName(source.domainId)}
-                </td>
-                <td className="px-4 py-3">
-                  <StarRating
-                    score={source.reliabilityScore}
-                    onChange={(score) => updateReliability(source, score)}
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => setDeleteId(source.id)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        {sources.length === 0 && (
-          <div className="text-center py-12 text-slate-500">
-            No sources yet. Add your first source above.
-          </div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-slate-700">
+        <button
+          onClick={() => setActiveTab('sources')}
+          className={`px-6 py-3 font-medium transition ${
+            activeTab === 'sources'
+              ? 'text-argus-600 border-b-2 border-argus-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          My Sources ({mySources.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('lists')}
+          className={`px-6 py-3 font-medium transition ${
+            activeTab === 'lists'
+              ? 'text-argus-600 border-b-2 border-argus-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          My Lists ({sourceLists.length})
+        </button>
+        {isAdmin && (
+          <span className="px-4 py-3 ml-auto text-sm text-slate-500">
+            👑 {globalSources.length} global sources (admin access)
+          </span>
         )}
       </div>
       
-      {/* Delete Confirmation Modal */}
+      {/* Sources Tab */}
+      {activeTab === 'sources' && (
+        <div className="space-y-6">
+          {/* Add Source Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowSourceForm(!showSourceForm)}
+              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+            >
+              {showSourceForm ? 'Cancel' : '+ Add Source'}
+            </button>
+          </div>
+          
+          {/* Add Source Form */}
+          {showSourceForm && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">Add New Source</h2>
+              <form onSubmit={handleSubmitSource} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={sourceFormData.name}
+                      onChange={(e) => setSourceFormData({ ...sourceFormData, name: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                      placeholder="Source name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">URL *</label>
+                    <input
+                      type="url"
+                      value={sourceFormData.url}
+                      onChange={(e) => setSourceFormData({ ...sourceFormData, url: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Type *</label>
+                    <select
+                      value={sourceFormData.type}
+                      onChange={(e) => setSourceFormData({ ...sourceFormData, type: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                    >
+                      {SOURCE_TYPES.map(type => (
+                        <option key={type} value={type}>{type.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Domain</label>
+                    <select
+                      value={sourceFormData.domainId}
+                      onChange={(e) => setSourceFormData({ ...sourceFormData, domainId: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                    >
+                      <option value="">Select a domain...</option>
+                      {domains.map(domain => (
+                        <option key={domain.id} value={domain.id}>{domain.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1">
+                      Reliability Score: {sourceFormData.reliabilityScore}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={sourceFormData.reliabilityScore}
+                      onChange={(e) => setSourceFormData({ ...sourceFormData, reliabilityScore: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  
+                  {isAdmin && (
+                    <div className="md:col-span-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={sourceFormData.asGlobal}
+                          onChange={(e) => setSourceFormData({ ...sourceFormData, asGlobal: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">Create as Global Source (visible to all users)</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSourceForm(false)}
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {submitting ? 'Adding...' : 'Add Source'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+          
+          {/* My Sources Table */}
+          {mySources.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-slate-50 dark:bg-slate-700 px-6 py-3 border-b border-slate-200 dark:border-slate-600">
+                <h3 className="font-semibold">My Sources</h3>
+              </div>
+              <SourceTable
+                sources={mySources}
+                getDomainName={getDomainName}
+                toggleActive={toggleActive}
+                updateReliability={updateReliability}
+                setDeleteId={setDeleteId}
+              />
+            </div>
+          )}
+          
+          {mySources.length === 0 && !showSourceForm && (
+            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow">
+              <p className="text-slate-500 mb-4">You haven't created any sources yet.</p>
+              <button
+                onClick={() => setShowSourceForm(true)}
+                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg"
+              >
+                Add Your First Source
+              </button>
+            </div>
+          )}
+          
+          {/* Admin: Global Sources */}
+          {isAdmin && globalSources.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-blue-50 dark:bg-blue-900/30 px-6 py-3 border-b border-slate-200 dark:border-slate-600">
+                <h3 className="font-semibold text-blue-700 dark:text-blue-300">👑 Global Sources (Admin)</h3>
+              </div>
+              <SourceTable
+                sources={globalSources}
+                getDomainName={getDomainName}
+                toggleActive={toggleActive}
+                updateReliability={updateReliability}
+                setDeleteId={setDeleteId}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Lists Tab */}
+      {activeTab === 'lists' && (
+        <div className="space-y-6">
+          {/* Add List Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowListForm(!showListForm)}
+              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+            >
+              {showListForm ? 'Cancel' : '+ Create Source List'}
+            </button>
+          </div>
+          
+          {/* Add List Form */}
+          {showListForm && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">Create Source List</h2>
+              <form onSubmit={handleSubmitList} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={listFormData.name}
+                    onChange={(e) => setListFormData({ ...listFormData, name: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                    placeholder="e.g., China Tech Watch"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <textarea
+                    value={listFormData.description}
+                    onChange={(e) => setListFormData({ ...listFormData, description: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                    rows={2}
+                    placeholder="Describe what this list is for..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={listFormData.isPublic}
+                      onChange={(e) => setListFormData({ ...listFormData, isPublic: e.target.checked })}
+                      className="rounded"
+                    />
+                    <span className="text-sm font-medium">Make this list public (others can view)</span>
+                  </label>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowListForm(false)}
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {submitting ? 'Creating...' : 'Create List'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+          
+          {/* Source Lists */}
+          {sourceLists.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {sourceLists.map((list) => (
+                <div key={list.id} className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-semibold text-lg">{list.name}</h3>
+                    <div className="flex gap-2">
+                      {list.isPublic && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded text-xs">
+                          Public
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {list.description && (
+                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-3">
+                      {list.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 text-sm">
+                      {list.itemCount} source{list.itemCount !== 1 ? 's' : ''}
+                    </span>
+                    <div className="flex gap-2">
+                      <a
+                        href={`/sources/lists/${list.id}`}
+                        className="text-sm text-argus-600 hover:text-argus-700"
+                      >
+                        View
+                      </a>
+                      <button
+                        onClick={() => setDeleteListId(list.id)}
+                        className="text-sm text-red-600 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow">
+              <p className="text-slate-500 mb-4">You haven't created any source lists yet.</p>
+              <p className="text-slate-400 text-sm mb-4">
+                Source lists let you organize sources into collections for different purposes.
+              </p>
+              <button
+                onClick={() => setShowListForm(true)}
+                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg"
+              >
+                Create Your First List
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Delete Source Modal */}
       {deleteId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-2">Delete Source?</h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              This action cannot be undone. The source and its configuration will be permanently removed.
+              This action cannot be undone. The source will be permanently removed.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -406,7 +716,33 @@ export default function SourceManagePage() {
                 Cancel
               </button>
               <button
-                onClick={confirmDelete}
+                onClick={confirmDeleteSource}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete List Modal */}
+      {deleteListId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Delete Source List?</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+              This action cannot be undone. The list and all its items will be removed.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteListId(null)}
+                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteList}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
               >
                 Delete
@@ -416,6 +752,80 @@ export default function SourceManagePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Source Table Component
+function SourceTable({ 
+  sources, 
+  getDomainName, 
+  toggleActive, 
+  updateReliability, 
+  setDeleteId 
+}: {
+  sources: Source[];
+  getDomainName: (id: string | null) => string;
+  toggleActive: (source: Source) => void;
+  updateReliability: (source: Source, score: number) => void;
+  setDeleteId: (id: string) => void;
+}) {
+  return (
+    <table className="w-full">
+      <thead className="bg-slate-50 dark:bg-slate-700">
+        <tr>
+          <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+          <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+          <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
+          <th className="px-4 py-3 text-left text-sm font-medium">Domain</th>
+          <th className="px-4 py-3 text-left text-sm font-medium">Reliability</th>
+          <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+        {sources.map((source) => (
+          <tr key={source.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+            <td className="px-4 py-3">
+              <button
+                onClick={() => toggleActive(source)}
+                className={`w-10 h-6 rounded-full relative transition-colors ${
+                  source.isActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                    source.isActive ? 'left-5' : 'left-1'
+                  }`}
+                />
+              </button>
+            </td>
+            <td className="px-4 py-3">
+              <div className="font-medium">{source.name}</div>
+              <div className="text-xs text-slate-500 truncate max-w-xs">{source.url}</div>
+            </td>
+            <td className="px-4 py-3">
+              <TypeBadge type={source.type} />
+            </td>
+            <td className="px-4 py-3 text-sm">
+              {getDomainName(source.domainId)}
+            </td>
+            <td className="px-4 py-3">
+              <StarRating
+                score={source.reliabilityScore}
+                onChange={(score) => updateReliability(source, score)}
+              />
+            </td>
+            <td className="px-4 py-3">
+              <button
+                onClick={() => setDeleteId(source.id)}
+                className="text-red-600 hover:text-red-800 text-sm"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -438,11 +848,9 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function StarRating({ score, onChange }: { score: number; onChange: (score: number) => void }) {
-  // Convert 0-100 score to 1-5 stars
   const stars = Math.round(score / 20);
   
   const handleClick = (star: number) => {
-    // Convert 1-5 stars to 0-100 score
     onChange(star * 20);
   };
   

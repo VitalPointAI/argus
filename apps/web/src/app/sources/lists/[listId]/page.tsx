@@ -1,0 +1,275 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth';
+import { useParams } from 'next/navigation';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
+
+interface SourceListItem {
+  id: string;
+  sourceId: string;
+  addedAt: string;
+  source: {
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+    domainId: string | null;
+    reliabilityScore: number;
+    isActive: boolean;
+  };
+}
+
+interface SourceList {
+  id: string;
+  name: string;
+  description: string;
+  isPublic: boolean;
+  isOwner: boolean;
+  items: SourceListItem[];
+}
+
+export default function SourceListDetailPage() {
+  const { listId } = useParams();
+  const { user, token } = useAuth();
+  const [list, setList] = useState<SourceList | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    if (listId) {
+      fetchList();
+    }
+  }, [listId, token]);
+
+  const fetchList = async () => {
+    try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${API_URL}/api/sources/lists/${listId}`, { headers });
+      const data = await res.json();
+
+      if (data.success) {
+        setList(data.data);
+      } else {
+        setError(data.error || 'Failed to load source list');
+      }
+    } catch (err) {
+      setError('Failed to load source list');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeItem = async (itemId: string) => {
+    if (!token || !list) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/${listId}/items/${itemId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setList({
+          ...list,
+          items: list.items.filter(item => item.id !== itemId),
+        });
+        setSuccessMessage('Source removed from list');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(data.error || 'Failed to remove source');
+      }
+    } catch (err) {
+      setError('Failed to remove source');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500">Loading source list...</div>
+      </div>
+    );
+  }
+
+  if (error && !list) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center">
+        <h1 className="text-2xl font-bold mb-4 text-red-600">Error</h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">{error}</p>
+        <a
+          href="/sources"
+          className="text-argus-600 hover:text-argus-700"
+        >
+          ← Back to Sources
+        </a>
+      </div>
+    );
+  }
+
+  if (!list) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center">
+        <h1 className="text-2xl font-bold mb-4">Source List Not Found</h1>
+        <a
+          href="/sources"
+          className="text-argus-600 hover:text-argus-700"
+        >
+          ← Back to Sources
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Messages */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+          {error}
+          <button onClick={() => setError('')} className="float-right">×</button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
+          {successMessage}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <a href="/sources" className="text-slate-500 hover:text-slate-700">
+              Sources
+            </a>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-700 dark:text-slate-300">Lists</span>
+            <span className="text-slate-400">/</span>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+            {list.name}
+            {list.isPublic && (
+              <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded text-sm font-medium">
+                Public
+              </span>
+            )}
+          </h1>
+          {list.description && (
+            <p className="text-slate-600 dark:text-slate-400 mt-2">
+              {list.description}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <a
+            href="/sources"
+            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+          >
+            ← Back
+          </a>
+          {list.isOwner && (
+            <a
+              href="/sources/manage"
+              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+            >
+              Manage Lists
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Sources in this list */}
+      {list.items.length > 0 ? (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+          <div className="bg-slate-50 dark:bg-slate-700 px-6 py-4 border-b border-slate-200 dark:border-slate-600">
+            <h2 className="text-lg font-semibold">
+              {list.items.length} Source{list.items.length !== 1 ? 's' : ''} in this list
+            </h2>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {list.items.map((item) => (
+              <div key={item.id} className="px-6 py-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <StatusDot active={item.source.isActive} />
+                    <span className="font-medium">{item.source.name}</span>
+                    <TypeBadge type={item.source.type} />
+                    <ReliabilityBadge score={item.source.reliabilityScore} />
+                  </div>
+                  <div className="mt-1 text-sm text-slate-500 truncate max-w-xl">
+                    {item.source.url}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-slate-500">
+                    Added {new Date(item.addedAt).toLocaleDateString()}
+                  </div>
+                  {list.isOwner && (
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-12 text-center">
+          <p className="text-slate-500 mb-4">This list is empty.</p>
+          {list.isOwner && (
+            <p className="text-slate-400 text-sm">
+              Go to the <a href="/sources" className="text-argus-600 hover:underline">Sources page</a> to add sources to this list.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusDot({ active }: { active: boolean }) {
+  return (
+    <span className={`w-2 h-2 rounded-full ${active ? 'bg-green-500' : 'bg-slate-300'}`} />
+  );
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const colors: Record<string, string> = {
+    rss: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    youtube: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    web: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    twitter: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+    telegram: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+    podcast: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    government: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  };
+
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[type] || 'bg-slate-100 text-slate-600'}`}>
+      {type.toUpperCase()}
+    </span>
+  );
+}
+
+function ReliabilityBadge({ score }: { score: number }) {
+  const stars = Math.round(score / 20);
+  return (
+    <span className="text-yellow-400 text-sm">
+      {'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
+    </span>
+  );
+}

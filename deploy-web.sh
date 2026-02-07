@@ -10,7 +10,11 @@ echo "📦 Preparing deployment..."
 # Create remote directory
 ssh -i $SSH_KEY $SERVER "mkdir -p $REMOTE_DIR"
 
-# Sync the web app (excluding .git, node_modules)
+# Build locally first
+echo "🏗️  Building locally..."
+cd /home/agent/openclaw/projects/strategic-scanner/apps/web && npm run build
+
+# Sync the web app (including .next build, excluding .git, node_modules)
 echo "📤 Uploading web app..."
 rsync -avz --delete \
   -e "ssh -i $SSH_KEY" \

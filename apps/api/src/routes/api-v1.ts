@@ -265,6 +265,44 @@ apiV1Routes.post('/briefings/generate', async (c) => {
 });
 
 /**
+ * List all briefings (history)
+ */
+apiV1Routes.get('/briefings', async (c) => {
+  const type = c.req.query('type') as 'morning' | 'evening' | 'alert' | undefined;
+  const limit = Math.min(parseInt(c.req.query('limit') || '50'), 100);
+  const offset = parseInt(c.req.query('offset') || '0');
+
+  const conditions: any[] = [];
+  if (type) {
+    conditions.push(eq(briefings.type, type));
+  }
+
+  const query = conditions.length > 0
+    ? db.select().from(briefings).where(and(...conditions)).orderBy(desc(briefings.generatedAt)).limit(limit).offset(offset)
+    : db.select().from(briefings).orderBy(desc(briefings.generatedAt)).limit(limit).offset(offset);
+
+  const items = await query;
+
+  // Get total count
+  const countQuery = conditions.length > 0
+    ? db.select({ count: sql<number>`count(*)` }).from(briefings).where(and(...conditions))
+    : db.select({ count: sql<number>`count(*)` }).from(briefings);
+  
+  const [countResult] = await countQuery;
+
+  return c.json({
+    success: true,
+    data: items,
+    meta: {
+      total: Number(countResult.count),
+      limit,
+      offset,
+      hasMore: offset + items.length < Number(countResult.count),
+    },
+  });
+});
+
+/**
  * Get latest briefing
  */
 apiV1Routes.get('/briefings/latest', async (c) => {

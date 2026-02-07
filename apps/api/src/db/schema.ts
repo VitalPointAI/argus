@@ -75,6 +75,8 @@ export const sources = pgTable('sources', {
   config: jsonb('config').notNull().default('{}'), // source-specific config
   lastFetchedAt: timestamp('last_fetched_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+  // Permission: null = admin/global source, userId = user-created source
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const sourceLists = pgTable('source_lists', {
@@ -128,6 +130,19 @@ export const verifications = pgTable('verifications', {
   factCheckResults: jsonb('fact_check_results').notNull().default('[]'),
   reasoning: text('reasoning').notNull(),
   verifiedAt: timestamp('verified_at').notNull().defaultNow(),
+});
+
+// ============ Article Claims (extracted facts for verification) ============
+export const articleClaims = pgTable('article_claims', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contentId: uuid('content_id').notNull().references(() => content.id, { onDelete: 'cascade' }),
+  claimText: text('claim_text').notNull(),
+  confidence: real('confidence').notNull().default(50),
+  verificationStatus: varchar('verification_status', { length: 50 }).notNull().default('unverified'), // verified, partially_verified, unverified, contradicted
+  verificationMethod: text('verification_method'), // how it was verified (e.g., "cross-referenced with Reuters")
+  verifiedBy: jsonb('verified_by').notNull().default('[]'), // array of source names/urls that corroborate
+  contradictedBy: jsonb('contradicted_by').notNull().default('[]'), // sources that contradict
+  extractedAt: timestamp('extracted_at').notNull().defaultNow(),
 });
 
 // ============ Briefings ============
