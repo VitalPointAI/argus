@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { verifyContent, verifyUnverifiedContent } from '../services/verification/engine';
+import { llmVerifyContent, llmBatchVerify } from '../services/verification/llm-verify';
 import { db, verifications, content } from '../db';
 import { eq, sql } from 'drizzle-orm';
 
@@ -20,7 +21,37 @@ verificationRoutes.post('/batch', async (c) => {
   }
 });
 
-// Verify a specific content item
+// LLM-powered batch verification (more thorough but expensive)
+verificationRoutes.post('/llm/batch', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '10');
+
+  try {
+    const result = await llmBatchVerify(limit);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// LLM-powered verification for a specific content item
+verificationRoutes.post('/llm/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    const result = await llmVerifyContent(contentId);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Verify a specific content item (heuristic)
 verificationRoutes.post('/content/:contentId', async (c) => {
   const contentId = c.req.param('contentId');
 
