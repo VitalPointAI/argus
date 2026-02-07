@@ -1,10 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
 type SortOption = 'date' | 'confidence' | 'domain';
+
+interface ActiveSourceList {
+  id: string;
+  name: string;
+}
 
 interface ContentItem {
   id: string;
@@ -26,6 +32,8 @@ interface Stats {
   };
   sources?: number;
   domains?: number;
+  activeSourceList?: ActiveSourceList | null;
+  isFiltered?: boolean;
 }
 
 interface Domain {
@@ -76,6 +84,7 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
 }
 
 export default function Dashboard() {
+  const { token } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -84,11 +93,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       try {
         const [statsRes, contentRes, domainsRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/stats`, { cache: 'no-store' }),
-          fetch(`${API_URL}/api/v1/intelligence?limit=20&minConfidence=50`, { cache: 'no-store' }),
-          fetch(`${API_URL}/api/v1/domains`, { cache: 'no-store' }),
+          fetch(`${API_URL}/api/v1/stats`, { headers }),
+          fetch(`${API_URL}/api/v1/intelligence?limit=20&minConfidence=50`, { headers }),
+          fetch(`${API_URL}/api/v1/domains`, { headers }),
         ]);
 
         if (statsRes.ok) {
@@ -110,7 +124,7 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [token]);
 
   // Sort content based on selected option
   const sortedContent = useMemo(() => {
@@ -142,13 +156,34 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Strategic Intelligence Dashboard
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-2">
-          Real-time OSINT with verification and confidence scoring
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            Strategic Intelligence Dashboard
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">
+            Real-time OSINT with verification and confidence scoring
+          </p>
+        </div>
+        
+        {/* Active Source List Indicator */}
+        {stats?.activeSourceList ? (
+          <a 
+            href={`/sources/lists/${stats.activeSourceList.id}`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 rounded-lg hover:bg-argus-200 dark:hover:bg-argus-800 transition"
+          >
+            <span className="text-green-500">●</span>
+            Filtered: <span className="font-medium">{stats.activeSourceList.name}</span>
+            <span className="text-xs text-slate-500">(click to change)</span>
+          </a>
+        ) : token ? (
+          <a 
+            href="/sources"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm"
+          >
+            📋 Create a source list to filter
+          </a>
+        ) : null}
       </div>
 
       {/* Stats */}

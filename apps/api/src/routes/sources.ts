@@ -558,3 +558,112 @@ sourcesRoutes.get('/user/info', async (c) => {
     }
   });
 });
+
+// ==================== ACTIVE SOURCE LIST ====================
+
+// Get user's active source list
+sourcesRoutes.get('/lists/active', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: true, data: null });
+  }
+  
+  const prefs = user.preferences as { activeSourceListId?: string } || {};
+  const activeListId = prefs.activeSourceListId;
+  
+  if (!activeListId) {
+    return c.json({ success: true, data: null });
+  }
+  
+  // Get the list details
+  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, activeListId)).limit(1);
+  
+  if (!list) {
+    // List was deleted, clear the preference
+    return c.json({ success: true, data: null });
+  }
+  
+  // Get source IDs in this list
+  const items = await db.select({ sourceId: sourceListItems.sourceId })
+    .from(sourceListItems)
+    .where(eq(sourceListItems.sourceListId, activeListId));
+  
+  return c.json({ 
+    success: true, 
+    data: {
+      ...list,
+      sourceIds: items.map(i => i.sourceId),
+    }
+  });
+});
+
+// Set a source list as active
+sourcesRoutes.post('/lists/:listId/activate', async (c) => {
+  const user = c.get('user');
+  const listId = c.req.param('listId');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  
+  // Verify list exists and user can access it
+  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, listId)).limit(1);
+  
+  if (!list) {
+    return c.json({ success: false, error: 'Source list not found' }, 404);
+  }
+  
+  // User must own the list or it must be public
+  if (list.userId !== user.id && !list.isPublic) {
+    return c.json({ success: false, error: 'Access denied' }, 403);
+  }
+  
+  try {
+    // Update user preferences
+    const currentPrefs = user.preferences as Record<string, unknown> || {};
+    const newPrefs = { ...currentPrefs, activeSourceListId: listId };
+    
+    await db.update(users)
+      .set({ preferences: newPrefs })
+      .where(eq(users.id, user.id));
+    
+    return c.json({ 
+      success: true, 
+      data: { 
+        activeSourceListId: listId,
+        listName: list.name,
+      }
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to activate list',
+    }, 500);
+  }
+});
+
+// Clear active source list (show all sources)
+sourcesRoutes.delete('/lists/active', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    const currentPrefs = user.preferences as Record<string, unknown> || {};
+    const { activeSourceListId, ...restPrefs } = currentPrefs;
+    
+    await db.update(users)
+      .set({ preferences: restPrefs })
+      .where(eq(users.id, user.id));
+    
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear active list',
+    }, 500);
+  }
+});

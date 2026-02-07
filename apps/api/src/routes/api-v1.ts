@@ -6,8 +6,48 @@
  */
 
 import { Hono } from 'hono';
-import { db, content, sources, domains, briefings, verifications } from '../db';
-import { eq, desc, gte, and, sql } from 'drizzle-orm';
+import { db, content, sources, domains, briefings, verifications, users, sourceLists, sourceListItems } from '../db';
+import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
+import { verify } from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+
+// Optional auth helper - doesn't reject unauthenticated requests
+async function getOptionalUser(c: any): Promise<{ id: string; preferences: Record<string, unknown> } | null> {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  try {
+    const token = authHeader.slice(7);
+    const payload = verify(token, JWT_SECRET) as { userId: string };
+    const [user] = await db.select({ id: users.id, preferences: users.preferences })
+      .from(users)
+      .where(eq(users.id, payload.userId))
+      .limit(1);
+    return user || null;
+  } catch {
+    return null;
+  }
+}
+
+// Helper to get source IDs from active source list
+async function getActiveSourceIds(user: { id: string; preferences: Record<string, unknown> } | null): Promise<string[] | null> {
+  if (!user) return null;
+  
+  const prefs = user.preferences as { activeSourceListId?: string } || {};
+  const activeListId = prefs.activeSourceListId;
+  
+  if (!activeListId) return null;
+  
+  // Get source IDs from the list
+  const items = await db.select({ sourceId: sourceListItems.sourceId })
+    .from(sourceListItems)
+    .where(eq(sourceListItems.sourceListId, activeListId));
+  
+  return items.length > 0 ? items.map(i => i.sourceId) : null;
+}
 
 export const apiV1Routes = new Hono();
 
@@ -31,6 +71,7 @@ apiV1Routes.get('/', (c) => {
 /**
  * Intelligence Feed
  * Primary endpoint for OSINT consumers like Bastion
+ * Supports optional auth - logged in users with an active source list get filtered results
  */
 apiV1Routes.get('/intelligence', async (c) => {
   const since = c.req.query('since'); // ISO timestamp
@@ -38,6 +79,11 @@ apiV1Routes.get('/intelligence', async (c) => {
   const minConfidence = parseInt(c.req.query('minConfidence') || '50');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
   const offset = parseInt(c.req.query('offset') || '0');
+  const useAllSources = c.req.query('all') === 'true'; // bypass source list filter
+
+  // Get user and their active source list (if any)
+  const user = await getOptionalUser(c);
+  const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
 
   // Build all conditions first
   const conditions: any[] = [gte(content.confidenceScore, minConfidence)];
@@ -48,6 +94,11 @@ apiV1Routes.get('/intelligence', async (c) => {
 
   if (domainSlug) {
     conditions.push(eq(domains.slug, domainSlug));
+  }
+
+  // Filter by active source list if user has one
+  if (activeSourceIds && activeSourceIds.length > 0) {
+    conditions.push(inArray(content.sourceId, activeSourceIds));
   }
 
   const items = await db
@@ -346,16 +397,31 @@ apiV1Routes.get('/briefings/:id', async (c) => {
 });
 
 /**
- * Platform stats
+ * Platform stats - filtered by user's active source list if logged in
  */
 apiV1Routes.get('/stats', async (c) => {
+  const useAllSources = c.req.query('all') === 'true';
+  const user = await getOptionalUser(c);
+  const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
+  
+  // Base conditions for content queries
+  const contentConditions = activeSourceIds && activeSourceIds.length > 0
+    ? and(sql`${content.confidenceScore} IS NOT NULL`, inArray(content.sourceId, activeSourceIds))
+    : sql`${content.confidenceScore} IS NOT NULL`;
+    
+  const allContentConditions = activeSourceIds && activeSourceIds.length > 0
+    ? inArray(content.sourceId, activeSourceIds)
+    : sql`1=1`;
+
   const [contentTotal] = await db
     .select({ count: sql<number>`count(*)` })
-    .from(content);
+    .from(content)
+    .where(allContentConditions);
 
   const [sourceTotal] = await db
     .select({ count: sql<number>`count(*)` })
-    .from(sources);
+    .from(sources)
+    .where(activeSourceIds ? inArray(sources.id, activeSourceIds) : sql`1=1`);
 
   const [domainTotal] = await db
     .select({ count: sql<number>`count(*)` })
@@ -364,18 +430,37 @@ apiV1Routes.get('/stats', async (c) => {
   const [verified] = await db
     .select({ count: sql<number>`count(*)` })
     .from(content)
-    .where(sql`${content.confidenceScore} IS NOT NULL`);
+    .where(contentConditions);
 
   const [avgConf] = await db
     .select({ avg: sql<number>`AVG(${content.confidenceScore})` })
     .from(content)
-    .where(sql`${content.confidenceScore} IS NOT NULL`);
+    .where(contentConditions);
 
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const last24hConditions = activeSourceIds && activeSourceIds.length > 0
+    ? and(gte(content.fetchedAt, yesterday), inArray(content.sourceId, activeSourceIds))
+    : gte(content.fetchedAt, yesterday);
+    
   const [last24h] = await db
     .select({ count: sql<number>`count(*)` })
     .from(content)
-    .where(gte(content.fetchedAt, yesterday));
+    .where(last24hConditions);
+
+  // Get active list info if user has one
+  let activeListInfo = null;
+  if (user && !useAllSources) {
+    const prefs = user.preferences as { activeSourceListId?: string } || {};
+    if (prefs.activeSourceListId) {
+      const [list] = await db.select({ id: sourceLists.id, name: sourceLists.name })
+        .from(sourceLists)
+        .where(eq(sourceLists.id, prefs.activeSourceListId))
+        .limit(1);
+      if (list) {
+        activeListInfo = list;
+      }
+    }
+  }
 
   return c.json({
     success: true,
@@ -389,6 +474,8 @@ apiV1Routes.get('/stats', async (c) => {
       sources: Number(sourceTotal.count),
       domains: Number(domainTotal.count),
       lastUpdated: new Date().toISOString(),
+      activeSourceList: activeListInfo,
+      isFiltered: !!activeListInfo,
     },
   });
 });

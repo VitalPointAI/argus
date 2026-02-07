@@ -37,12 +37,76 @@ export default function SourceListDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isActive, setIsActive] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     if (listId) {
       fetchList();
+      checkIfActive();
     }
   }, [listId, token]);
+
+  const checkIfActive = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/active`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data && data.data.id === listId) {
+        setIsActive(true);
+      }
+    } catch (err) {
+      // Ignore errors
+    }
+  };
+
+  const activateList = async () => {
+    if (!token || !listId) return;
+    setActivating(true);
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/${listId}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsActive(true);
+        setSuccessMessage('Source list activated! Dashboard and briefings will now use these sources.');
+        setTimeout(() => setSuccessMessage(''), 5000);
+      } else {
+        setError(data.error || 'Failed to activate list');
+      }
+    } catch (err) {
+      setError('Failed to activate list');
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const deactivateList = async () => {
+    if (!token) return;
+    setActivating(true);
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/active`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsActive(false);
+        setSuccessMessage('Switched to all sources.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(data.error || 'Failed to deactivate');
+      }
+    } catch (err) {
+      setError('Failed to deactivate');
+    } finally {
+      setActivating(false);
+    }
+  };
 
   const fetchList = async () => {
     try {
@@ -177,12 +241,31 @@ export default function SourceListDetailPage() {
           >
             ← Back
           </a>
+          {user && (
+            isActive ? (
+              <button
+                onClick={deactivateList}
+                disabled={activating}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+              >
+                <span>✓</span> Active — Click to Show All
+              </button>
+            ) : (
+              <button
+                onClick={activateList}
+                disabled={activating}
+                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {activating ? 'Activating...' : '🎯 Use for Dashboard'}
+              </button>
+            )
+          )}
           {list.isOwner && (
             <a
               href="/sources/manage"
-              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
             >
-              Manage Lists
+              Manage
             </a>
           )}
         </div>
