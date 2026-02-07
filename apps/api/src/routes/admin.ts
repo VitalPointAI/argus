@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
-import { db, users, sources, articles, briefings, domains } from '../db';
-import { eq, desc, count, sql, and, gte } from 'drizzle-orm';
+import { db, users, sources, content, briefings, domains } from '../db';
+import { eq, desc, count, and, gte, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'argus-secret-change-in-production';
 
 export const adminRoutes = new Hono();
+
+interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  isAdmin: boolean;
+}
 
 /**
  * Middleware to verify admin status
@@ -25,7 +32,7 @@ async function requireAdmin(c: any, next: () => Promise<void>) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
     
-    c.set('user', user);
+    c.set('adminUser', user);
     await next();
   } catch {
     return c.json({ success: false, error: 'Invalid token' }, 401);
@@ -47,20 +54,20 @@ adminRoutes.get('/stats', async (c) => {
     // Get counts
     const [userCount] = await db.select({ count: count() }).from(users);
     const [sourceCount] = await db.select({ count: count() }).from(sources);
-    const [articleCount] = await db.select({ count: count() }).from(articles);
+    const [contentCount] = await db.select({ count: count() }).from(content);
     const [briefingCount] = await db.select({ count: count() }).from(briefings);
     const [domainCount] = await db.select({ count: count() }).from(domains);
     
-    // Recent activity
-    const [articles24h] = await db
+    // Recent activity - content ingested
+    const [content24h] = await db
       .select({ count: count() })
-      .from(articles)
-      .where(gte(articles.ingestedAt, last24h));
+      .from(content)
+      .where(gte(content.fetchedAt, last24h));
     
-    const [articles7d] = await db
+    const [content7d] = await db
       .select({ count: count() })
-      .from(articles)
-      .where(gte(articles.ingestedAt, last7d));
+      .from(content)
+      .where(gte(content.fetchedAt, last7d));
     
     // Active sources (fetched in last 24h)
     const [activeSources] = await db
@@ -74,13 +81,13 @@ adminRoutes.get('/stats', async (c) => {
         totals: {
           users: userCount.count,
           sources: sourceCount.count,
-          articles: articleCount.count,
+          articles: contentCount.count,
           briefings: briefingCount.count,
           domains: domainCount.count,
         },
         activity: {
-          articlesLast24h: articles24h.count,
-          articlesLast7d: articles7d.count,
+          articlesLast24h: content24h.count,
+          articlesLast7d: content7d.count,
           activeSourcesLast24h: activeSources.count,
         },
         timestamp: now.toISOString(),
@@ -123,7 +130,7 @@ adminRoutes.put('/users/:id', async (c) => {
   try {
     const userId = c.req.param('id');
     const body = await c.req.json();
-    const currentUser = c.get('user');
+    const currentUser = c.get('adminUser') as AdminUser;
     
     // Prevent self-demotion
     if (userId === currentUser.id && body.isAdmin === false) {
@@ -167,7 +174,7 @@ adminRoutes.put('/users/:id', async (c) => {
 adminRoutes.delete('/users/:id', async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentUser = c.get('user');
+    const currentUser = c.get('adminUser') as AdminUser;
     
     if (userId === currentUser.id) {
       return c.json({ success: false, error: 'Cannot delete yourself' }, 400);
@@ -190,14 +197,14 @@ adminRoutes.delete('/users/:id', async (c) => {
 });
 
 /**
- * GET /admin/sources/global - List all global sources with stats
+ * GET /admin/sources/global - List all global sources (createdBy is null)
  */
 adminRoutes.get('/sources/global', async (c) => {
   try {
     const globalSources = await db
       .select()
       .from(sources)
-      .where(eq(sources.isGlobal, true))
+      .where(isNull(sources.createdBy))
       .orderBy(desc(sources.lastFetchedAt));
     
     return c.json({ success: true, data: globalSources });
@@ -208,27 +215,26 @@ adminRoutes.get('/sources/global', async (c) => {
 });
 
 /**
- * POST /admin/sources/:id/toggle-global - Toggle source global status
+ * POST /admin/sources/:id/make-global - Make a user source global
  */
-adminRoutes.post('/sources/:id/toggle-global', async (c) => {
+adminRoutes.post('/sources/:id/make-global', async (c) => {
   try {
     const sourceId = c.req.param('id');
     
-    const [source] = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1);
-    if (!source) {
-      return c.json({ success: false, error: 'Source not found' }, 404);
-    }
-    
     const [updated] = await db
       .update(sources)
-      .set({ isGlobal: !source.isGlobal })
+      .set({ createdBy: null })
       .where(eq(sources.id, sourceId))
       .returning();
     
+    if (!updated) {
+      return c.json({ success: false, error: 'Source not found' }, 404);
+    }
+    
     return c.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Admin toggle global error:', error);
-    return c.json({ success: false, error: 'Failed to toggle source' }, 500);
+    console.error('Admin make global error:', error);
+    return c.json({ success: false, error: 'Failed to update source' }, 500);
   }
 });
 
