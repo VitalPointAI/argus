@@ -29,6 +29,8 @@ interface DevelopmentItem {
   text: string;
   source: string;
   confidence: number;
+  contentId?: string;
+  url?: string;
 }
 
 interface Citation {
@@ -261,60 +263,47 @@ function FactVerificationModal({
 }) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
+  const [skipSuggested, setSkipSuggested] = useState(false);
+  const [skipReason, setSkipReason] = useState('');
+  const [verificationData, setVerificationData] = useState<any>(null);
 
-  // Fetch claims from API - falls back to mock data if no claims exist
+  // Fetch existing claims from API - uses real claims when contentId is available
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      // Note: We'd need a content ID to fetch real claims. Since we only have parsed text,
-      // we show mock data. In a full implementation, the DevelopmentItem would include contentId.
-      // For now, try to fetch and fall back to generated claims.
+      setClaims([]);
+      setSkipSuggested(false);
+      setVerificationData(null);
       
       const fetchClaims = async () => {
         try {
-          // In a full implementation, we'd have the contentId on the item
-          // For now, generate informative mock claims based on the article
-          const generatedClaims: Claim[] = [
-            {
-              id: '1',
-              text: item.text,
-              confidence: item.confidence,
-              status: item.confidence >= 80 ? 'verified' : item.confidence >= 60 ? 'partially_verified' : 'unverified',
-              method: item.confidence >= 70 
-                ? 'Cross-referenced with multiple news sources' 
-                : 'Single source report, awaiting additional confirmation',
-              verifiedBy: item.confidence >= 70 ? [item.source] : [],
-              contradictedBy: [],
-            },
-          ];
-          
-          // Add additional claims for context
-          if (item.confidence >= 60) {
-            generatedClaims.push({
-              id: '2',
-              text: 'Source attribution and reporting methodology',
-              confidence: Math.min(95, item.confidence + 10),
-              status: 'verified',
-              method: `Verified through ${item.source} editorial standards`,
-              verifiedBy: [item.source],
-              contradictedBy: [],
-            });
+          // If we have a contentId, fetch existing claims from the API
+          if (item.contentId) {
+            const response = await fetch(`${API_URL}/api/verification/claims/${item.contentId}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data.claims && data.data.claims.length > 0) {
+                // Map API claims to our Claim interface
+                const apiClaims: Claim[] = data.data.claims.map((c: any) => ({
+                  id: c.id,
+                  text: c.text,
+                  confidence: c.confidence,
+                  status: c.status,
+                  method: c.method,
+                  verifiedBy: c.verifiedBy || [],
+                  contradictedBy: c.contradictedBy || [],
+                }));
+                setClaims(apiClaims);
+                setLoading(false);
+                return;
+              }
+            }
           }
           
-          if (item.confidence < 80) {
-            generatedClaims.push({
-              id: '3',
-              text: 'Some specific claims require additional corroboration',
-              confidence: Math.max(40, item.confidence - 20),
-              status: 'unverified',
-              method: 'Awaiting confirmation from additional independent sources',
-              verifiedBy: [],
-              contradictedBy: [],
-            });
-          }
-          
-          setClaims(generatedClaims);
+          // No existing claims - show prompt to verify
+          setClaims([]);
         } catch (error) {
           console.error('Failed to fetch claims:', error);
           setClaims([]);
@@ -326,6 +315,45 @@ function FactVerificationModal({
       fetchClaims();
     }
   }, [isOpen, item]);
+
+  // Extract claims on-demand when user clicks "Verify Claims"
+  const handleVerifyClaims = async (force = false) => {
+    if (!item.contentId) return;
+    
+    setExtracting(true);
+    setSkipSuggested(false);
+    
+    try {
+      const url = `${API_URL}/api/verification/verify-claims/${item.contentId}${force ? '?force=true' : ''}`;
+      const response = await fetch(url, { method: 'POST' });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.skipSuggested && !force) {
+          setSkipSuggested(true);
+          setSkipReason(data.reason);
+          setVerificationData(data.data);
+        } else if (data.success && data.data.claims) {
+          const apiClaims: Claim[] = data.data.claims.map((c: any) => ({
+            id: c.id,
+            text: c.text,
+            confidence: c.confidence,
+            status: c.status,
+            method: c.method,
+            verifiedBy: c.verifiedBy || [],
+            contradictedBy: c.contradictedBy || [],
+          }));
+          setClaims(apiClaims);
+          setVerificationData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to extract claims:', error);
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -420,12 +448,40 @@ function FactVerificationModal({
             </div>
           )}
 
+          {/* Skip suggestion banner */}
+          {skipSuggested && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-green-500 text-xl">✓</span>
+                <div className="flex-1">
+                  <h4 className="font-medium text-green-700 dark:text-green-400">Verification Not Required</h4>
+                  <p className="text-sm text-green-600 dark:text-green-300 mt-1">{skipReason}</p>
+                  {verificationData && (
+                    <p className="text-xs text-green-500 mt-2">
+                      Source: {verificationData.sourceName} (reliability: {verificationData.sourceReliability}%)
+                    </p>
+                  )}
+                  <button
+                    onClick={() => handleVerifyClaims(true)}
+                    disabled={extracting}
+                    className="mt-3 text-sm text-green-700 dark:text-green-400 underline hover:no-underline"
+                  >
+                    Verify anyway →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Claims list */}
           <div>
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Extracted Claims</h4>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
+            {loading || extracting ? (
+              <div className="flex flex-col items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-argus-500 border-t-transparent"></div>
+                {extracting && (
+                  <p className="text-sm text-slate-500 mt-3">Extracting claims with AI...</p>
+                )}
               </div>
             ) : claims.length > 0 ? (
               <div className="space-y-2">
@@ -438,10 +494,48 @@ function FactVerificationModal({
                   />
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-6 text-slate-500 dark:text-slate-400">
-                <p>No detailed claims extracted yet.</p>
-                <p className="text-xs mt-1">Claims are extracted during LLM verification.</p>
+            ) : !skipSuggested && (
+              <div className="text-center py-8 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
+                <div className="text-4xl mb-3">🔍</div>
+                <p className="text-slate-700 dark:text-slate-300 font-medium">No claims extracted yet</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">
+                  Click the button below to extract and verify claims from this article
+                </p>
+                {item.contentId ? (
+                  <button
+                    onClick={() => handleVerifyClaims(false)}
+                    disabled={extracting}
+                    className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                  >
+                    {extracting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        <span>🔬</span>
+                        Verify Claims
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Deep claim extraction not available for this item.
+                    </p>
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        <span>📰</span> View Original Source ↗
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -449,8 +543,27 @@ function FactVerificationModal({
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <div className="text-xs text-slate-400 dark:text-slate-500">
-            Verification based on source reputation, cross-referencing, and AI-powered content analysis. Claims are extracted and verified individually.
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 dark:text-slate-500">
+              {item.contentId ? (
+                <>
+                  <span className="text-green-500 mr-1">●</span>
+                  Claims verified against source reputation and cross-referenced with related articles.
+                </>
+              ) : (
+                'Verification based on source reputation.'
+              )}
+            </div>
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-3 py-1.5 bg-argus-100 dark:bg-argus-900/40 text-argus-700 dark:text-argus-300 rounded-lg hover:bg-argus-200 dark:hover:bg-argus-800 transition-colors flex items-center gap-1.5"
+              >
+                <span>📰</span> View Source ↗
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -467,15 +580,35 @@ function DevelopmentCard({
 }) {
   const [showModal, setShowModal] = useState(false);
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowModal(true);
+  };
+
+  const handleVerifyClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowModal(true);
+  };
+
+  const handleSourceClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Let the link navigate naturally
+  };
+
   return (
     <>
       <div 
-        className={`group rounded-lg p-4 border cursor-pointer transition-all hover:shadow-md ${
+        role="button"
+        tabIndex={0}
+        className={`group rounded-lg p-4 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99] select-none ${
           isUnverified 
-            ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50 hover:border-amber-300' 
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-argus-300'
+            ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-600' 
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-argus-400 dark:hover:border-argus-500'
         }`}
-        onClick={() => setShowModal(true)}
+        onClick={handleClick}
+        onKeyDown={(e) => e.key === 'Enter' && setShowModal(true)}
       >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
@@ -483,15 +616,36 @@ function DevelopmentCard({
               {isUnverified && <span className="text-amber-500 mr-1">⚠</span>}
               {item.text}
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-argus-600 dark:text-argus-400 font-medium">
-                {item.source}
-              </span>
+            <div className="flex items-center flex-wrap gap-2 mt-3">
+              {item.url ? (
+                <a 
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleSourceClick}
+                  className="text-xs text-argus-600 dark:text-argus-400 font-medium hover:underline flex items-center gap-1"
+                >
+                  {item.source} <span className="opacity-60">↗</span>
+                </a>
+              ) : (
+                <span className="text-xs text-argus-600 dark:text-argus-400 font-medium">
+                  {item.source}
+                </span>
+              )}
               <span className="text-slate-300 dark:text-slate-600">•</span>
               <ConfidenceBadge confidence={item.confidence} />
-              <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                Click for details →
-              </span>
+              {item.contentId && (
+                <span className="text-xs text-green-500 flex items-center gap-1">
+                  <span>●</span> Verifiable
+                </span>
+              )}
+              <button
+                onClick={handleVerifyClick}
+                className="ml-auto px-3 py-1 text-xs font-medium rounded-full bg-argus-100 dark:bg-argus-900/40 text-argus-700 dark:text-argus-300 hover:bg-argus-200 dark:hover:bg-argus-800 transition-colors flex items-center gap-1.5"
+              >
+                <span>🔍</span>
+                Verify
+              </button>
             </div>
           </div>
         </div>
@@ -876,7 +1030,54 @@ export default function BriefingsPage() {
   );
 }
 
+// Helper to match parsed items with changes array to get contentIds and URLs
+function enrichWithContentIds(items: DevelopmentItem[], changes: any[]): DevelopmentItem[] {
+  return items.map(item => {
+    // Try to find matching change by text similarity or source name
+    const textLower = item.text.toLowerCase();
+    const sourceLower = item.source.toLowerCase();
+    
+    const match = changes.find((c: any) => {
+      const descLower = (c.description || '').toLowerCase();
+      const changeSource = (c.sourceName || c.source || '').toLowerCase();
+      
+      // Method 1: Source name match (most reliable)
+      if (sourceLower && changeSource && (
+        sourceLower.includes(changeSource) || changeSource.includes(sourceLower)
+      )) {
+        // Also need some text overlap
+        const words = textLower.split(/\s+/).filter(w => w.length > 3);
+        const hasOverlap = words.some(w => descLower.includes(w));
+        if (hasOverlap) return true;
+      }
+      
+      // Method 2: Significant word overlap
+      const words = textLower.split(/\s+/).filter(w => w.length > 4);
+      const matchCount = words.filter(w => descLower.includes(w)).length;
+      if (matchCount >= 2) return true;
+      
+      // Method 3: Substring match
+      if (descLower.includes(textLower.substring(0, 30))) return true;
+      
+      return false;
+    });
+    
+    if (match) {
+      return {
+        ...item,
+        contentId: match.contentId,
+        url: match.url,
+      };
+    }
+    return item;
+  });
+}
+
 function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed: ParsedBriefing }) {
+  // Enrich parsed items with contentIds from changes array
+  const enrichedVerified = enrichWithContentIds(parsed.verified, briefing.changes || []);
+  const enrichedUnverified = enrichWithContentIds(parsed.unverified, briefing.changes || []);
+  
   return (
     <div className="space-y-6">
       {/* Executive Summary Card */}
@@ -921,13 +1122,13 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
       </div>
 
       {/* Verified Developments */}
-      {parsed.verified.length > 0 && (
+      {enrichedVerified.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <span className="text-green-500">✓</span> Verified Developments
           </h2>
           <div className="grid gap-3">
-            {parsed.verified.map((item, i) => (
+            {enrichedVerified.map((item, i) => (
               <DevelopmentCard key={i} item={item} />
             ))}
           </div>
@@ -935,7 +1136,7 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
       )}
 
       {/* Unverified Reports */}
-      {parsed.unverified.length > 0 && (
+      {enrichedUnverified.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <span className="text-amber-500">⚠</span> Unverified Reports
@@ -944,7 +1145,7 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
             </span>
           </h2>
           <div className="grid gap-3">
-            {parsed.unverified.map((item, i) => (
+            {enrichedUnverified.map((item, i) => (
               <DevelopmentCard key={i} item={item} isUnverified />
             ))}
           </div>
@@ -962,8 +1163,8 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
           </h3>
           <div className="space-y-3">
             {briefing.changes.map((change: any, i: number) => (
-              <div key={i} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
+              <div key={i} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                <div className="flex items-center flex-wrap gap-2 mb-2">
                   <span className="text-xs font-medium text-argus-600 dark:text-argus-400 px-2 py-0.5 bg-argus-100 dark:bg-argus-900/30 rounded">
                     {change.domain}
                   </span>
@@ -975,6 +1176,21 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
                     }`}>
                       {change.significance}
                     </span>
+                  )}
+                  {change.source && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      via {change.source}
+                    </span>
+                  )}
+                  {change.url && (
+                    <a
+                      href={change.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-xs px-2 py-1 bg-argus-100 dark:bg-argus-900/40 text-argus-700 dark:text-argus-300 rounded hover:bg-argus-200 dark:hover:bg-argus-800 transition-colors flex items-center gap-1"
+                    >
+                      <span>📰</span> Source ↗
+                    </a>
                   )}
                 </div>
                 <p className="text-slate-700 dark:text-slate-300 text-sm">{change.description}</p>
@@ -993,9 +1209,36 @@ function BriefingContent({ briefing, parsed }: { briefing: BriefingData; parsed:
           <div className="space-y-3">
             {briefing.forecasts.map((forecast: any, i: number) => (
               <div key={i} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-                <p className="text-slate-700 dark:text-slate-300 text-sm">
-                  {forecast.prediction || forecast}
-                </p>
+                {typeof forecast === 'string' ? (
+                  <p className="text-slate-700 dark:text-slate-300 text-sm">{forecast}</p>
+                ) : (
+                  <>
+                    <p className="text-slate-700 dark:text-slate-300 text-sm font-medium mb-2">
+                      {forecast.event || forecast.prediction}
+                    </p>
+                    {forecast.reasoning && (
+                      <p className="text-slate-500 dark:text-slate-400 text-xs mb-2">{forecast.reasoning}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {forecast.timeframe && (
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                          {forecast.timeframe}
+                        </span>
+                      )}
+                      {(forecast.probability !== undefined || forecast.confidence !== undefined) && (
+                        <span className={`px-2 py-0.5 rounded font-medium ${
+                          (forecast.probability || forecast.confidence) >= 70 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : (forecast.probability || forecast.confidence) >= 40
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                          {forecast.probability || forecast.confidence}% probability
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

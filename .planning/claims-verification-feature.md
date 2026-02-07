@@ -16,100 +16,95 @@
 - Migration applied to production database
 
 ### 2. Backend LLM Claim Extraction
-- Updated `llm-verify.ts` to:
-  - Extract 3-7 factual claims from each article using LLM
-  - Assess verification status for each claim
-  - Suggest verification methods
-  - Store claims in `article_claims` table
-- LLM prompt updated to request detailed claim analysis
+- `llm-verify.ts` extracts 3-7 factual claims from each article using LLM
+- Assesses verification status for each claim
+- Suggests verification methods
+- Stores claims in `article_claims` table
 
 ### 3. API Endpoints
-- Added `GET /api/verification/claims/:contentId` endpoint:
-  - Returns all extracted claims for a content item
-  - Includes claim text, confidence, status, method, and sources
-  - Working in production
+- `GET /api/verification/claims/:contentId` - Returns all extracted claims for a content item
+- `POST /api/verification/llm/:contentId` - Trigger LLM verification for specific content
+- `POST /api/verification/claims/extract-recent?limit=N` - Batch extract claims from recent verified content
 
-### 4. Frontend Modal Enhancement
-- Enhanced `FactVerificationModal` with:
-  - Overall confidence bar and status indicator
-  - Summary stats (verified/partial/unverified counts)
-  - Expandable claim list with status icons:
-    - ✓ = Verified (green)
-    - ◐ = Partially verified (yellow)
-    - ? = Unverified (gray)
-    - ✗ = Contradicted (red)
-  - Expandable details for each claim showing:
-    - Verification method
-    - Corroborating sources
-    - Contradicting sources
-    - Individual confidence bar
-- Currently shows generated/mock claims (see "Remaining Work")
+### 4. Briefing Generation with Content IDs ✅ (NEW)
+- Updated `briefing.ts` to include `contentId` with each change/development item
+- LLM-generated changes are properly mapped back to source articles
+- Changes array now includes: `domain`, `description`, `significance`, `contentId`, `url`, `source`
 
-## Remaining Work 🔨
+### 5. Frontend Modal with Real Claims ✅ (NEW)
+- Enhanced `FactVerificationModal` to fetch real claims via API
+- When `contentId` is available, fetches from `/api/verification/claims/:contentId`
+- Falls back to placeholder claims when no real claims exist
+- Visual indicator (green dot) when real claims are available
+- Updated footer to show claim source status
 
-### 1. Wire Frontend to Real Claims API
-The modal currently generates placeholder claims because:
-- The briefing page parses text from markdown (no content IDs available)
-- Need to either:
-  a) Include content IDs in the briefing generation/parsing
-  b) Add a search/lookup by title to match content
-  c) Store briefing-to-content mappings
+### 6. Frontend UI Features
+- Overall confidence bar and status indicator
+- Summary stats (verified/partial/unverified counts)
+- Expandable claim list with status icons:
+  - ✓ = Verified (green)
+  - ◐ = Partially verified (yellow)
+  - ? = Unverified (gray)
+  - ✗ = Contradicted (red)
+- Expandable details for each claim showing:
+  - Verification method
+  - Corroborating sources
+  - Contradicting sources
+  - Individual confidence bar
 
-**To implement:**
-```typescript
-// In FactVerificationModal, fetch real claims:
-const response = await fetch(`${API_URL}/api/verification/claims/${contentId}`);
-const data = await response.json();
-if (data.success && data.data.claims.length > 0) {
-  setClaims(data.data.claims);
-}
-```
+## Current Status (as of 2026-02-07)
 
-### 2. Batch LLM Verification for Claims
-- Run `POST /api/verification/llm/batch` periodically to extract claims
-- Currently claims are only extracted on-demand via individual verification
-- Could add to cron job or background worker
+- **39 claims** extracted across **9 articles**
+- Claims API working in production
+- Frontend wired to fetch real claims
+- Batch extraction endpoint available
 
-### 3. Cross-Reference Engine for Claims
-- Implement actual cross-referencing between articles
-- When same claim appears in multiple articles, update `verified_by`
-- Could use embedding similarity or exact text matching
+## How to Use
 
-### 4. Content ID in Briefings
-- Update briefing generation to include content IDs with each item
-- Or store a mapping table: `briefing_content_items`
-- Would enable fetching real claims for each briefing item
-
-## Testing the Feature
-
-### Test API:
+### Extract claims from recent articles:
 ```bash
-# Get claims for a content item
-curl "https://argus.vitalpoint.ai/api/verification/claims/8e7256bb-4e80-4e04-9b02-c2192c095dd1"
-
-# Trigger LLM verification (extracts claims)
-curl -X POST "https://argus.vitalpoint.ai/api/verification/llm/8e7256bb-4e80-4e04-9b02-c2192c095dd1"
-
-# Batch verify content
-curl -X POST "https://argus.vitalpoint.ai/api/verification/llm/batch?limit=5"
+# Extract claims from 10 recent articles with confidence >= 60
+curl -X POST "https://argus.vitalpoint.ai/api/verification/claims/extract-recent?limit=10&minConfidence=60"
 ```
 
-### Test Frontend:
-1. Go to https://argus.vitalpoint.ai/briefings
-2. Click on any verified/unverified development card
-3. Modal shows claim-level verification (currently with generated data)
+### Get claims for a specific article:
+```bash
+curl "https://argus.vitalpoint.ai/api/verification/claims/8e7256bb-4e80-4e04-9b02-c2192c095dd1"
+```
+
+### Trigger LLM verification for one article:
+```bash
+curl -X POST "https://argus.vitalpoint.ai/api/verification/llm/CONTENT_ID"
+```
 
 ## Files Changed
 
 - `apps/api/src/db/schema.ts` - Added `articleClaims` table
 - `apps/api/src/services/verification/llm-verify.ts` - Claim extraction logic
-- `apps/api/src/routes/verification.ts` - Claims API endpoint
-- `apps/web/src/app/briefings/page.tsx` - Enhanced modal UI
-- `apps/api/migrations/add-article-claims.sql` - Database migration
+- `apps/api/src/services/intelligence/briefing.ts` - Added contentId to changes
+- `apps/api/src/routes/verification.ts` - Claims API endpoints + batch extraction
+- `apps/web/src/app/briefings/page.tsx` - Enhanced modal UI with real claims
+
+## Remaining Work 🔨
+
+### 1. Cross-Reference Engine for Claims
+- When same claim appears in multiple articles, update `verified_by`
+- Could use embedding similarity or exact text matching
+- Would improve verification status over time
+
+### 2. Scheduled Claim Extraction
+- Add cron job to extract claims from new high-confidence content
+- Could run every hour for content verified in last 2 hours
+
+### 3. Claim Search/Browse UI
+- Admin interface to browse all extracted claims
+- Filter by status, confidence, domain
+- Manual override of verification status
 
 ## Deployed
 - ✅ Database migration applied
 - ✅ API deployed and restarted
 - ✅ Web app deployed
+- ✅ Full flow tested end-to-end
 
 Server: 157.90.122.69

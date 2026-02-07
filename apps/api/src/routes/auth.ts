@@ -113,7 +113,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   return c.json({
     success: true,
     data: {
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
       token,
     },
   });
@@ -141,7 +141,7 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   return c.json({
     success: true,
     data: {
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
       token,
     },
   });
@@ -167,6 +167,7 @@ authRoutes.get('/me', authMiddleware, async (c) => {
       id: user.id,
       email: user.email,
       name: user.name,
+      isAdmin: user.isAdmin,
       preferences: user.preferences,
     },
   });

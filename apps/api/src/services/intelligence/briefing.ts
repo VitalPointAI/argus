@@ -145,8 +145,9 @@ export async function generateBriefing(
 
   if (useLLM) {
     try {
-      // Use LLM for intelligent analysis
+      // Use LLM for intelligent analysis - include id for proper contentId mapping
       const articles = items.map(item => ({
+        id: item.id,
         title: item.title,
         body: item.body || '',
         domain: item.domainName || 'Unknown',
@@ -159,14 +160,34 @@ export async function generateBriefing(
 
       // Analyze changes with LLM
       const llmChanges = await llm.analyzeChanges(articles);
-      changes = llmChanges.map((c, i) => ({
-        domain: articles[i]?.domain || 'Unknown',
-        description: c.description,
-        significance: c.significance,
-        contentId: items[i]?.id || '',
-        url: items[i]?.url || '',
-        source: items[i]?.sourceName || 'Unknown',
-      }));
+      
+      // Map each LLM change back to its source article by matching content
+      changes = llmChanges.map((c) => {
+        // Find the best matching article by comparing description with titles
+        const descLower = c.description.toLowerCase();
+        let bestMatch = articles[0];
+        let bestScore = 0;
+        
+        for (const article of articles) {
+          const titleLower = article.title.toLowerCase();
+          // Check for keyword overlap
+          const titleWords = titleLower.split(/\s+/).filter(w => w.length > 4);
+          const matchCount = titleWords.filter(word => descLower.includes(word)).length;
+          if (matchCount > bestScore) {
+            bestScore = matchCount;
+            bestMatch = article;
+          }
+        }
+        
+        return {
+          domain: bestMatch?.domain || 'Unknown',
+          description: c.description,
+          significance: c.significance,
+          contentId: bestMatch?.id || '',
+          url: bestMatch?.url || '',
+          source: bestMatch?.source || 'Unknown',
+        };
+      });
 
       // Generate LLM forecasts
       const domainNames = [...new Set(items.map(i => i.domainName).filter(Boolean))] as string[];
