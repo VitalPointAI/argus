@@ -40,12 +40,14 @@ async function fetchTopArticles(options: BriefingOptions): Promise<Article[]> {
   const hoursBack = options.hoursBack || (options.type === 'morning' ? 12 : 8);
   const minConfidence = options.minConfidence || 50;
   const maxArticles = options.maxArticles || 50;
+  const minBodyLength = 200; // Require substantive content
   
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   
   const conditions: any[] = [
     gte(content.fetchedAt, since),
     gte(content.confidenceScore, minConfidence),
+    sql`LENGTH(${content.body}) >= ${minBodyLength}`,
   ];
 
   const articles = await db
@@ -63,7 +65,7 @@ async function fetchTopArticles(options: BriefingOptions): Promise<Article[]> {
     .leftJoin(sources, eq(content.sourceId, sources.id))
     .leftJoin(domains, eq(sources.domainId, domains.id))
     .where(and(...conditions))
-    .orderBy(desc(content.confidenceScore))
+    .orderBy(desc(content.confidenceScore), desc(sql`LENGTH(${content.body})`))
     .limit(maxArticles);
 
   return articles as Article[];
@@ -91,8 +93,14 @@ function buildBriefingPrompt(articles: Article[], options: BriefingOptions): str
     .map(([domain, domainArticles]) => {
       const articleList = domainArticles
         .slice(0, 5) // Top 5 per domain
-        .map(a => `- "${a.title}" (${a.source}, ${a.confidenceScore}% confidence)`)
-        .join('\n');
+        .map(a => {
+          // Include first 500 chars of body for context
+          const bodyPreview = a.body ? a.body.substring(0, 500).replace(/\n+/g, ' ').trim() : '';
+          const content = bodyPreview ? `\n  Content: ${bodyPreview}...` : '';
+          const urlInfo = a.url ? `\n  URL: ${a.url}` : '';
+          return `- "${a.title}" (${a.source}, ${a.confidenceScore}% confidence)${urlInfo}${content}`;
+        })
+        .join('\n\n');
       return `## ${domain}\n${articleList}`;
     })
     .join('\n\n');
@@ -341,7 +349,8 @@ function generateFallbackBriefing(articles: Article[], options: BriefingOptions)
     if (verified.length > 0) {
       lines.push(`**${domain}** [${verified.length} verified]`);
       verified.slice(0, 3).forEach(a => {
-        lines.push(`• ${a.title} (${a.source}) [${a.confidenceScore}%]`);
+        const urlLink = a.url ? `\n  📎 ${a.url}` : '';
+        lines.push(`• ${a.title} (${a.source}) [${a.confidenceScore}%]${urlLink}`);
       });
       lines.push('');
     }
@@ -349,7 +358,8 @@ function generateFallbackBriefing(articles: Article[], options: BriefingOptions)
     if (unverified.length > 0 && verified.length === 0) {
       lines.push(`**${domain}** [UNVERIFIED]`);
       unverified.slice(0, 2).forEach(a => {
-        lines.push(`• ⚠ ${a.title} (${a.source}) [${a.confidenceScore}%]`);
+        const urlLink = a.url ? `\n  📎 ${a.url}` : '';
+        lines.push(`• ⚠ ${a.title} (${a.source}) [${a.confidenceScore}%]${urlLink}`);
       });
       lines.push('');
     }

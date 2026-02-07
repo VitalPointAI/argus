@@ -49,13 +49,19 @@ export default async function SourcesPage() {
             {sources.length} RSS feeds across {domains.length} strategic domains
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
-            {sources.filter((s: any) => s.active).length} Active
+            {sources.filter((s: any) => s.active || s.isActive).length} Active
           </span>
           <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium">
-            {sources.filter((s: any) => !s.active).length} Inactive
+            {sources.filter((s: any) => !s.active && !s.isActive).length} Inactive
           </span>
+          <a
+            href="/sources/manage"
+            className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            Manage Sources
+          </a>
         </div>
       </div>
 

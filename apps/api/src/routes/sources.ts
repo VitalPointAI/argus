@@ -112,3 +112,91 @@ sourcesRoutes.post('/add-suggested', async (c) => {
     }, 500);
   }
 });
+
+// Create a new source
+sourcesRoutes.post('/', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { name, url, type, domainId, reliabilityScore, isActive } = body;
+  
+  if (!name || !url || !type) {
+    return c.json({ success: false, error: 'name, url, and type are required' }, 400);
+  }
+  
+  try {
+    const [inserted] = await db.insert(sources).values({
+      name,
+      url,
+      type,
+      domainId: domainId || null,
+      reliabilityScore: reliabilityScore ?? 50,
+      isActive: isActive ?? true,
+    }).returning();
+    
+    return c.json({ success: true, data: inserted });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Update a source
+sourcesRoutes.patch('/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const { name, url, type, domainId, reliabilityScore, isActive } = body;
+  
+  try {
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (url !== undefined) updateData.url = url;
+    if (type !== undefined) updateData.type = type;
+    if (domainId !== undefined) updateData.domainId = domainId;
+    if (reliabilityScore !== undefined) updateData.reliabilityScore = reliabilityScore;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ success: false, error: 'No fields to update' }, 400);
+    }
+    
+    const [updated] = await db.update(sources)
+      .set(updateData)
+      .where(eq(sources.id, id))
+      .returning();
+    
+    if (!updated) {
+      return c.json({ success: false, error: 'Source not found' }, 404);
+    }
+    
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Delete a source
+sourcesRoutes.delete('/:id', async (c) => {
+  const id = c.req.param('id');
+  
+  try {
+    const [deleted] = await db.delete(sources)
+      .where(eq(sources.id, id))
+      .returning();
+    
+    if (!deleted) {
+      return c.json({ success: false, error: 'Source not found' }, 404);
+    }
+    
+    return c.json({ success: true, data: deleted });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});

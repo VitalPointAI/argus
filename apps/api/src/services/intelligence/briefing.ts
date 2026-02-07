@@ -2,11 +2,22 @@ import { db, content, sources, domains, briefings, userDomains } from '../../db'
 import { eq, desc, gte, and, inArray, sql } from 'drizzle-orm';
 import { llm } from './llm';
 
+export interface ArticleReference {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  domain: string;
+}
+
 export interface BriefingContent {
   summary: string;
+  executiveSummary?: string;
+  keyThemes?: string[];
   changes: Change[];
   forecasts: Forecast[];
   contentIds: string[];
+  sources: ArticleReference[];
 }
 
 export interface Change {
@@ -14,6 +25,8 @@ export interface Change {
   description: string;
   significance: 'low' | 'medium' | 'high';
   contentId: string;
+  url: string;
+  source?: string;
 }
 
 export interface Forecast {
@@ -92,9 +105,12 @@ export async function generateBriefing(
   if (items.length === 0) {
     return {
       summary: 'No significant developments to report in your monitored domains.',
+      executiveSummary: 'No new intelligence available.',
+      keyThemes: [],
       changes: [],
       forecasts: [],
       contentIds: [],
+      sources: [],
     };
   }
 
@@ -115,6 +131,18 @@ export async function generateBriefing(
   let changes: Change[];
   let forecasts: Forecast[];
 
+  // Build sources array with URLs
+  const sourcesArray: ArticleReference[] = items.map(item => ({
+    id: item.id,
+    title: item.title,
+    url: item.url,
+    source: item.sourceName || 'Unknown',
+    domain: item.domainName || 'Unknown',
+  }));
+
+  // Extract key themes from domains
+  const keyThemes = [...new Set(items.map(i => i.domainName).filter(Boolean))] as string[];
+
   if (useLLM) {
     try {
       // Use LLM for intelligent analysis
@@ -123,6 +151,7 @@ export async function generateBriefing(
         body: item.body || '',
         domain: item.domainName || 'Unknown',
         source: item.sourceName || 'Unknown',
+        url: item.url,
       }));
 
       // Generate LLM summary
@@ -135,6 +164,8 @@ export async function generateBriefing(
         description: c.description,
         significance: c.significance,
         contentId: items[i]?.id || '',
+        url: items[i]?.url || '',
+        source: items[i]?.sourceName || 'Unknown',
       }));
 
       // Generate LLM forecasts
@@ -162,11 +193,20 @@ export async function generateBriefing(
     forecasts = generateForecasts(byDomain);
   }
 
+  // Generate executive summary (top 3 most significant items)
+  const topItems = items.slice(0, 3);
+  const executiveSummary = topItems.length > 0
+    ? `Key developments: ${topItems.map(i => i.title).join('; ')}`
+    : 'No major developments.';
+
   return {
     summary,
+    executiveSummary,
+    keyThemes,
     changes,
     forecasts,
     contentIds: items.map(i => i.id),
+    sources: sourcesArray,
   };
 }
 
@@ -181,7 +221,10 @@ function generateSummary(byDomain: Record<string, any[]>): string {
     parts.push(`**${domainName}** (${count} articles):`);
     
     for (const item of topItems) {
-      parts.push(`• ${item.title}`);
+      // Include source and URL in summary
+      const sourceInfo = item.sourceName ? ` (${item.sourceName})` : '';
+      const urlLink = item.url ? ` [Link](${item.url})` : '';
+      parts.push(`• ${item.title}${sourceInfo}${urlLink}`);
     }
     
     if (count > 3) {
@@ -214,6 +257,8 @@ function identifyChanges(items: any[]): Change[] {
           description: item.title,
           significance,
           contentId: item.id,
+          url: item.url || '',
+          source: item.sourceName || 'Unknown',
         });
         break;
       }
@@ -258,13 +303,18 @@ export async function saveBriefing(
   briefingContent: BriefingContent,
   deliveryChannels: string[] = ['web']
 ): Promise<string> {
+  // Build extended summary with executive summary if available
+  const fullSummary = briefingContent.executiveSummary 
+    ? `**EXECUTIVE SUMMARY**\n${briefingContent.executiveSummary}\n\n**KEY THEMES:** ${(briefingContent.keyThemes || []).join(', ')}\n\n${briefingContent.summary}`
+    : briefingContent.summary;
+
   const [briefing] = await db.insert(briefings).values({
     userId,
     type,
-    summary: briefingContent.summary,
+    summary: fullSummary,
     changes: briefingContent.changes,
     forecasts: briefingContent.forecasts,
-    contentIds: briefingContent.contentIds,
+    contentIds: [...briefingContent.contentIds, { sources: briefingContent.sources }], // Store sources in contentIds JSONB
     deliveryChannels,
   }).returning();
 

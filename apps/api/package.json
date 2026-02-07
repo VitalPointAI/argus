@@ -11,23 +11,27 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@argus/shared": "*",
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.2",
-    "hono": "^4.6.16",
-    "drizzle-orm": "^0.38.3",
-    "postgres": "^3.4.5",
-    "pg-boss": "^10.1.5",
-    "lucia": "^3.2.2",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
+    "bcrypt": "^6.0.0",
     "dotenv": "^16.4.7",
-    "zod": "^3.24.1",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.16",
+    "jsonwebtoken": "^9.0.3",
+    "lucia": "^3.2.2",
+    "pg-boss": "^10.1.5",
+    "postgres": "^3.4.5",
     "rss-parser": "^3.13.0",
-    "@argus/shared": "*"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.7",
-    "typescript": "^5.7.3",
+    "drizzle-kit": "^0.30.2",
     "tsx": "^4.19.2",
-    "drizzle-kit": "^0.30.2"
+    "typescript": "^5.7.3"
   }
 }
