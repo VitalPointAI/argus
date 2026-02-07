@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { ingestRSSSource, ingestAllRSSSources } from '../services/ingestion/rss';
+import { ingestYouTubeVideo, ingestAllYouTubeSources } from '../services/ingestion/youtube';
 import { db, sources } from '../db';
 import { eq } from 'drizzle-orm';
 
@@ -19,6 +20,9 @@ ingestionRoutes.post('/:sourceId', async (c) => {
     let count = 0;
     if (source.type === 'rss') {
       count = await ingestRSSSource(sourceId);
+    } else if (source.type === 'youtube') {
+      const result = await ingestYouTubeVideo(source.url, sourceId);
+      count = result.success ? 1 : 0;
     } else {
       return c.json({ success: false, error: `Ingestion not implemented for type: ${source.type}` }, 501);
     }
@@ -46,6 +50,58 @@ ingestionRoutes.post('/rss/all', async (c) => {
         details: results 
       } 
     });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Ingest all YouTube sources
+ingestionRoutes.post('/youtube/all', async (c) => {
+  try {
+    const results = await ingestAllYouTubeSources();
+    const totalIngested = results.reduce((sum, r) => sum + r.count, 0);
+    
+    return c.json({ 
+      success: true, 
+      data: { 
+        sourcesProcessed: results.length,
+        totalItemsIngested: totalIngested,
+        details: results 
+      } 
+    });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Ingest a single YouTube video by URL
+ingestionRoutes.post('/youtube/video', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { url, sourceId } = body;
+
+  if (!url) {
+    return c.json({ success: false, error: 'URL required' }, 400);
+  }
+
+  try {
+    // Use a default YouTube source if none provided
+    let targetSourceId = sourceId;
+    if (!targetSourceId) {
+      const [ytSource] = await db.select().from(sources).where(eq(sources.type, 'youtube')).limit(1);
+      if (!ytSource) {
+        return c.json({ success: false, error: 'No YouTube source configured' }, 400);
+      }
+      targetSourceId = ytSource.id;
+    }
+
+    const result = await ingestYouTubeVideo(url, targetSourceId);
+    return c.json({ success: result.success, data: result });
   } catch (error) {
     return c.json({ 
       success: false, 
