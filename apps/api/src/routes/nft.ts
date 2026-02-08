@@ -12,7 +12,14 @@ import { Hono } from 'hono';
 import { db } from '../db';
 import { sourceLists, sourceListItems, sources } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import * as nearAPI from 'near-api-js';
+
+// NEAR utils - basic implementation without near-api-js dependency
+const parseNearAmount = (amount: string): string => {
+  // Convert NEAR to yoctoNEAR (1 NEAR = 10^24 yoctoNEAR)
+  const parsed = parseFloat(amount);
+  if (isNaN(parsed)) return '0';
+  return BigInt(Math.floor(parsed * 1e24)).toString();
+};
 
 // NEAR configuration
 const NEAR_NETWORK = process.env.NEAR_NETWORK || 'testnet';
@@ -170,7 +177,7 @@ nft.post('/prepare-mint', async (c) => {
       description: list.description || `A curated list of ${items.length} intelligence sources`,
       sourceCount: items.length,
       domain: 'intelligence', // Could be derived from source domains
-      price: price ? nearAPI.utils.format.parseNearAmount(price) : null,
+      price: price ? parseNearAmount(price) : null,
       royaltyPercent,
       // The actual source data would be encrypted and stored on IPFS
       sources: listSources.map(s => ({
@@ -279,7 +286,7 @@ nft.post('/set-price/:tokenId', async (c) => {
           methodName: 'set_price',
           args: {
             token_id: tokenId,
-            price: price ? nearAPI.utils.format.parseNearAmount(price) : null,
+            price: price ? parseNearAmount(price) : null,
           },
           deposit: '1', // 1 yoctoNEAR for function call
         },
