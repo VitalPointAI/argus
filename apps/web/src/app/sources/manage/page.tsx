@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useSearchParams } from 'next/navigation';
+import SourceAssistant from '@/components/SourceAssistant';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -35,18 +37,42 @@ interface SourceList {
   itemCount: number;
 }
 
+interface HumintSource {
+  codename: string;
+  bio: string | null;
+  domains: string[];
+  regions: string[];
+  reputationScore: number;
+  totalSubmissions: number;
+  subscriberCount: number;
+  isAcceptingSubscribers: boolean;
+}
+
 const SOURCE_TYPES = ['rss', 'youtube', 'web', 'twitter', 'telegram', 'podcast', 'government'];
 
-export default function SourceManagePage() {
+// Wrapper to handle Suspense for useSearchParams
+export default function SourceManagePageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="text-slate-500">Loading...</div></div>}>
+      <SourceManagePage />
+    </Suspense>
+  );
+}
+
+function SourceManagePage() {
   const { user, token, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [sourceLists, setSourceLists] = useState<SourceList[]>([]);
+  const [humintSources, setHumintSources] = useState<HumintSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'sources' | 'lists'>('sources');
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'lists' ? 'lists' : tabParam === 'humint' ? 'humint' : 'sources';
+  const [activeTab, setActiveTab] = useState<'sources' | 'lists' | 'humint'>(initialTab);
   
   // Source form state
   const [showSourceForm, setShowSourceForm] = useState(false);
@@ -107,6 +133,13 @@ export default function SourceManagePage() {
         if (listsData.success) {
           setSourceLists(listsData.data || []);
         }
+      }
+      
+      // Fetch HUMINT sources
+      const humintRes = await fetch(`${API_URL}/api/humint/sources?limit=50`, { headers });
+      const humintData = await humintRes.json();
+      if (humintData.success) {
+        setHumintSources(humintData.data || []);
       }
     } catch (err) {
       setError('Failed to load data');
@@ -340,12 +373,12 @@ export default function SourceManagePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             Manage Sources
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-1 sm:mt-2">
             {isAdmin && <span className="text-argus-600 font-medium">Admin Mode • </span>}
             Manage your sources and source lists
           </p>
@@ -353,7 +386,7 @@ export default function SourceManagePage() {
         <div className="flex gap-3">
           <a 
             href="/sources" 
-            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
           >
             View All Sources
           </a>
@@ -375,30 +408,42 @@ export default function SourceManagePage() {
       )}
       
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700">
-        <button
-          onClick={() => setActiveTab('sources')}
-          className={`px-6 py-3 font-medium transition ${
-            activeTab === 'sources'
-              ? 'text-argus-600 border-b-2 border-argus-600'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          My Sources ({mySources.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('lists')}
-          className={`px-6 py-3 font-medium transition ${
-            activeTab === 'lists'
-              ? 'text-argus-600 border-b-2 border-argus-600'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          My Lists ({sourceLists.length})
-        </button>
+      <div className="flex flex-col sm:flex-row border-b border-slate-200 dark:border-slate-700">
+        <div className="flex flex-wrap">
+          <button
+            onClick={() => setActiveTab('sources')}
+            className={`px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition ${
+              activeTab === 'sources'
+                ? 'text-argus-600 border-b-2 border-argus-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Sources ({mySources.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('lists')}
+            className={`px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition ${
+              activeTab === 'lists'
+                ? 'text-argus-600 border-b-2 border-argus-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Lists ({sourceLists.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('humint')}
+            className={`px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium transition flex items-center gap-1 ${
+              activeTab === 'humint'
+                ? 'text-purple-600 border-b-2 border-purple-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            🎭 HUMINT ({humintSources.length})
+          </button>
+        </div>
         {isAdmin && (
-          <span className="px-4 py-3 ml-auto text-sm text-slate-500">
-            👑 {globalSources.length} global sources (admin access)
+          <span className="px-4 py-2 sm:py-3 sm:ml-auto text-xs sm:text-sm text-slate-500">
+            👑 {globalSources.length} global
           </span>
         )}
       </div>
@@ -416,116 +461,132 @@ export default function SourceManagePage() {
             </button>
           </div>
           
-          {/* Add Source Form */}
+          {/* AI Source Assistant */}
           {showSourceForm && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Add New Source</h2>
-              <form onSubmit={handleSubmitSource} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Name *</label>
-                    <input
-                      type="text"
-                      value={sourceFormData.name}
-                      onChange={(e) => setSourceFormData({ ...sourceFormData, name: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                      placeholder="Source name"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">URL *</label>
-                    <input
-                      type="url"
-                      value={sourceFormData.url}
-                      onChange={(e) => setSourceFormData({ ...sourceFormData, url: e.target.value })}
-                      required
-                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Type *</label>
-                    <select
-                      value={sourceFormData.type}
-                      onChange={(e) => setSourceFormData({ ...sourceFormData, type: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                    >
-                      {SOURCE_TYPES.map(type => (
-                        <option key={type} value={type}>{type.toUpperCase()}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Domain</label>
-                    <select
-                      value={sourceFormData.domainId}
-                      onChange={(e) => setSourceFormData({ ...sourceFormData, domainId: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
-                    >
-                      <option value="">Select a domain...</option>
-                      {domains.map(domain => (
-                        <option key={domain.id} value={domain.id}>{domain.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">
-                      Reliability Score: {sourceFormData.reliabilityScore}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={sourceFormData.reliabilityScore}
-                      onChange={(e) => setSourceFormData({ ...sourceFormData, reliabilityScore: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  {isAdmin && (
+            <SourceAssistant 
+              token={token} 
+              onSourceAdded={() => {
+                fetchData();
+                showSuccess('Source added successfully!');
+              }} 
+            />
+          )}
+
+          {/* Legacy form hidden behind link for manual entry */}
+          {showSourceForm && (
+            <details className="mt-4">
+              <summary className="text-sm text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-300">
+                ⚙️ Advanced: Manual source entry
+              </summary>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 sm:p-6 mt-4">
+                <h2 className="text-base sm:text-lg font-semibold mb-4">Manual Source Entry</h2>
+                <form onSubmit={handleSubmitSource} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Name *</label>
+                      <input
+                        type="text"
+                        value={sourceFormData.name}
+                        onChange={(e) => setSourceFormData({ ...sourceFormData, name: e.target.value })}
+                        required
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                        placeholder="Source name"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">URL *</label>
+                      <input
+                        type="url"
+                        value={sourceFormData.url}
+                        onChange={(e) => setSourceFormData({ ...sourceFormData, url: e.target.value })}
+                        required
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Type *</label>
+                      <select
+                        value={sourceFormData.type}
+                        onChange={(e) => setSourceFormData({ ...sourceFormData, type: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                      >
+                        {SOURCE_TYPES.map(type => (
+                          <option key={type} value={type}>{type.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Domain</label>
+                      <select
+                        value={sourceFormData.domainId}
+                        onChange={(e) => setSourceFormData({ ...sourceFormData, domainId: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                      >
+                        <option value="">Select a domain...</option>
+                        {domains.map(domain => (
+                          <option key={domain.id} value={domain.id}>{domain.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
                     <div className="md:col-span-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={sourceFormData.asGlobal}
-                          onChange={(e) => setSourceFormData({ ...sourceFormData, asGlobal: e.target.checked })}
-                          className="rounded"
-                        />
-                        <span className="text-sm font-medium">Create as Global Source (visible to all users)</span>
+                      <label className="block text-sm font-medium mb-1">
+                        Reliability Score: {sourceFormData.reliabilityScore}
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={sourceFormData.reliabilityScore}
+                        onChange={(e) => setSourceFormData({ ...sourceFormData, reliabilityScore: parseInt(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                    
+                    {isAdmin && (
+                      <div className="md:col-span-2">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={sourceFormData.asGlobal}
+                            onChange={(e) => setSourceFormData({ ...sourceFormData, asGlobal: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span className="text-sm font-medium">Create as Global Source (visible to all users)</span>
                       </label>
                     </div>
                   )}
                 </div>
                 
-                <div className="flex justify-end gap-3">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setShowSourceForm(false)}
-                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                    className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
+                    className="px-4 py-2 text-sm bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
                   >
                     {submitting ? 'Adding...' : 'Add Source'}
                   </button>
                 </div>
               </form>
-            </div>
+              </div>
+            </details>
           )}
           
           {/* My Sources Table */}
           {mySources.length > 0 && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-              <div className="bg-slate-50 dark:bg-slate-700 px-6 py-3 border-b border-slate-200 dark:border-slate-600">
+              <div className="bg-slate-50 dark:bg-slate-700 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-600">
                 <h3 className="font-semibold">My Sources</h3>
               </div>
               <SourceTable
@@ -583,8 +644,8 @@ export default function SourceManagePage() {
           
           {/* Add List Form */}
           {showListForm && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Create Source List</h2>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-semibold mb-4">Create Source List</h2>
               <form onSubmit={handleSubmitList} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Name *</label>
@@ -621,18 +682,18 @@ export default function SourceManagePage() {
                   </label>
                 </div>
                 
-                <div className="flex justify-end gap-3">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setShowListForm(false)}
-                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                    className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
+                    className="px-4 py-2 text-sm bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
                   >
                     {submitting ? 'Creating...' : 'Create List'}
                   </button>
@@ -643,11 +704,11 @@ export default function SourceManagePage() {
           
           {/* Source Lists */}
           {sourceLists.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
               {sourceLists.map((list) => (
-                <div key={list.id} className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">{list.name}</h3>
+                <div key={list.id} className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 sm:p-6">
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <h3 className="font-semibold text-base sm:text-lg">{list.name}</h3>
                     <div className="flex gap-2">
                       {list.isPublic && (
                         <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded text-xs">
@@ -697,6 +758,109 @@ export default function SourceManagePage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* HUMINT Tab */}
+      {activeTab === 'humint' && (
+        <div className="space-y-6">
+          {/* Info Box */}
+          <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+            <h3 className="font-semibold text-purple-800 dark:text-purple-200 mb-2 flex items-center gap-2">
+              🎭 Human Intelligence Sources
+            </h3>
+            <p className="text-sm text-purple-700 dark:text-purple-300">
+              Anonymous human sources providing on-the-ground intelligence. Add them to your source lists alongside RSS feeds and other traditional sources.
+            </p>
+          </div>
+
+          {/* HUMINT Sources Grid */}
+          {humintSources.length > 0 ? (
+            <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {humintSources.map((source) => (
+                <div key={source.codename} className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-white">{source.codename}</h3>
+                      {source.bio && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{source.bio}</p>
+                      )}
+                    </div>
+                    <div className={`px-2 py-1 rounded text-xs font-bold ${
+                      source.reputationScore >= 70 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                        : source.reputationScore >= 50
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      ⭐ {source.reputationScore}
+                    </div>
+                  </div>
+                  
+                  {/* Coverage Tags */}
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {source.regions.slice(0, 2).map((region) => (
+                      <span key={region} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
+                        📍 {region}
+                      </span>
+                    ))}
+                    {source.domains.slice(0, 2).map((domain) => (
+                      <span key={domain} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">
+                        {domain}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  {/* Stats */}
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
+                    <span>{source.totalSubmissions} posts</span>
+                    <span>{source.subscriberCount} subscribers</span>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <a
+                      href={`/sources/humint/${source.codename}`}
+                      className="flex-1 px-3 py-1.5 text-center text-sm border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                    >
+                      View Profile
+                    </a>
+                    <button
+                      onClick={() => {
+                        // TODO: Add to list modal for HUMINT sources
+                        showSuccess('Adding HUMINT sources to lists coming soon!');
+                      }}
+                      className="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition"
+                    >
+                      + List
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow">
+              <div className="text-4xl mb-4">🎭</div>
+              <h3 className="text-lg font-semibold mb-2">No HUMINT Sources Yet</h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
+                Human intelligence sources will appear here once registered.
+              </p>
+            </div>
+          )}
+          
+          {/* Become a Source - Wallet Only */}
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 sm:p-6 border border-slate-200 dark:border-slate-700">
+            <h3 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              🔒 Want to become a HUMINT source?
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+              To protect your identity, HUMINT source registration requires <strong>anonymous wallet login</strong>. 
+              Your real identity is never stored — only a codename and public key.
+            </p>
+            <p className="text-xs text-slate-500">
+              Standard login (email/Google/Twitter) cannot register as a HUMINT source — this ensures true anonymity.
+            </p>
+          </div>
         </div>
       )}
       
@@ -770,24 +934,19 @@ function SourceTable({
   setDeleteId: (id: string) => void;
 }) {
   return (
-    <table className="w-full">
-      <thead className="bg-slate-50 dark:bg-slate-700">
-        <tr>
-          <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-          <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-          <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-          <th className="px-4 py-3 text-left text-sm font-medium">Domain</th>
-          <th className="px-4 py-3 text-left text-sm font-medium">Reliability</th>
-          <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+    <>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3 p-4">
         {sources.map((source) => (
-          <tr key={source.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-            <td className="px-4 py-3">
+          <div key={source.id} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-slate-900 dark:text-white">{source.name}</div>
+                <div className="text-xs text-slate-500 truncate">{source.url}</div>
+              </div>
               <button
                 onClick={() => toggleActive(source)}
-                className={`w-10 h-6 rounded-full relative transition-colors ${
+                className={`w-10 h-6 rounded-full relative transition-colors shrink-0 ${
                   source.isActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               >
@@ -797,35 +956,87 @@ function SourceTable({
                   }`}
                 />
               </button>
-            </td>
-            <td className="px-4 py-3">
-              <div className="font-medium">{source.name}</div>
-              <div className="text-xs text-slate-500 truncate max-w-xs">{source.url}</div>
-            </td>
-            <td className="px-4 py-3">
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <TypeBadge type={source.type} />
-            </td>
-            <td className="px-4 py-3 text-sm">
-              {getDomainName(source.domainId)}
-            </td>
-            <td className="px-4 py-3">
+              <span className="text-xs text-slate-500">{getDomainName(source.domainId)}</span>
+            </div>
+            <div className="flex items-center justify-between">
               <StarRating
                 score={source.reliabilityScore}
                 onChange={(score) => updateReliability(source, score)}
               />
-            </td>
-            <td className="px-4 py-3">
               <button
                 onClick={() => setDeleteId(source.id)}
                 className="text-red-600 hover:text-red-800 text-sm"
               >
                 Delete
               </button>
-            </td>
-          </tr>
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-slate-50 dark:bg-slate-700">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Domain</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Reliability</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+            {sources.map((source) => (
+              <tr key={source.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => toggleActive(source)}
+                    className={`w-10 h-6 rounded-full relative transition-colors ${
+                      source.isActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        source.isActive ? 'left-5' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{source.name}</div>
+                  <div className="text-xs text-slate-500 truncate max-w-xs">{source.url}</div>
+                </td>
+                <td className="px-4 py-3">
+                  <TypeBadge type={source.type} />
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {getDomainName(source.domainId)}
+                </td>
+                <td className="px-4 py-3">
+                  <StarRating
+                    score={source.reliabilityScore}
+                    onChange={(score) => updateReliability(source, score)}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => setDeleteId(source.id)}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

@@ -32,6 +32,14 @@ async function getOptionalUser(c: any): Promise<{ id: string; preferences: Recor
   }
 }
 
+// Get user's selected domain IDs (for filtering)
+function getUserDomainIds(user: { preferences: Record<string, unknown> } | null): string[] | null {
+  if (!user) return null;
+  const prefs = user.preferences as { domains?: { selected?: string[] } } || {};
+  const selected = prefs.domains?.selected;
+  return selected && selected.length > 0 ? selected : null;
+}
+
 // Helper to get source IDs from active source list
 async function getActiveSourceIds(user: { id: string; preferences: Record<string, unknown> } | null): Promise<string[] | null> {
   if (!user) return null;
@@ -79,11 +87,12 @@ apiV1Routes.get('/intelligence', async (c) => {
   const minConfidence = parseInt(c.req.query('minConfidence') || '50');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
   const offset = parseInt(c.req.query('offset') || '0');
-  const useAllSources = c.req.query('all') === 'true'; // bypass source list filter
+  const useAllSources = c.req.query('all') === 'true'; // bypass source list and domain filters
 
-  // Get user and their active source list (if any)
+  // Get user and their preferences
   const user = await getOptionalUser(c);
   const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
+  const userDomainIds = useAllSources ? null : getUserDomainIds(user);
 
   // Build all conditions first
   const conditions: any[] = [gte(content.confidenceScore, minConfidence)];
@@ -92,8 +101,11 @@ apiV1Routes.get('/intelligence', async (c) => {
     conditions.push(gte(content.fetchedAt, new Date(since)));
   }
 
+  // Domain filter: query param takes precedence, then user preferences
   if (domainSlug) {
     conditions.push(eq(domains.slug, domainSlug));
+  } else if (userDomainIds && userDomainIds.length > 0) {
+    conditions.push(inArray(sources.domainId, userDomainIds));
   }
 
   // Filter by active source list if user has one

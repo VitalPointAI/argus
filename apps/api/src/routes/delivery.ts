@@ -3,6 +3,7 @@ import { db, briefings } from '../db';
 import { eq } from 'drizzle-orm';
 import { formatBriefingForTelegram, markDelivered } from '../services/delivery/telegram';
 import { formatBriefingForEmail, sendEmail } from '../services/delivery/email';
+import { deliverScheduledBriefings, getDeliverySchedule } from '../services/delivery/scheduled-briefings';
 
 export const deliveryRoutes = new Hono();
 
@@ -154,4 +155,44 @@ deliveryRoutes.get('/webhook/pending', async (c) => {
   }));
 
   return c.json({ success: true, data: formatted });
+});
+
+// Trigger scheduled briefing delivery (called by cron)
+deliveryRoutes.post('/scheduled/run', async (c) => {
+  console.log('[Delivery] Running scheduled briefing delivery...');
+  
+  try {
+    const result = await deliverScheduledBriefings();
+    
+    return c.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[Delivery] Scheduled delivery failed:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Get delivery schedule overview
+deliveryRoutes.get('/scheduled/status', async (c) => {
+  try {
+    const schedule = await getDeliverySchedule();
+    
+    return c.json({
+      success: true,
+      data: {
+        ...schedule,
+        nextCheck: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // Next hour
+      },
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
 });

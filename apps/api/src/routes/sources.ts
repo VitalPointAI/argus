@@ -3,6 +3,7 @@ import { db, sources, domains, sourceLists, sourceListItems, users } from '../db
 import { eq, or, isNull, and } from 'drizzle-orm';
 import { authMiddleware } from './auth';
 import { suggestSourcesForTopic, suggestSourcesForDomain, validateRSSUrl } from '../services/intelligence/source-suggestions';
+import { analyzeSource } from '../services/sources/ai-source-analyzer';
 
 // User type from database
 interface User {
@@ -28,6 +29,139 @@ function isAdmin(user: User | null): boolean {
 
 // Apply auth middleware to all routes
 sourcesRoutes.use('*', authMiddleware);
+
+// ==================== AI SOURCE ANALYZER ====================
+
+// Analyze a URL or description and suggest how to add it
+sourcesRoutes.post('/analyze', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const { input } = body;
+
+  if (!input || typeof input !== 'string') {
+    return c.json({ success: false, error: 'Input is required' }, 400);
+  }
+
+  try {
+    console.log(`[AI Analyzer] Analyzing: ${input.substring(0, 100)}...`);
+    const result = await analyzeSource(input);
+    
+    if (!result.success) {
+      return c.json({ success: false, error: result.error }, 400);
+    }
+
+    // Get available domains for selection
+    const allDomains = await db.select({ id: domains.id, name: domains.name, slug: domains.slug })
+      .from(domains);
+
+    // Try to match suggested domain
+    let matchedDomain = allDomains.find(d => 
+      d.name.toLowerCase() === result.analysis?.suggestedDomain.toLowerCase() ||
+      d.slug === result.analysis?.suggestedDomain.toLowerCase().replace(/\s+/g, '-')
+    );
+
+    return c.json({
+      success: true,
+      data: {
+        analysis: result.analysis,
+        matchedDomain: matchedDomain || null,
+        availableDomains: allDomains,
+      },
+    });
+  } catch (error) {
+    console.error('[AI Analyzer] Error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Analysis failed',
+    }, 500);
+  }
+});
+
+// Add source from AI analysis
+sourcesRoutes.post('/from-analysis', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const { analysis, domainId, isGlobal = false } = body;
+
+  if (!analysis || !domainId) {
+    return c.json({ success: false, error: 'Analysis and domainId are required' }, 400);
+  }
+
+  // Only admins can create global sources
+  if (isGlobal && !isAdmin(user)) {
+    return c.json({ success: false, error: 'Only admins can create global sources' }, 403);
+  }
+
+  try {
+    // Determine source type
+    let type: 'rss' | 'website' | 'youtube';
+    let url: string;
+    let config: Record<string, any> = {};
+
+    switch (analysis.sourceType) {
+      case 'rss':
+        type = 'rss';
+        url = analysis.feedUrl || analysis.websiteUrl;
+        break;
+      case 'youtube_channel':
+      case 'youtube_playlist':
+        type = 'youtube';
+        url = analysis.websiteUrl;
+        config.channelId = analysis.youtubeChannelId;
+        break;
+      case 'website':
+        type = 'website';
+        url = analysis.websiteUrl;
+        config.scrapeSelector = 'article, .article, .post, main';
+        break;
+      default:
+        type = 'website';
+        url = analysis.websiteUrl || analysis.feedUrl;
+    }
+
+    if (!url) {
+      return c.json({ success: false, error: 'No valid URL found in analysis' }, 400);
+    }
+
+    // Create the source
+    const [newSource] = await db.insert(sources).values({
+      name: analysis.name,
+      type,
+      url,
+      domainId,
+      reliabilityScore: analysis.confidence,
+      isActive: true,
+      config,
+      createdBy: isGlobal ? null : user.id,
+    }).returning();
+
+    console.log(`[AI Analyzer] Created source: ${newSource.name} (${newSource.id})`);
+
+    return c.json({
+      success: true,
+      data: {
+        source: newSource,
+        message: `Successfully added "${analysis.name}" as a ${type} source.`,
+      },
+    });
+  } catch (error) {
+    console.error('[AI Analyzer] Create error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create source',
+    }, 500);
+  }
+});
 
 // List sources (all global sources + user's own sources)
 sourcesRoutes.get('/', async (c) => {
@@ -116,6 +250,42 @@ sourcesRoutes.get('/lists/my', async (c) => {
   }));
   
   return c.json({ success: true, data: listsWithCounts });
+});
+
+// Get user's active source list (must be before :listId route!)
+sourcesRoutes.get('/lists/active', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: true, data: null });
+  }
+  
+  const prefs = user.preferences as { activeSourceListId?: string } || {};
+  const activeListId = prefs.activeSourceListId;
+  
+  if (!activeListId) {
+    return c.json({ success: true, data: null });
+  }
+  
+  // Get the list details
+  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, activeListId)).limit(1);
+  
+  if (!list) {
+    return c.json({ success: true, data: null });
+  }
+  
+  // Get source IDs in this list
+  const items = await db.select({ sourceId: sourceListItems.sourceId })
+    .from(sourceListItems)
+    .where(eq(sourceListItems.sourceListId, activeListId));
+  
+  return c.json({ 
+    success: true, 
+    data: {
+      ...list,
+      sourceIds: items.map(i => i.sourceId),
+    }
+  });
 });
 
 // Get a specific source list with its items
@@ -239,6 +409,31 @@ sourcesRoutes.patch('/lists/:listId', async (c) => {
     return c.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update list',
+    }, 500);
+  }
+});
+
+// Clear active source list (must be before :listId route!)
+sourcesRoutes.delete('/lists/active', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    const currentPrefs = user.preferences as Record<string, unknown> || {};
+    const { activeSourceListId, ...restPrefs } = currentPrefs;
+    
+    await db.update(users)
+      .set({ preferences: restPrefs })
+      .where(eq(users.id, user.id));
+    
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear active list',
     }, 500);
   }
 });
@@ -557,113 +752,4 @@ sourcesRoutes.get('/user/info', async (c) => {
       email: user?.email || null,
     }
   });
-});
-
-// ==================== ACTIVE SOURCE LIST ====================
-
-// Get user's active source list
-sourcesRoutes.get('/lists/active', async (c) => {
-  const user = c.get('user');
-  
-  if (!user) {
-    return c.json({ success: true, data: null });
-  }
-  
-  const prefs = user.preferences as { activeSourceListId?: string } || {};
-  const activeListId = prefs.activeSourceListId;
-  
-  if (!activeListId) {
-    return c.json({ success: true, data: null });
-  }
-  
-  // Get the list details
-  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, activeListId)).limit(1);
-  
-  if (!list) {
-    // List was deleted, clear the preference
-    return c.json({ success: true, data: null });
-  }
-  
-  // Get source IDs in this list
-  const items = await db.select({ sourceId: sourceListItems.sourceId })
-    .from(sourceListItems)
-    .where(eq(sourceListItems.sourceListId, activeListId));
-  
-  return c.json({ 
-    success: true, 
-    data: {
-      ...list,
-      sourceIds: items.map(i => i.sourceId),
-    }
-  });
-});
-
-// Set a source list as active
-sourcesRoutes.post('/lists/:listId/activate', async (c) => {
-  const user = c.get('user');
-  const listId = c.req.param('listId');
-  
-  if (!user) {
-    return c.json({ success: false, error: 'Authentication required' }, 401);
-  }
-  
-  // Verify list exists and user can access it
-  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, listId)).limit(1);
-  
-  if (!list) {
-    return c.json({ success: false, error: 'Source list not found' }, 404);
-  }
-  
-  // User must own the list or it must be public
-  if (list.userId !== user.id && !list.isPublic) {
-    return c.json({ success: false, error: 'Access denied' }, 403);
-  }
-  
-  try {
-    // Update user preferences
-    const currentPrefs = user.preferences as Record<string, unknown> || {};
-    const newPrefs = { ...currentPrefs, activeSourceListId: listId };
-    
-    await db.update(users)
-      .set({ preferences: newPrefs })
-      .where(eq(users.id, user.id));
-    
-    return c.json({ 
-      success: true, 
-      data: { 
-        activeSourceListId: listId,
-        listName: list.name,
-      }
-    });
-  } catch (error) {
-    return c.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to activate list',
-    }, 500);
-  }
-});
-
-// Clear active source list (show all sources)
-sourcesRoutes.delete('/lists/active', async (c) => {
-  const user = c.get('user');
-  
-  if (!user) {
-    return c.json({ success: false, error: 'Authentication required' }, 401);
-  }
-  
-  try {
-    const currentPrefs = user.preferences as Record<string, unknown> || {};
-    const { activeSourceListId, ...restPrefs } = currentPrefs;
-    
-    await db.update(users)
-      .set({ preferences: restPrefs })
-      .where(eq(users.id, user.id));
-    
-    return c.json({ success: true });
-  } catch (error) {
-    return c.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to clear active list',
-    }, 500);
-  }
 });

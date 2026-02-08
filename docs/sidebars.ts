@@ -11,7 +11,15 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Features',
-      items: ['features/sources', 'features/briefings', 'features/verification', 'features/source-lists'],
+      items: [
+        'features/sources', 
+        'features/briefings', 
+        'features/verification', 
+        'features/source-lists',
+        'features/humint',
+        'features/intel-bounties',
+        'features/zk-proofs',
+      ],
     },
     {
       type: 'category',
@@ -21,7 +29,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Integrations',
-      items: ['integrations/telegram', 'integrations/bastion'],
+      items: ['integrations/telegram', 'integrations/bastion', 'integrations/zcash-escrow'],
     },
     {
       type: 'category',

@@ -17,6 +17,7 @@
     "@lucia-auth/adapter-drizzle": "^1.1.0",
     "@mozilla/readability": "^0.6.0",
     "bcrypt": "^6.0.0",
+    "circomlibjs": "^0.1.7",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.6.16",
@@ -26,6 +27,7 @@
     "pg-boss": "^10.1.5",
     "postgres": "^3.4.5",
     "rss-parser": "^3.13.0",
+    "snarkjs": "^0.7.6",
     "zod": "^3.24.1"
   },
   "devDependencies": {

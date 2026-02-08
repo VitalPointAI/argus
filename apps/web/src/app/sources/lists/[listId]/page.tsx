@@ -32,20 +32,27 @@ interface SourceList {
 
 export default function SourceListDetailPage() {
   const { listId } = useParams();
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const [list, setList] = useState<SourceList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
-    if (listId) {
-      fetchList();
+    // Wait for auth to finish loading before making requests
+    if (authLoading || hasFetched) return;
+    if (!listId) return;
+    
+    // Once auth is settled, fetch the list
+    setHasFetched(true);
+    fetchList();
+    if (token) {
       checkIfActive();
     }
-  }, [listId, token]);
+  }, [listId, token, authLoading, hasFetched]);
 
   const checkIfActive = async () => {
     if (!token) return;
@@ -210,17 +217,16 @@ export default function SourceListDetailPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-2 mb-2 text-sm">
             <a href="/sources" className="text-slate-500 hover:text-slate-700">
               Sources
             </a>
             <span className="text-slate-400">/</span>
             <span className="text-slate-700 dark:text-slate-300">Lists</span>
-            <span className="text-slate-400">/</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
             {list.name}
             {list.isPublic && (
               <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded text-sm font-medium">
@@ -234,10 +240,10 @@ export default function SourceListDetailPage() {
             </p>
           )}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2">
           <a
             href="/sources"
-            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+            className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
           >
             ← Back
           </a>
@@ -246,15 +252,15 @@ export default function SourceListDetailPage() {
               <button
                 onClick={deactivateList}
                 disabled={activating}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+                className="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1"
               >
-                <span>✓</span> Active — Click to Show All
+                <span>✓</span> <span className="hidden sm:inline">Active —</span> Show All
               </button>
             ) : (
               <button
                 onClick={activateList}
                 disabled={activating}
-                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+                className="px-3 py-2 text-sm bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1"
               >
                 {activating ? 'Activating...' : '🎯 Use for Dashboard'}
               </button>
@@ -263,7 +269,7 @@ export default function SourceListDetailPage() {
           {list.isOwner && (
             <a
               href="/sources/manage"
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+              className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
             >
               Manage
             </a>
@@ -274,37 +280,41 @@ export default function SourceListDetailPage() {
       {/* Sources in this list */}
       {list.items.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-          <div className="bg-slate-50 dark:bg-slate-700 px-6 py-4 border-b border-slate-200 dark:border-slate-600">
+          <div className="bg-slate-50 dark:bg-slate-700 px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-600">
             <h2 className="text-lg font-semibold">
               {list.items.length} Source{list.items.length !== 1 ? 's' : ''} in this list
             </h2>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {list.items.map((item) => (
-              <div key={item.id} className="px-6 py-4 flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
+              <div key={item.id} className="px-4 md:px-6 py-4 space-y-2">
+                {/* Source name and status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
                     <StatusDot active={item.source.isActive} />
-                    <span className="font-medium">{item.source.name}</span>
-                    <TypeBadge type={item.source.type} />
-                    <ReliabilityBadge score={item.source.reliabilityScore} />
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500 truncate max-w-xl">
-                    {item.source.url}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-slate-500">
-                    Added {new Date(item.addedAt).toLocaleDateString()}
+                    <span className="font-medium break-words">{item.source.name}</span>
                   </div>
                   {list.isOwner && (
                     <button
                       onClick={() => removeItem(item.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      className="text-red-600 hover:text-red-800 text-sm shrink-0"
                     >
                       Remove
                     </button>
                   )}
+                </div>
+                {/* URL */}
+                <div className="text-sm text-slate-500 truncate">
+                  {item.source.url}
+                </div>
+                {/* Badges and date */}
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <TypeBadge type={item.source.type} />
+                  <ReliabilityBadge score={item.source.reliabilityScore} />
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-500">
+                    Added {new Date(item.addedAt).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
             ))}

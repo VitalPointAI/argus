@@ -1,3 +1,5 @@
+import { ConfidenceBadge } from '@/components/VerificationTrail';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
 async function getDomain(slug: string) {
@@ -88,13 +90,7 @@ export default async function DomainPage({ params }: { params: { slug: string } 
                       <span>{new Date(item.publishedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 rounded text-sm font-medium ${
-                    item.confidenceScore >= 70 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                    item.confidenceScore >= 40 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {item.confidenceScore}%
-                  </span>
+                  <ConfidenceBadge score={item.confidenceScore || 0} contentId={item.id} />
                 </div>
               </article>
             ))

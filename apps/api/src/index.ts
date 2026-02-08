@@ -20,6 +20,12 @@ import { factcheckRoutes } from './routes/factcheck';
 import articlesRoutes from './routes/articles';
 import { adminRoutes } from './routes/admin';
 import { apiKeysRoutes, combinedAuthMiddleware } from './routes/api-keys';
+import { emailRoutes } from './routes/email';
+import { profileRoutes } from './routes/profile';
+import humintRoutes from './routes/humint';
+import bountiesRoutes from './routes/bounties';
+import opsecRoutes from './routes/opsec';
+import zkRoutes from './routes/zk';
 
 const app = new Hono();
 
@@ -38,6 +44,7 @@ app.use('/api/*', combinedAuthMiddleware);
 
 // Routes
 app.route('/health', healthRoutes);
+app.route('/api/health', healthRoutes); // Also expose under /api/health
 app.route('/api/auth', authRoutes);
 app.route('/api/keys', apiKeysRoutes); // API key management
 app.route('/api/domains', domainsRoutes);
@@ -52,6 +59,12 @@ app.route('/api/v1', apiV1Routes);
 app.route('/api/factcheck', factcheckRoutes);
 app.route('/api/articles', articlesRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/email', emailRoutes);
+app.route('/api/profile', profileRoutes);
+app.route('/api/humint', humintRoutes);
+app.route('/api/bounties', bountiesRoutes);
+app.route('/api/opsec', opsecRoutes);
+app.route('/api/zk', zkRoutes);
 
 // Root
 app.get('/', (c) => {

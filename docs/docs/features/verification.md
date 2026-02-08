@@ -2,69 +2,141 @@
 sidebar_position: 3
 ---
 
-# Verification
+# Verification & Trust
 
-AI-powered fact-checking and confidence scoring for all articles.
-
-## How Verification Works
-
-Each ingested article is analyzed for:
-
-1. **Source Credibility** - Historical accuracy of the source
-2. **Cross-Reference** - Corroboration from other sources
-3. **Claim Analysis** - Factual claims extracted and checked
-4. **Recency** - Timeliness and freshness of information
+Argus provides multi-layered verification to help you assess content reliability.
 
 ## Confidence Scores
 
-Articles receive a confidence score from 0-100%:
+Every article gets a confidence score (0-100) based on:
 
-| Score | Label | Description |
-|-------|-------|-------------|
-| 90-100% | ✅ Verified | Multiple corroborating sources |
-| 70-89% | 🟡 Likely | Single credible source, plausible |
-| 50-69% | 🟠 Unverified | Limited corroboration |
-| 0-49% | 🔴 Disputed | Contradicted or suspicious |
+- **Source reliability** - Historical accuracy of the publication
+- **Credibility indicators** - Citations, specific data, expert quotes
+- **Claim verification** - Cross-referenced with other sources
+- **Bias analysis** - Emotional language, sensationalism, political lean
 
-## Verification in Briefings
+### Score Levels
 
-By default, briefings prioritize verified content:
+| Level | Score | Meaning |
+|-------|-------|---------|
+| High | 80-100 | Well-sourced, factually accurate, neutral tone |
+| Medium | 60-79 | Moderately reliable, consider cross-referencing |
+| Low | 40-59 | Exercise caution, verify key claims |
+| Very Low | 0-39 | Significant concerns, verify with trusted sources |
 
-```json
-{
-  "minConfidence": 0.7,
-  "showUnverified": false
-}
-```
+## Ground Truth Sources
 
-Override to include all content:
+Wire services are treated as ground truth due to their journalistic standards:
 
-```bash
-curl -X POST http://localhost:3000/api/briefings/generate \
-  -d '{"minConfidence": 0, "showUnverified": true}'
-```
+- **Associated Press (AP News)**
+- **Reuters**
+- **AFP (Agence France-Presse)**
 
-## Manual Verification
+Claims corroborated by wire services get an automatic confidence boost.
 
-Mark articles as verified/disputed in the dashboard:
+## Claim Extraction
 
-1. Open article detail view
-2. Click **Verification Status**
-3. Select status and add notes
-
-## Verification API
+Argus extracts factual claims from articles using AI:
 
 ```bash
-# Get verification status
-curl http://localhost:3000/api/articles/123/verification
-
-# Update verification
-curl -X PUT http://localhost:3000/api/articles/123/verification \
-  -d '{"status": "verified", "notes": "Confirmed via official source"}'
+# Extract and verify claims for an article
+curl -X POST "https://argus.vitalpoint.ai/api/verification/verify-claims/{contentId}"
 ```
 
-## Improving Accuracy
+Each claim is assessed for:
+- **Verifiability** - Can it be fact-checked?
+- **Status** - verified, partially_verified, unverified, contradicted
+- **Corroboration** - Which other sources support or contradict it?
 
-- Add more diverse sources for better cross-referencing
-- Regularly review flagged articles
-- Report false positives to improve the model
+## Cross-Reference Verification
+
+Claims are automatically compared against your article database:
+
+```bash
+# Cross-reference all claims for an article
+curl -X POST "https://argus.vitalpoint.ai/api/verification/cross-reference/content/{contentId}"
+```
+
+A claim is marked **verified** when:
+- Found in 3+ independent sources, OR
+- Corroborated by a wire service (ground truth)
+
+## Bias Detection
+
+AI-powered analysis of political lean and journalistic quality:
+
+```bash
+# Analyze article bias
+curl -X POST "https://argus.vitalpoint.ai/api/verification/bias/{contentId}"
+```
+
+Returns:
+- **Political bias**: far-left to far-right spectrum
+- **Emotional language**: none/low/medium/high
+- **Sensationalism**: clickbait detection
+- **Specific indicators**: loaded language, unsupported claims, ad hominem attacks
+
+## Verification Trail
+
+See exactly why an article got its confidence score:
+
+```bash
+# Get full verification trail
+curl "https://argus.vitalpoint.ai/api/verification/trail/{contentId}"
+```
+
+Returns a step-by-step breakdown:
+- Source reliability contribution
+- Claim verification results
+- Cross-reference matches
+- Bias indicators
+- Overall recommendation
+
+## Deep Verification
+
+Run the full verification pipeline in one call:
+
+```bash
+# Full verification: claims + cross-reference + bias + trail
+curl -X POST "https://argus.vitalpoint.ai/api/verification/deep/{contentId}"
+```
+
+This is expensive (multiple LLM calls) but provides comprehensive analysis.
+
+## Batch Operations
+
+### Batch Claim Extraction
+```bash
+curl -X POST "https://argus.vitalpoint.ai/api/verification/claims/extract-recent?limit=10"
+```
+
+### Batch Cross-Reference
+```bash
+curl -X POST "https://argus.vitalpoint.ai/api/verification/cross-reference/batch?limit=20"
+```
+
+### Batch Bias Analysis
+```bash
+curl -X POST "https://argus.vitalpoint.ai/api/verification/bias/batch?limit=20"
+```
+
+## Statistics
+
+```bash
+# Overall verification stats
+curl "https://argus.vitalpoint.ai/api/verification/stats/overview"
+
+# Cross-reference stats
+curl "https://argus.vitalpoint.ai/api/verification/cross-reference/stats"
+
+# Source bias summary
+curl "https://argus.vitalpoint.ai/api/verification/bias/source/{sourceId}"
+```
+
+## Best Practices
+
+1. **Trust but verify** - High-confidence scores are a good signal, but always check important claims
+2. **Wire services first** - Prioritize AP, Reuters, AFP for breaking news
+3. **Check the trail** - Use `/trail` to understand why a score was assigned
+4. **Bias awareness** - Use bias analysis to understand perspective, not to dismiss content
+5. **Cross-reference important claims** - Run deep verification on high-stakes content

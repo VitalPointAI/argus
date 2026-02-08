@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ingestRSSSource, ingestAllRSSSources } from '../services/ingestion/rss';
 import { ingestYouTubeVideo, ingestAllYouTubeSources } from '../services/ingestion/youtube';
+import { ingestWebSource, ingestAllWebSources } from '../services/ingestion/web';
 import { db, sources } from '../db';
 import { eq } from 'drizzle-orm';
 
@@ -23,6 +24,8 @@ ingestionRoutes.post('/:sourceId', async (c) => {
     } else if (source.type === 'youtube') {
       const result = await ingestYouTubeVideo(source.url, sourceId);
       count = result.success ? 1 : 0;
+    } else if (source.type === 'web') {
+      count = await ingestWebSource(sourceId);
     } else {
       return c.json({ success: false, error: `Ingestion not implemented for type: ${source.type}` }, 501);
     }
@@ -80,6 +83,28 @@ ingestionRoutes.post('/youtube/all', async (c) => {
   }
 });
 
+// Ingest all web sources
+ingestionRoutes.post('/web/all', async (c) => {
+  try {
+    const results = await ingestAllWebSources();
+    const totalIngested = results.reduce((sum, r) => sum + r.count, 0);
+    
+    return c.json({ 
+      success: true, 
+      data: { 
+        sourcesProcessed: results.length,
+        totalItemsIngested: totalIngested,
+        details: results 
+      } 
+    });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
 // Ingest a single YouTube video by URL
 ingestionRoutes.post('/youtube/video', async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -102,6 +127,40 @@ ingestionRoutes.post('/youtube/video', async (c) => {
 
     const result = await ingestYouTubeVideo(url, targetSourceId);
     return c.json({ success: result.success, data: result });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Ingest ALL sources (RSS + YouTube + Web)
+ingestionRoutes.post('/all', async (c) => {
+  try {
+    const [rssResults, ytResults, webResults] = await Promise.all([
+      ingestAllRSSSources(),
+      ingestAllYouTubeSources(),
+      ingestAllWebSources(),
+    ]);
+    
+    return c.json({ 
+      success: true, 
+      data: { 
+        rss: {
+          sourcesProcessed: rssResults.length,
+          totalItemsIngested: rssResults.reduce((sum, r) => sum + r.count, 0),
+        },
+        youtube: {
+          sourcesProcessed: ytResults.length,
+          totalItemsIngested: ytResults.reduce((sum, r) => sum + r.count, 0),
+        },
+        web: {
+          sourcesProcessed: webResults.length,
+          totalItemsIngested: webResults.reduce((sum, r) => sum + r.count, 0),
+        },
+      } 
+    });
   } catch (error) {
     return c.json({ 
       success: false, 

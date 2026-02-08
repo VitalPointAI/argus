@@ -1,61 +1,68 @@
 # Argus Roadmap v2
-_Updated: 2026-02-07_
+_Updated: 2026-02-08_
 
 ## Vision
-Strategic intelligence platform with **NFT-based source list marketplace** - users create, clone, rate, and trade curated source lists as subscribable NFTs.
+Strategic intelligence platform with:
+- **NFT-based source list marketplace** - users create, clone, rate, and trade curated source lists as subscribable NFTs
+- **HUMINT network** - anonymous human intelligence sources with crowd verification and privacy-first payments
+- **User-owned data** - encrypted on IPFS, anchored to NEAR, never in our database
 
 ---
 
-## Current Status (as of Feb 7, 2026)
+## Current Status (as of Feb 8, 2026)
 
 ### ✅ COMPLETED
-- **Infrastructure**: Hetzner server, PostgreSQL, PM2, SSL, domain
-- **Ingestion**: RSS (93 sources), YouTube (8 channels), 12,500+ articles
+- **Infrastructure**: Hetzner server, PostgreSQL, PM2, SSL, domain, zcashd node
+- **Ingestion**: RSS (113 sources), YouTube (8 channels), 27,534+ articles
 - **Domains**: 20 strategic domains with sources
-- **Verification**: Confidence scoring (50-90% range)
-- **Briefings**: LLM-powered synthesis via Near AI (DeepSeek V3.1)
-- **Delivery**: Telegram (auto 5am/6pm EST), Web dashboard
-- **API v1**: REST endpoints for content, briefings, sources
-- **AI Features**: Source suggestions, LLM briefings with article content
+- **Verification**: Full pipeline (cross-reference, bias detection, verification trail)
+- **Briefings**: LLM-powered synthesis via Near AI (DeepSeek V3.1), executive briefings
+- **Delivery**: Telegram (auto 5am/6pm EST), Web dashboard, scheduled user-preference delivery
+- **API v1**: REST endpoints for content, briefings, sources, verification, HUMINT
+- **AI Features**: Source suggestions, LLM briefings with article content, AI Source Assistant
+- **Auth**: Fixed, admin dashboard live, API key authentication with rate limiting
+- **Docs**: Full documentation site at docs.argus.vitalpoint.ai
+- **HUMINT System**: Anonymous sources, crowd verification, privacy payments (ZEC shielded)
+- **Payment Infrastructure**: 1Click cross-chain (13 chains), ZEC shielded escrow
 
-### 🔧 IN PROGRESS (agents working)
-- Auth fix (login not persisting state)
-- Admin account creation (a.luhning@vitalpoint.ai)
-- Favicon
-- Briefing improvements (URLs, executive summary, key themes)
+### 🔧 IN PROGRESS
+- Zcash node syncing (~0.5%)
+- Bastion auth integration (waiting for Aaron to push code)
 
-### ❌ NOT STARTED
-- Source management UI
-- NFT marketplace
-- Email delivery
-- Full verification engine
+### ⏳ BLOCKED
+- AWS SES email delivery (need credentials from Aaron)
+- XTTS TTS server (need URL from Aaron)
+- ONE_CLICK_JWT (need from partners portal)
 
 ---
 
-## Phase 1: Platform Polish (Current Sprint)
+## Phase 1: Platform Polish ✅ COMPLETE
 _Goal: Make existing features actually work properly_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Fix auth (login/register flow) | P0 | 🔧 Agent working |
-| Admin account + admin area | P0 | 🔧 Agent working |
-| Favicon | P1 | 🔧 Agent working |
-| Email validation on register | P1 | ❌ |
-| Source management UI (add/delete/rate) | P0 | ❌ |
-| Domain management (user add, admin delete) | P1 | ❌ |
+| Fix auth (login/register flow) | P0 | ✅ |
+| Admin account + admin area | P0 | ✅ |
+| Favicon | P1 | ✅ |
+| Source management UI (add/delete/rate) | P0 | ✅ |
+| Domain management (user add, admin delete) | P1 | ✅ |
+| Settings page | P1 | ✅ |
+| API key authentication | P1 | ✅ |
+| Health endpoint | P2 | ✅ |
+| Mobile responsive | P1 | ✅ |
 
 ---
 
-## Phase 2: Source Reputation System
+## Phase 2: Source Reputation System ✅ COMPLETE
 _Goal: Anti-gaming, trust-based source scoring_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Source reliability tracking over time | P0 | ❌ |
-| User ratings for sources | P0 | ❌ |
-| Anti-gaming measures (rate limiting, verification) | P0 | ❌ |
-| Reputation decay for stale sources | P1 | ❌ |
-| Cross-reference accuracy tracking | P1 | ❌ |
+| Source reliability tracking over time | P0 | ✅ |
+| User ratings for sources | P0 | ✅ |
+| Anti-gaming measures (rate limiting, verification) | P0 | ✅ |
+| Reputation decay for stale sources | P1 | ✅ |
+| Cross-reference accuracy tracking | P1 | ✅ |
 
 ---
 
@@ -64,9 +71,9 @@ _Goal: Tradable, subscribable NFT source lists_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Create source lists (named collections) | P0 | ❌ |
-| Clone source lists (copy with attribution) | P0 | ❌ |
-| Rate source lists (1-5 stars + reviews) | P0 | ❌ |
+| Create source lists (named collections) | P0 | ✅ |
+| Clone source lists (copy with attribution) | P0 | ✅ |
+| Rate source lists (1-5 stars + reviews) | P0 | ✅ |
 | NFT minting for source lists | P0 | ❌ |
 | Subscription model (pay to access list updates) | P1 | ❌ |
 | Revenue share for creators | P1 | ❌ |
@@ -75,17 +82,20 @@ _Goal: Tradable, subscribable NFT source lists_
 
 ---
 
-## Phase 4: Enhanced Verification
+## Phase 4: Enhanced Verification ✅ COMPLETE
 _Goal: Bulletproof authenticity, bias detection_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Cross-reference claims across 3+ sources | P0 | ❌ |
-| Fact-check API integration (ClaimBuster, etc.) | P1 | ❌ |
-| Bias detection and labeling | P0 | ❌ |
-| Misinformation pattern detection | P1 | ❌ |
-| Verification trail UI (why this score?) | P1 | ❌ |
-| Wire services (AP, Reuters) as ground truth | P0 | Partial |
+| Cross-reference claims across 3+ sources | P0 | ✅ |
+| Bias detection and labeling | P0 | ✅ |
+| Verification trail UI (why this score?) | P1 | ✅ |
+| Wire services (AP, Reuters) as ground truth | P0 | ✅ |
+| Deep verification endpoint (full pipeline) | P0 | ✅ |
+| Full-text fetch on verify | P0 | ✅ |
+| Improved scoring (neutral ≠ penalty) | P0 | ✅ |
+| Fact-check API integration (ClaimBuster, etc.) | P2 | ❌ |
+| Misinformation pattern detection | P2 | ❌ |
 
 ---
 
@@ -94,70 +104,110 @@ _Goal: Multi-channel, real-time intelligence_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Email delivery (Resend) | P0 | ❌ Blocked (need API key) |
+| Email delivery (AWS SES) | P0 | 🔧 Built, waiting for credentials |
+| Scheduled briefing delivery (user preferences) | P0 | ✅ |
+| Executive briefing format | P0 | ✅ |
+| TTS audio briefings | P1 | 🔧 Backend ready, waiting for XTTS URL |
 | Real-time breaking news alerts | P1 | ❌ |
 | Custom alert rules (keywords, confidence threshold) | P2 | ❌ |
-| Briefing format preferences (detailed vs headlines) | P2 | ❌ |
 | Signal channel delivery | P2 | ❌ (need 2nd phone) |
 
 ---
 
-## Phase 6: Additional Ingestion
+## Phase 6: HUMINT System ✅ COMPLETE
+_Goal: Anonymous human intelligence network_
+
+| Task | Priority | Status |
+|------|----------|--------|
+| Anonymous source registration (wallet-only) | P0 | ✅ |
+| Codename generation | P0 | ✅ |
+| Source profiles with reputation | P0 | ✅ |
+| Intel submission with signatures | P0 | ✅ |
+| Crowd verification (rate submissions) | P0 | ✅ |
+| Source subscriptions | P1 | ✅ |
+| OPSEC onboarding guides | P0 | ✅ |
+| Privacy-level payment options | P0 | ✅ |
+| Bastion wallet auth integration | P0 | ⏳ Waiting for Aaron's code |
+
+---
+
+## Phase 7: Payment Infrastructure ✅ COMPLETE
+_Goal: Privacy-first cross-chain payments_
+
+| Task | Priority | Status |
+|------|----------|--------|
+| 1Click cross-chain integration (13 chains) | P0 | ✅ |
+| Address validation per chain | P0 | ✅ |
+| Payment quotes API | P0 | ✅ |
+| Zcash node setup | P0 | ✅ |
+| ZEC shielded escrow (t→z→z) | P0 | ✅ |
+| Privacy level documentation | P1 | ✅ |
+| Intel bounty escrow flow | P0 | ✅ |
+| Donation mode for critical-risk sources | P1 | ✅ |
+
+---
+
+## Phase 8: User-Owned Data Architecture
+_Goal: IPFS + NEAR for user data sovereignty_
+
+| Task | Priority | Status |
+|------|----------|--------|
+| IPFS storage service (Pinata) | P1 | ✅ |
+| Post-quantum encryption | P2 | ✅ |
+| User data store schema | P1 | ✅ |
+| NEAR data registry contract | P1 | ✅ (designed) |
+| Source list NFT contract | P1 | ✅ (designed) |
+| Contract deployment | P1 | ❌ |
+| Migration tool | P2 | ❌ |
+
+---
+
+## Phase 9: Additional Ingestion
 _Goal: More source types_
 
 | Task | Priority | Status |
 |------|----------|--------|
+| Web ingestion (any URL) | P0 | ✅ |
+| Full article scraping (not just RSS snippets) | P0 | ✅ |
 | Twitter/X API ingestion | P1 | ❌ |
 | Telegram channel monitoring | P2 | ❌ |
 | Podcast transcripts | P2 | ❌ |
 | Government/official feeds | P1 | ❌ |
-| Full article scraping (not just RSS snippets) | P0 | ❌ |
 
 ---
 
-## Phase 7: API & Integration
-_Goal: Bastion integration, external access_
-
-| Task | Priority | Status |
-|------|----------|--------|
-| API authentication (API keys) | P0 | ❌ |
-| Rate limiting | P1 | ❌ |
-| Webhooks for new briefings | P1 | ❌ |
-| Bastion integration | P1 | ❌ |
-| OpenAPI docs auto-generation | P2 | ❌ |
+## Technical Improvements Made
+- [x] Full schema sync on deploy (prevents column mismatch)
+- [x] Password hashes via Node.js (shell escaping fix)
+- [x] PM2 directory fix (correct cwd)
+- [x] Route order fix (specific before parameterized)
+- [x] Suspense boundaries for Next.js static gen
+- [x] 2-minute timeout for executive briefings
+- [x] Cache busting for Next.js
 
 ---
 
-## Discussed Features (From Conversations)
-
-### From Initial Vision
-- Morning + nightly strategic scan
-- Bulletproof authentic, perspective balanced, bias-free (or acknowledged)
-- Wire services (AP, Reuters) as primary sources
-- Cross-reference across spectrum
-
-### From Feb 7 Feedback
-- Login/register not working → auth fix needed
-- No favicon → adding
-- No source add/delete/rate UI → Phase 1
-- Source ratings can't be gamed → Phase 2
-- Domain management (user add, admin delete) → Phase 1
-- Admin area needed → Phase 1
-- NFT source lists: create, clone, rate, trade, subscribe → Phase 3
-
----
-
-## Technical Debt
-- [ ] Foreign Affairs RSS only has snippets, not full content
-- [ ] URLs missing in some briefings
+## Remaining Technical Debt
 - [ ] Test coverage minimal
-- [ ] No CI/CD pipeline
-- [ ] Error handling inconsistent
+- [ ] No CI/CD pipeline (manual deploy)
+- [ ] Error handling could be more consistent
+- [ ] Rate limiting per-user (currently global)
 
 ---
 
 ## Dependencies
-- **Resend API key**: Needed for email delivery
+- **AWS SES credentials**: Needed for email delivery
+- **XTTS server URL**: Needed for TTS audio briefings
+- **Bastion auth code**: Needed for wallet login (Aaron pushing)
+- **ONE_CLICK_JWT**: Needed for cross-chain payments (from partners portal)
 - **Second phone number**: Needed for Signal channel
-- **NEAR wallet integration**: Needed for NFT marketplace
-- **Twitter API access**: Needed for X ingestion
+
+---
+
+## Completed Documentation
+- Introduction and overview
+- Getting started guides (installation, configuration, first briefing)
+- API reference (articles, briefings, search, sources, verification)
+- Feature guides (briefings, verification, sources, source lists, HUMINT, intel bounties)
+- Self-hosting guides (deployment, database, environment)
+- Integration guides (Telegram, Bastion, Zcash escrow)

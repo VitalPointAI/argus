@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
+import { ConfidenceBadge } from '@/components/VerificationTrail';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -54,17 +55,7 @@ function StatCard({ title, value, subtitle }: { title: string; value: number; su
   );
 }
 
-function ConfidenceBadge({ score }: { score: number }) {
-  const color = score >= 70 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                score >= 40 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-  
-  return (
-    <span className={`px-2 py-1 rounded text-sm font-medium ${color}`}>
-      {score}%
-    </span>
-  );
-}
+// ConfidenceBadge moved to @/components/VerificationTrail
 
 function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: SortOption) => void }) {
   return (
@@ -254,7 +245,7 @@ export default function Dashboard() {
                       <span>{new Date(item.publishedAt || item.fetchedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <ConfidenceBadge score={item.confidenceScore || 0} />
+                  <ConfidenceBadge score={item.confidenceScore || 0} contentId={item.id} />
                 </div>
               </article>
             ))

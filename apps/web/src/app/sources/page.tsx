@@ -140,7 +140,7 @@ export default function SourcesPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
             Intelligence Sources
@@ -149,16 +149,22 @@ export default function SourcesPage() {
             {sources.length} sources across {domains.length} strategic domains
           </p>
         </div>
-        <div className="flex gap-3 items-center">
-          <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+        <div className="flex flex-wrap gap-2 md:gap-3 items-center">
+          <span className="px-3 py-1.5 md:px-4 md:py-2 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-lg text-sm font-medium">
             {sources.filter((s) => s.isActive).length} Active
           </span>
-          <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium">
+          <span className="px-3 py-1.5 md:px-4 md:py-2 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium">
             {sources.filter((s) => !s.isActive).length} Inactive
           </span>
           <a
+            href="/sources/humint"
+            className="px-3 py-1.5 md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-1"
+          >
+            🎭 HUMINT
+          </a>
+          <a
             href="/sources/manage"
-            className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
+            className="px-3 py-1.5 md:px-4 md:py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
           >
             Manage Sources
           </a>
@@ -166,23 +172,51 @@ export default function SourcesPage() {
       </div>
 
       {/* User's Source Lists */}
-      {user && sourceLists.length > 0 && (
+      {user && (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            📋 My Source Lists
-          </h2>
-          <div className="flex flex-wrap gap-3">
-            {sourceLists.map((list) => (
-              <a
-                key={list.id}
-                href={`/sources/lists/${list.id}`}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition"
-              >
-                <span className="font-medium">{list.name}</span>
-                <span className="ml-2 text-slate-500 text-sm">({list.itemCount} sources)</span>
-              </a>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              📋 My Source Lists
+            </h2>
+            <a
+              href="/sources/manage?tab=lists"
+              className="text-sm text-argus-600 hover:text-argus-700 dark:text-argus-400"
+            >
+              Manage Lists →
+            </a>
           </div>
+          {sourceLists.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {sourceLists.map((list) => (
+                <a
+                  key={list.id}
+                  href={`/sources/lists/${list.id}`}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+                >
+                  <span className="font-medium">{list.name}</span>
+                  <span className="ml-2 text-slate-500 text-sm">({list.itemCount} sources)</span>
+                </a>
+              ))}
+              <a
+                href="/sources/manage?tab=lists"
+                className="px-4 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-argus-400 hover:text-argus-600 transition flex items-center gap-2"
+              >
+                <span>+</span> New List
+              </a>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-slate-500 dark:text-slate-400 mb-3">
+                Create lists to organize sources for focused briefings
+              </p>
+              <a
+                href="/sources/manage?tab=lists"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
+              >
+                <span>+</span> Create Your First List
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -204,10 +238,57 @@ export default function SourcesPage() {
                 </span>
               </h2>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700">
+              {group.sources.map((source: Source) => (
+                <div key={source.id} className="px-4 py-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <StatusDot active={source.isActive} />
+                      <span className="font-medium truncate">{source.name}</span>
+                    </div>
+                    {user && (
+                      <button
+                        onClick={() => setAddToListModal({ sourceId: source.id, sourceName: source.name })}
+                        className="px-2 py-1 text-xs bg-argus-100 text-argus-700 dark:bg-argus-900/30 dark:text-argus-300 rounded hover:bg-argus-200 transition shrink-0"
+                        title="Add to list"
+                      >
+                        + List
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TypeBadge type={source.type} />
+                    {source.isGlobal && (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded text-xs font-medium">
+                        Global
+                      </span>
+                    )}
+                    {source.isOwner && (
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded text-xs font-medium">
+                        Mine
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 break-all">
+                    {source.url}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {source.lastFetchedAt ? (
+                      <>Fetched: {new Date(source.lastFetchedAt).toLocaleDateString()}</>
+                    ) : (
+                      <>Never fetched</>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Row View */}
+            <div className="hidden md:block divide-y divide-slate-100 dark:divide-slate-700">
               {group.sources.map((source: Source) => (
                 <div key={source.id} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <StatusDot active={source.isActive} />
                       <span className="font-medium">{source.name}</span>
@@ -227,7 +308,7 @@ export default function SourcesPage() {
                       {source.url}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right text-sm text-slate-500">
                       {source.lastFetchedAt ? (
                         <div>
@@ -237,7 +318,7 @@ export default function SourcesPage() {
                         <div className="text-slate-400">Never fetched</div>
                       )}
                     </div>
-                    {user && sourceLists.length > 0 && (
+                    {user && (
                       <button
                         onClick={() => setAddToListModal({ sourceId: source.id, sourceName: source.name })}
                         className="px-3 py-1 text-sm bg-argus-100 text-argus-700 dark:bg-argus-900/30 dark:text-argus-300 rounded hover:bg-argus-200 transition"
@@ -256,7 +337,7 @@ export default function SourcesPage() {
 
       {/* Legend */}
       <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 text-sm text-slate-600 dark:text-slate-400">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
           <div className="flex items-center gap-2">
             <StatusDot active={true} />
             <span>Active - Feed is being polled</span>
@@ -270,27 +351,53 @@ export default function SourcesPage() {
 
       {/* Add to List Modal */}
       {addToListModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Add to Source List</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Select a list to add "{addToListModal.sourceName}" to:
-            </p>
-            <div className="space-y-2 mb-4">
-              {sourceLists.map((list) => (
-                <button
-                  key={list.id}
-                  onClick={() => addToList(list.id)}
-                  className="w-full text-left px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition"
+            
+            {sourceLists.length > 0 ? (
+              <>
+                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  Select a list to add "{addToListModal.sourceName}" to:
+                </p>
+                <div className="space-y-2 mb-4">
+                  {sourceLists.map((list) => (
+                    <button
+                      key={list.id}
+                      onClick={() => addToList(list.id)}
+                      className="w-full text-left px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition"
+                    >
+                      <div className="font-medium">{list.name}</div>
+                      {list.description && (
+                        <div className="text-sm text-slate-500">{list.description}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mb-4">
+                  <a
+                    href="/sources/manage?tab=lists"
+                    className="text-sm text-argus-600 hover:text-argus-700 dark:text-argus-400"
+                  >
+                    + Create a new list
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4 mb-4">
+                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  You don't have any lists yet. Create one to organize your sources.
+                </p>
+                <a
+                  href="/sources/manage?tab=lists"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
                 >
-                  <div className="font-medium">{list.name}</div>
-                  {list.description && (
-                    <div className="text-sm text-slate-500">{list.description}</div>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end gap-3">
+                  + Create Your First List
+                </a>
+              </div>
+            )}
+            
+            <div className="flex justify-end">
               <button
                 onClick={() => setAddToListModal(null)}
                 className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"

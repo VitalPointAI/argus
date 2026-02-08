@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import ExecutiveBriefing from '@/components/ExecutiveBriefing';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -449,13 +451,158 @@ function BriefingHistoryCard({ briefing, onSelect, isSelected }: {
   );
 }
 
+interface SavedBriefing {
+  id: string;
+  title: string;
+  type: string;
+  content: string;
+  createdAt: string;
+}
+
 export default function BriefingsPage() {
+  const { token } = useAuth();
   const [briefings, setBriefings] = useState<BriefingData[]>([]);
   const [selectedBriefing, setSelectedBriefing] = useState<BriefingData | null>(null);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'latest' | 'history'>('latest');
+  const [activeTab, setActiveTab] = useState<'executive' | 'latest' | 'history'>('executive');
+  const [executiveBriefing, setExecutiveBriefing] = useState<any>(null);
+  const [currentSavedBriefing, setCurrentSavedBriefing] = useState<SavedBriefing | null>(null);
+  const [executiveHistory, setExecutiveHistory] = useState<SavedBriefing[]>([]);
+  const [executiveLoading, setExecutiveLoading] = useState(false);
+  const [executiveError, setExecutiveError] = useState<string | null>(null);
+
+  // Fetch current saved executive briefing
+  const fetchCurrentExecutive = async () => {
+    if (!token) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/briefings/executive/current`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCurrentSavedBriefing(data.data);
+        // Convert to display format
+        setExecutiveBriefing({
+          title: data.data.title,
+          markdownContent: data.data.content,
+          savedAt: data.data.createdAt,
+          briefingId: data.data.id,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch current briefing:', error);
+    }
+  };
+
+  // Fetch executive briefing history
+  const fetchExecutiveHistory = async () => {
+    if (!token) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/briefings/executive/history?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setExecutiveHistory(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch briefing history:', error);
+    }
+  };
+
+  const generateExecutiveBriefing = async () => {
+    setExecutiveLoading(true);
+    setExecutiveError(null);
+    
+    // Create abort controller with 2 minute timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    
+    try {
+      console.log('Starting executive briefing generation...');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const res = await fetch(`${API_URL}/api/briefings/executive`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          type: 'morning',
+          hoursBack: 14,
+          includeTTS: true,
+        }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      console.log('Response received:', res.status);
+      
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('Data parsed, success:', data.success);
+      
+      if (data.success) {
+        setExecutiveBriefing(data.data);
+        // Refresh history to include new briefing
+        if (data.data.saved) {
+          setCurrentSavedBriefing({
+            id: data.data.briefingId,
+            title: data.data.title,
+            type: 'morning',
+            content: data.data.markdownContent,
+            createdAt: new Date().toISOString(),
+          });
+          fetchExecutiveHistory();
+        }
+      } else {
+        setExecutiveError(data.error || 'Failed to generate briefing');
+      }
+    } catch (error: any) {
+      console.error('Executive briefing error:', error);
+      if (error.name === 'AbortError') {
+        setExecutiveError('Request timed out. The briefing is taking longer than expected.');
+      } else {
+        setExecutiveError(error.message || 'Failed to generate briefing');
+      }
+    } finally {
+      setExecutiveLoading(false);
+    }
+  };
+
+  // Load a specific briefing from history
+  const loadHistoricalBriefing = async (id: string) => {
+    if (!token) return;
+    
+    setExecutiveLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/briefings/executive/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setExecutiveBriefing({
+          title: data.data.title,
+          markdownContent: data.data.content,
+          savedAt: data.data.createdAt,
+          briefingId: data.data.id,
+          isHistorical: true,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load briefing:', error);
+    } finally {
+      setExecutiveLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -490,6 +637,14 @@ export default function BriefingsPage() {
 
     fetchData();
   }, []);
+
+  // Fetch executive briefings when token is available
+  useEffect(() => {
+    if (token) {
+      fetchCurrentExecutive();
+      fetchExecutiveHistory();
+    }
+  }, [token]);
 
   const handleSelectBriefing = async (id: string) => {
     const existing = briefings.find(b => b.id === id);
@@ -563,6 +718,16 @@ export default function BriefingsPage() {
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-700">
         <button
+          onClick={() => setActiveTab('executive')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'executive'
+              ? 'border-argus-500 text-argus-600 dark:text-argus-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
+          }`}
+        >
+          🎯 Executive Briefing
+        </button>
+        <button
           onClick={() => setActiveTab('latest')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'latest'
@@ -570,7 +735,7 @@ export default function BriefingsPage() {
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
           }`}
         >
-          Latest Briefing
+          Raw Briefing
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -580,11 +745,110 @@ export default function BriefingsPage() {
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
           }`}
         >
-          Briefing History ({briefings.length})
+          History ({briefings.length})
         </button>
       </div>
 
-      {activeTab === 'history' ? (
+      {activeTab === 'executive' ? (
+        /* Executive Briefing View */
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* History sidebar */}
+          <div className="lg:col-span-1 order-2 lg:order-1">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4">
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-3 text-sm">
+                📜 Briefing History
+              </h3>
+              {executiveHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  No history yet. Generate your first briefing.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {executiveHistory.map((item) => {
+                    const date = new Date(item.createdAt);
+                    const isActive = currentSavedBriefing?.id === item.id || executiveBriefing?.briefingId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => loadHistoricalBriefing(item.id)}
+                        className={`w-full text-left p-2 rounded-lg text-xs transition ${
+                          isActive 
+                            ? 'bg-argus-100 dark:bg-argus-900/30 border border-argus-300 dark:border-argus-700'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                        }`}
+                      >
+                        <div className="font-medium text-slate-700 dark:text-slate-300">
+                          {date.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric',
+                          })}
+                        </div>
+                        <div className="text-slate-500 dark:text-slate-400">
+                          {date.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Main briefing content */}
+          <div className="lg:col-span-3 order-1 lg:order-2">
+            {executiveError && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
+                <strong>Error:</strong> {executiveError}
+                <button 
+                  onClick={() => setExecutiveError(null)}
+                  className="ml-2 text-red-500 hover:text-red-700"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            
+            {/* Show saved timestamp if viewing saved briefing */}
+            {executiveBriefing?.savedAt && !executiveLoading && (
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  {executiveBriefing.isHistorical ? '📜 Viewing historical briefing from' : '📋 Current briefing from'}{' '}
+                  <span className="font-medium">
+                    {new Date(executiveBriefing.savedAt).toLocaleString()}
+                  </span>
+                </div>
+                {executiveBriefing.isHistorical && (
+                  <button
+                    onClick={() => {
+                      if (currentSavedBriefing) {
+                        setExecutiveBriefing({
+                          title: currentSavedBriefing.title,
+                          markdownContent: currentSavedBriefing.content,
+                          savedAt: currentSavedBriefing.createdAt,
+                          briefingId: currentSavedBriefing.id,
+                        });
+                      }
+                    }}
+                    className="text-sm text-argus-600 hover:text-argus-700 dark:text-argus-400"
+                  >
+                    ← Back to current
+                  </button>
+                )}
+              </div>
+            )}
+            
+            <ExecutiveBriefing 
+              briefing={executiveBriefing}
+              onGenerate={generateExecutiveBriefing}
+              loading={executiveLoading}
+            />
+          </div>
+        </div>
+      ) : activeTab === 'history' ? (
         /* History View */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* History List */}

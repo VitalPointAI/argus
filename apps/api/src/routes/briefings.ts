@@ -1,10 +1,135 @@
 import { Hono } from 'hono';
 import { db, briefings, users } from '../db';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 import { generateBriefing, createBriefing } from '../services/intelligence/briefing';
 import { generateLLMBriefing, generateFactCheckedBriefing } from '../services/intelligence/llm-briefing';
+import { generateExecutiveBriefing } from '../services/intelligence/executive-briefing';
+import { generateBriefingAudio } from '../services/tts/elevenlabs';
 
 export const briefingsRoutes = new Hono();
+
+// Get latest executive briefing for current user
+briefingsRoutes.get('/executive/current', async (c) => {
+  const user = c.get('user' as never) as { id: string } | null;
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  try {
+    const [latest] = await db.select()
+      .from(briefings)
+      .where(eq(briefings.userId, user.id))
+      .orderBy(desc(briefings.createdAt))
+      .limit(1);
+
+    if (!latest) {
+      return c.json({ 
+        success: true, 
+        data: null,
+        message: 'No briefing found. Generate your first executive briefing.',
+      });
+    }
+
+    return c.json({ 
+      success: true, 
+      data: {
+        id: latest.id,
+        title: latest.title,
+        type: latest.type,
+        content: latest.content,
+        createdAt: latest.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Get current briefing error:', error);
+    return c.json({ success: false, error: 'Failed to fetch briefing' }, 500);
+  }
+});
+
+// Get executive briefing history for current user
+briefingsRoutes.get('/executive/history', async (c) => {
+  const user = c.get('user' as never) as { id: string } | null;
+  const limit = parseInt(c.req.query('limit') || '10');
+  const offset = parseInt(c.req.query('offset') || '0');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  try {
+    const history = await db.select({
+      id: briefings.id,
+      title: briefings.title,
+      type: briefings.type,
+      createdAt: briefings.createdAt,
+    })
+      .from(briefings)
+      .where(eq(briefings.userId, user.id))
+      .orderBy(desc(briefings.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count
+    const [{ count }] = await db.select({ 
+      count: sql<number>`count(*)::int` 
+    })
+      .from(briefings)
+      .where(eq(briefings.userId, user.id));
+
+    return c.json({ 
+      success: true, 
+      data: history,
+      pagination: {
+        total: count,
+        limit,
+        offset,
+        hasMore: offset + history.length < count,
+      },
+    });
+  } catch (error) {
+    console.error('Get briefing history error:', error);
+    return c.json({ success: false, error: 'Failed to fetch history' }, 500);
+  }
+});
+
+// Get a specific briefing by ID
+briefingsRoutes.get('/executive/:id', async (c) => {
+  const user = c.get('user' as never) as { id: string } | null;
+  const id = c.req.param('id');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  try {
+    const [briefing] = await db.select()
+      .from(briefings)
+      .where(and(
+        eq(briefings.id, id),
+        eq(briefings.userId, user.id)
+      ))
+      .limit(1);
+
+    if (!briefing) {
+      return c.json({ success: false, error: 'Briefing not found' }, 404);
+    }
+
+    return c.json({ 
+      success: true, 
+      data: {
+        id: briefing.id,
+        title: briefing.title,
+        type: briefing.type,
+        content: briefing.content,
+        createdAt: briefing.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Get briefing error:', error);
+    return c.json({ success: false, error: 'Failed to fetch briefing' }, 500);
+  }
+});
 
 // Generate LLM-powered briefing (new!)
 briefingsRoutes.post('/llm', async (c) => {
@@ -95,6 +220,131 @@ briefingsRoutes.post('/factcheck', async (c) => {
     });
   } catch (error) {
     console.error('Fact-checked briefing error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Generate executive briefing (new structured format)
+// Always saves when user is authenticated
+briefingsRoutes.post('/executive', async (c) => {
+  const user = c.get('user' as never) as { id: string } | null;
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    type = 'morning', 
+    hoursBack = 14, 
+    minConfidence = 45,
+    maxArticles = 100,
+    includeTTS = false,
+  } = body;
+
+  try {
+    console.log(`Generating executive ${type} briefing...`);
+    
+    const briefing = await generateExecutiveBriefing({
+      type,
+      hoursBack,
+      minConfidence,
+      maxArticles,
+      includeTTS,
+    });
+
+    // Always save when user is authenticated
+    if (user) {
+      const [saved] = await db.insert(briefings).values({
+        userId: user.id,
+        type,
+        title: briefing.title,
+        content: briefing.markdownContent,
+        summary: briefing.markdownContent.substring(0, 500),
+        changes: [],
+        forecasts: [],
+        contentIds: [],
+        deliveryChannels: ['web'],
+      }).returning();
+
+      return c.json({ 
+        success: true, 
+        data: {
+          ...briefing,
+          saved: true,
+          briefingId: saved.id,
+        }
+      });
+    }
+
+    // Not authenticated - return without saving
+    return c.json({ 
+      success: true, 
+      data: briefing,
+    });
+  } catch (error) {
+    console.error('Executive briefing error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Generate TTS audio for a briefing
+briefingsRoutes.post('/executive/tts', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    type = 'morning', 
+    hoursBack = 14,
+    generateAudio = false, // If true, actually generate audio (costs API credits)
+  } = body;
+
+  try {
+    const briefing = await generateExecutiveBriefing({
+      type,
+      hoursBack,
+      includeTTS: true,
+    });
+
+    if (!briefing.ttsScript) {
+      return c.json({ success: false, error: 'TTS script generation failed' }, 500);
+    }
+
+    // If generateAudio is true and ElevenLabs is configured, generate actual audio
+    if (generateAudio) {
+      const audio = await generateBriefingAudio(briefing.ttsScript);
+      
+      if (audio) {
+        return c.json({ 
+          success: true, 
+          data: {
+            title: briefing.title,
+            audioBase64: audio.audioBase64,
+            contentType: audio.contentType,
+            durationEstimate: audio.durationEstimate,
+            readTimeMinutes: briefing.readTimeMinutes,
+          }
+        });
+      } else {
+        return c.json({ 
+          success: false, 
+          error: 'Audio generation failed. Check ELEVENLABS_API_KEY configuration.',
+        }, 500);
+      }
+    }
+
+    // Return script only (for client-side TTS or preview)
+    return c.json({ 
+      success: true, 
+      data: {
+        title: briefing.title,
+        ttsScript: briefing.ttsScript,
+        readTimeMinutes: briefing.readTimeMinutes,
+        summary: briefing.summary,
+        instructions: 'Set generateAudio=true to get audio, or use this script with your TTS provider',
+      }
+    });
+  } catch (error) {
+    console.error('TTS generation error:', error);
     return c.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

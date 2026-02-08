@@ -1,8 +1,12 @@
 import { Hono } from 'hono';
 import { verifyContent, verifyUnverifiedContent } from '../services/verification/engine';
 import { llmVerifyContent, llmBatchVerify } from '../services/verification/llm-verify';
-import { db, verifications, content, articleClaims, sources } from '../db';
-import { eq, sql } from 'drizzle-orm';
+import { crossReferenceClaim, crossReferenceContent, batchCrossReference, GROUND_TRUTH_SOURCES } from '../services/verification/cross-reference';
+import { analyzeContentBias, batchBiasAnalysis, getSourceBiasSummary } from '../services/verification/bias-detection';
+import { generateVerificationTrail, getVerificationSummary } from '../services/verification/trail';
+import { ensureFullText } from '../services/verification/full-text';
+import { db, verifications, content, articleClaims, sources, crossReferenceResults } from '../db';
+import { eq, sql, desc } from 'drizzle-orm';
 
 export const verificationRoutes = new Hono();
 
@@ -361,4 +365,227 @@ verificationRoutes.get('/stats/overview', async (c) => {
       },
     },
   });
+});
+
+// ============ PHASE 4: Enhanced Verification ============
+
+// Cross-reference a single claim across other sources
+verificationRoutes.post('/cross-reference/claim/:claimId', async (c) => {
+  const claimId = c.req.param('claimId');
+  const daysBack = parseInt(c.req.query('daysBack') || '7');
+
+  try {
+    const result = await crossReferenceClaim(claimId, daysBack);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Cross-reference all claims for a content item
+verificationRoutes.post('/cross-reference/content/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+  const daysBack = parseInt(c.req.query('daysBack') || '7');
+
+  try {
+    const result = await crossReferenceContent(contentId, daysBack);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Batch cross-reference unverified claims
+verificationRoutes.post('/cross-reference/batch', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '20');
+  const daysBack = parseInt(c.req.query('daysBack') || '7');
+
+  try {
+    const result = await batchCrossReference(limit, daysBack);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Get cross-reference stats
+verificationRoutes.get('/cross-reference/stats', async (c) => {
+  try {
+    const [total] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(crossReferenceResults);
+
+    const [accurate] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(crossReferenceResults)
+      .where(sql`was_accurate = true`);
+
+    const recentRefs = await db
+      .select({
+        verificationSource: crossReferenceResults.verificationSource,
+        count: sql<number>`count(*)`,
+      })
+      .from(crossReferenceResults)
+      .groupBy(crossReferenceResults.verificationSource)
+      .orderBy(desc(sql`count(*)`))
+      .limit(10);
+
+    return c.json({
+      success: true,
+      data: {
+        totalReferences: Number(total.count),
+        accurateReferences: Number(accurate.count),
+        accuracyRate: total.count ? Math.round((Number(accurate.count) / Number(total.count)) * 100) : 0,
+        topCorroboratingSources: recentRefs,
+        groundTruthSources: GROUND_TRUTH_SOURCES,
+      },
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Analyze content for bias
+verificationRoutes.post('/bias/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    const result = await analyzeContentBias(contentId);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Batch bias analysis
+verificationRoutes.post('/bias/batch', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '20');
+
+  try {
+    const result = await batchBiasAnalysis(limit);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Get source bias summary
+verificationRoutes.get('/bias/source/:sourceId', async (c) => {
+  const sourceId = c.req.param('sourceId');
+
+  try {
+    const result = await getSourceBiasSummary(sourceId);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Get full verification trail (explains confidence score)
+verificationRoutes.get('/trail/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    const trail = await generateVerificationTrail(contentId);
+    return c.json({ success: true, data: trail });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Get verification summary (lightweight for lists)
+verificationRoutes.get('/summary/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    const summary = await getVerificationSummary(contentId);
+    return c.json({ success: true, data: summary });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Deep verification: extract claims + cross-reference + bias analysis
+verificationRoutes.post('/deep/:contentId', async (c) => {
+  const contentId = c.req.param('contentId');
+
+  try {
+    // Step 0: Ensure we have full article text
+    const fullTextResult = await ensureFullText(contentId);
+    
+    // Step 1: Extract claims via LLM
+    const claimResult = await llmVerifyContent(contentId);
+    
+    // Step 2: Cross-reference claims (skip if no claims extracted)
+    let crossRefResult = null;
+    try {
+      crossRefResult = await crossReferenceContent(contentId, 7);
+    } catch (e) {
+      // No claims to cross-reference - that's okay for short articles
+      crossRefResult = {
+        contentId,
+        claimsProcessed: 0,
+        verified: 0,
+        partiallyVerified: 0,
+        unverified: 0,
+        contradicted: 0,
+        overallConfidence: claimResult.confidenceScore || 50,
+        claims: [],
+        note: 'No claims extracted for cross-referencing',
+      };
+    }
+    
+    // Step 3: Analyze bias
+    const biasResult = await analyzeContentBias(contentId);
+    
+    // Step 4: Generate trail
+    const trail = await generateVerificationTrail(contentId);
+
+    return c.json({
+      success: true,
+      data: {
+        contentId,
+        fullTextFetched: fullTextResult.wasFetched,
+        bodyLength: fullTextResult.newLength,
+        claims: claimResult,
+        crossReference: crossRefResult,
+        bias: biasResult,
+        trail,
+        finalConfidence: trail.finalConfidenceScore,
+        recommendation: trail.summary.recommendation,
+      },
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
 });

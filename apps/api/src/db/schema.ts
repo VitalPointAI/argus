@@ -257,3 +257,161 @@ export const apiKeyRateLimits = pgTable('api_key_rate_limits', {
   windowStart: timestamp('window_start').notNull(),
   requestCount: integer('request_count').notNull().default(0),
 });
+
+// ============ HUMINT (Human Intelligence) ============
+
+// Anonymous HUMINT sources
+export const humintSources = pgTable('humint_sources', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  codename: text('codename').notNull().unique(),
+  publicKey: text('public_key').notNull().unique(),
+  
+  // Profile
+  bio: text('bio'),
+  domains: text('domains').array().notNull().default([]),
+  regions: text('regions').array().notNull().default([]),
+  eventTypes: text('event_types').array().notNull().default([]),
+  
+  // Reputation (crowd-sourced)
+  reputationScore: integer('reputation_score').notNull().default(50),
+  totalSubmissions: integer('total_submissions').notNull().default(0),
+  verifiedCount: integer('verified_count').notNull().default(0),
+  contradictedCount: integer('contradicted_count').notNull().default(0),
+  
+  // Monetization
+  subscriptionPriceUsdc: real('subscription_price_usdc'),
+  isAcceptingSubscribers: boolean('is_accepting_subscribers').notNull().default(false),
+  totalEarningsUsdc: real('total_earnings_usdc').notNull().default(0),
+  subscriberCount: integer('subscriber_count').notNull().default(0),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  lastActiveAt: timestamp('last_active_at'),
+});
+
+// Payment addresses (unlinkable to codename externally)
+// Supports any chain via NEAR Intents 1Click
+export const sourcePaymentAddresses = pgTable('source_payment_addresses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  address: text('address').notNull(),
+  // Chain info for 1Click cross-chain payments
+  chain: text('chain').notNull().default('near'), // 'near', 'eth', 'arb', 'sol', 'btc', etc.
+  tokenId: text('token_id'), // NEAR Intents token ID e.g. 'nep141:sol-5ce3bf...'
+  isPrimary: boolean('is_primary').notNull().default(false),
+  addedAt: timestamp('added_at').notNull().defaultNow(),
+});
+
+// Payment records for 1Click cross-chain payouts
+export const humintPayments = pgTable('humint_payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  
+  // Payment details
+  amountUsdc: real('amount_usdc').notNull(),
+  reason: text('reason').notNull(), // 'subscription', 'bounty', 'tip'
+  referenceId: uuid('reference_id'), // subscription or bounty ID
+  
+  // 1Click details
+  depositAddress: text('deposit_address'), // 1Click temp deposit address
+  recipientAddress: text('recipient_address').notNull(),
+  recipientChain: text('recipient_chain').notNull(),
+  recipientTokenId: text('recipient_token_id'),
+  
+  // Status tracking
+  status: text('status').notNull().default('pending'), // pending, deposited, processing, success, failed, refunded
+  oneClickQuoteId: text('one_click_quote_id'),
+  depositTxHash: text('deposit_tx_hash'),
+  settlementTxHash: text('settlement_tx_hash'),
+  errorMessage: text('error_message'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+});
+
+// HUMINT Submissions
+export const humintSubmissions = pgTable('humint_submissions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  
+  // Content
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  mediaUrls: text('media_urls').array().notNull().default([]),
+  
+  // Context
+  locationRegion: text('location_region'),
+  locationCountry: text('location_country'),
+  eventTag: text('event_tag'),
+  occurredAt: timestamp('occurred_at'),
+  isTimeSensitive: boolean('is_time_sensitive').notNull().default(false),
+  
+  // Cryptographic proof
+  contentHash: text('content_hash').notNull(),
+  signature: text('signature').notNull(),
+  
+  // Verification (crowd-sourced)
+  verificationStatus: text('verification_status').notNull().default('unverified'),
+  verifiedCount: integer('verified_count').notNull().default(0),
+  contradictedCount: integer('contradicted_count').notNull().default(0),
+  neutralCount: integer('neutral_count').notNull().default(0),
+  
+  // Metadata
+  submittedAt: timestamp('submitted_at').notNull().defaultNow(),
+});
+
+// Ratings from consumers
+export const submissionRatings = pgTable('submission_ratings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  submissionId: uuid('submission_id').notNull().references(() => humintSubmissions.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  rating: text('rating').notNull(), // 'verified', 'contradicted', 'neutral'
+  evidenceUrl: text('evidence_url'),
+  comment: text('comment'),
+  ratedAt: timestamp('rated_at').notNull().defaultNow(),
+});
+
+// Source subscriptions (direct to source)
+export const sourceSubscriptions = pgTable('source_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  subscriberId: uuid('subscriber_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  startsAt: timestamp('starts_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  amountPaidUsdc: real('amount_paid_usdc'),
+  paymentTxHash: text('payment_tx_hash'),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Intel bounties
+export const intelBounties = pgTable('intel_bounties', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  domains: text('domains').array().notNull().default([]),
+  regions: text('regions').array().notNull().default([]),
+  
+  rewardUsdc: real('reward_usdc').notNull(),
+  minSourceReputation: integer('min_source_reputation').notNull().default(50),
+  
+  status: text('status').notNull().default('open'), // open, claimed, paid, expired, cancelled
+  expiresAt: timestamp('expires_at'),
+  
+  fulfilledBy: uuid('fulfilled_by').references(() => humintSources.id),
+  fulfillmentSubmissionId: uuid('fulfillment_submission_id').references(() => humintSubmissions.id),
+  paymentTxHash: text('payment_tx_hash'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// HUMINT sources can also be added to regular source lists
+export const sourceListHumintItems = pgTable('source_list_humint_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listId: uuid('list_id').notNull().references(() => sourceLists.id, { onDelete: 'cascade' }),
+  humintSourceId: uuid('humint_source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  addedAt: timestamp('added_at').notNull().defaultNow(),
+});

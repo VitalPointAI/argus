@@ -8,11 +8,13 @@ export default function NavBar() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     router.push('/');
     setIsOpen(false);
+    setUserMenuOpen(false);
   };
 
   const navLinks = [
@@ -20,8 +22,9 @@ export default function NavBar() {
     { href: '/search', label: 'Search' },
     { href: '/domains', label: 'Domains' },
     { href: '/sources', label: 'Sources' },
+    { href: '/bounties', label: '📋 Bounties' },
     { href: '/briefings', label: 'Briefings' },
-    { href: '/predictions', label: '🔮 Predictions' },
+    { href: 'https://docs.argus.vitalpoint.ai', label: '📚 Docs', external: true },
   ];
 
   return (
@@ -37,7 +40,12 @@ export default function NavBar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-argus-300 transition">
+              <a 
+                key={link.href} 
+                href={link.href} 
+                className="hover:text-argus-300 transition"
+                {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              >
                 {link.label}
               </a>
             ))}
@@ -53,6 +61,9 @@ export default function NavBar() {
                     </a>
                   )}
                   <span className="text-slate-300">{user.name}</span>
+                  <a href="/settings" className="text-slate-400 hover:text-white transition">
+                    ⚙️ Settings
+                  </a>
                   <button
                     onClick={handleLogout}
                     className="text-slate-400 hover:text-white transition"
@@ -100,6 +111,7 @@ export default function NavBar() {
                   href={link.href}
                   onClick={() => setIsOpen(false)}
                   className="py-2 px-3 rounded-lg hover:bg-slate-800 transition"
+                  {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 >
                   {link.label}
                 </a>
@@ -109,23 +121,50 @@ export default function NavBar() {
                 {loading ? (
                   <span className="text-slate-400 px-3">...</span>
                 ) : user ? (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-slate-300 px-3">{user.name}</span>
-                    {user.isAdmin && (
-                      <a
-                        href="/admin"
-                        onClick={() => setIsOpen(false)}
-                        className="py-2 px-3 text-purple-400 hover:bg-slate-800 rounded-lg transition"
-                      >
-                        Admin Panel
-                      </a>
-                    )}
+                  <div className="flex flex-col">
+                    {/* Username - tappable to expand submenu */}
                     <button
-                      onClick={handleLogout}
-                      className="text-left py-2 px-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800 transition text-left"
                     >
-                      Logout
+                      <span className="text-white font-medium">{user.name}</span>
+                      <svg 
+                        className={`w-4 h-4 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </button>
+                    
+                    {/* User submenu */}
+                    {userMenuOpen && (
+                      <div className="ml-4 mt-1 flex flex-col gap-1 border-l-2 border-slate-700 pl-3">
+                        <a
+                          href="/settings"
+                          onClick={() => setIsOpen(false)}
+                          className="py-2 px-3 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                        >
+                          ⚙️ Settings
+                        </a>
+                        {user.isAdmin && (
+                          <a
+                            href="/admin"
+                            onClick={() => setIsOpen(false)}
+                            className="py-2 px-3 text-purple-400 hover:bg-slate-800 rounded-lg transition"
+                          >
+                            🛡️ Admin Panel
+                          </a>
+                        )}
+                        <button
+                          onClick={handleLogout}
+                          className="text-left py-2 px-3 text-red-400 hover:text-red-300 hover:bg-slate-800 rounded-lg transition"
+                        >
+                          🚪 Logout
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">

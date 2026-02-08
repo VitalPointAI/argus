@@ -122,3 +122,27 @@ export async function ingestWebSource(sourceId: string): Promise<number> {
     return 0;
   }
 }
+
+export async function ingestAllWebSources(): Promise<{ sourceId: string; name: string; count: number; error?: string }[]> {
+  const webSources = await db.select().from(sources).where(eq(sources.type, 'web'));
+  
+  const results = [];
+  
+  for (const source of webSources) {
+    if (!source.isActive) continue;
+    
+    try {
+      const count = await ingestWebSource(source.id);
+      results.push({ sourceId: source.id, name: source.name, count });
+    } catch (error) {
+      results.push({ 
+        sourceId: source.id, 
+        name: source.name, 
+        count: 0, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }
+  
+  return results;
+}
