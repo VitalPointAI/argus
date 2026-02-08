@@ -19,6 +19,7 @@ import { apiV1Routes } from './routes/api-v1';
 import { factcheckRoutes } from './routes/factcheck';
 import articlesRoutes from './routes/articles';
 import { adminRoutes } from './routes/admin';
+import { apiKeysRoutes, combinedAuthMiddleware } from './routes/api-keys';
 
 const app = new Hono();
 
@@ -32,9 +33,13 @@ app.use('*', cors({
   credentials: true,
 }));
 
+// Combined auth middleware - enables both JWT and API key authentication
+app.use('/api/*', combinedAuthMiddleware);
+
 // Routes
 app.route('/health', healthRoutes);
 app.route('/api/auth', authRoutes);
+app.route('/api/keys', apiKeysRoutes); // API key management
 app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/sources', ratingsRoutes); // Rating routes under /api/sources/:id/rate etc

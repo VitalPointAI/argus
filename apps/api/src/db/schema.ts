@@ -237,3 +237,23 @@ export const ratingAnomalies = pgTable('rating_anomalies', {
   resolved: boolean('resolved').notNull().default(false),
   resolutionAction: text('resolution_action'),
 });
+
+// ============ API Keys ============
+export const apiKeys = pgTable('api_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  keyHash: text('key_hash').notNull(), // SHA-256 hash of the API key
+  keyPrefix: varchar('key_prefix', { length: 8 }).notNull(), // First 8 chars for identification
+  name: varchar('name', { length: 255 }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// API key rate limiting
+export const apiKeyRateLimits = pgTable('api_key_rate_limits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  apiKeyId: uuid('api_key_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+  windowStart: timestamp('window_start').notNull(),
+  requestCount: integer('request_count').notNull().default(0),
+});

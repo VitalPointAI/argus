@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db, users, sources, content, briefings, domains } from '../db';
+import { db, users, sources, content, briefings, domains, apiKeys } from '../db';
 import { eq, desc, count, and, gte, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
@@ -276,5 +276,103 @@ adminRoutes.post('/ingest/trigger', async (c) => {
   } catch (error) {
     console.error('Admin ingest trigger error:', error);
     return c.json({ success: false, error: 'Failed to trigger ingestion' }, 500);
+  }
+});
+
+// ============ API Keys Management (Admin) ============
+
+/**
+ * GET /admin/api-keys - List all API keys across all users
+ */
+adminRoutes.get('/api-keys', async (c) => {
+  try {
+    const keys = await db
+      .select({
+        id: apiKeys.id,
+        userId: apiKeys.userId,
+        userName: users.name,
+        userEmail: users.email,
+        name: apiKeys.name,
+        keyPrefix: apiKeys.keyPrefix,
+        isActive: apiKeys.isActive,
+        lastUsedAt: apiKeys.lastUsedAt,
+        createdAt: apiKeys.createdAt,
+      })
+      .from(apiKeys)
+      .leftJoin(users, eq(apiKeys.userId, users.id))
+      .orderBy(desc(apiKeys.createdAt));
+    
+    return c.json({ success: true, data: keys });
+  } catch (error) {
+    console.error('Admin list API keys error:', error);
+    return c.json({ success: false, error: 'Failed to list API keys' }, 500);
+  }
+});
+
+/**
+ * PUT /admin/api-keys/:id - Update API key (activate/deactivate)
+ */
+adminRoutes.put('/api-keys/:id', async (c) => {
+  try {
+    const keyId = c.req.param('id');
+    const body = await c.req.json();
+    
+    const updateData: Record<string, any> = {};
+    
+    if (typeof body.isActive === 'boolean') {
+      updateData.isActive = body.isActive;
+    }
+    if (typeof body.name === 'string') {
+      updateData.name = body.name;
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ success: false, error: 'No valid fields to update' }, 400);
+    }
+    
+    const [updated] = await db
+      .update(apiKeys)
+      .set(updateData)
+      .where(eq(apiKeys.id, keyId))
+      .returning({
+        id: apiKeys.id,
+        name: apiKeys.name,
+        keyPrefix: apiKeys.keyPrefix,
+        isActive: apiKeys.isActive,
+        lastUsedAt: apiKeys.lastUsedAt,
+        createdAt: apiKeys.createdAt,
+      });
+    
+    if (!updated) {
+      return c.json({ success: false, error: 'API key not found' }, 404);
+    }
+    
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Admin update API key error:', error);
+    return c.json({ success: false, error: 'Failed to update API key' }, 500);
+  }
+});
+
+/**
+ * DELETE /admin/api-keys/:id - Delete any API key (admin only)
+ */
+adminRoutes.delete('/api-keys/:id', async (c) => {
+  try {
+    const keyId = c.req.param('id');
+    
+    const [deleted] = await db
+      .delete(apiKeys)
+      .where(eq(apiKeys.id, keyId))
+      .returning({ id: apiKeys.id });
+    
+    if (!deleted) {
+      return c.json({ success: false, error: 'API key not found' }, 404);
+    }
+    
+    return c.json({ success: true, message: 'API key deleted' });
+  } catch (error) {
+    console.error('Admin delete API key error:', error);
+    return c.json({ success: false, error: 'Failed to delete API key' }, 500);
   }
 });
