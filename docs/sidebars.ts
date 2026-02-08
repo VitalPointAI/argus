@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
         'features/briefings', 
         'features/verification', 
         'features/source-lists',
+        'features/nft-marketplace',
         'features/humint',
         'features/intel-bounties',
         'features/zk-proofs',
@@ -24,7 +25,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'API Reference',
-      items: ['api/overview', 'api/sources', 'api/articles', 'api/briefings', 'api/search'],
+      items: ['api/overview', 'api/sources', 'api/articles', 'api/briefings', 'api/search', 'api/verification'],
     },
     {
       type: 'category',
