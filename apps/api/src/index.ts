@@ -8,6 +8,7 @@ import 'dotenv/config';
 import { authRoutes } from './routes/auth';
 import { domainsRoutes } from './routes/domains';
 import { sourcesRoutes } from './routes/sources';
+import { ratingsRoutes } from './routes/ratings';
 import { briefingsRoutes } from './routes/briefings';
 import { healthRoutes } from './routes/health';
 import { ingestionRoutes } from './routes/ingestion';
@@ -36,6 +37,7 @@ app.route('/health', healthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
+app.route('/api/sources', ratingsRoutes); // Rating routes under /api/sources/:id/rate etc
 app.route('/api/briefings', briefingsRoutes);
 app.route('/api/ingestion', ingestionRoutes);
 app.route('/api/content', contentRoutes);

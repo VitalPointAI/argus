@@ -44,6 +44,10 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   isAdmin: boolean('is_admin').notNull().default(false),
   preferences: jsonb('preferences').notNull().default('{}'),
+  // Reputation system fields
+  trustScore: real('trust_score').notNull().default(1.0),
+  totalRatingsGiven: integer('total_ratings_given').notNull().default(0),
+  accurateRatings: integer('accurate_ratings').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -75,6 +79,9 @@ export const sources = pgTable('sources', {
   isActive: boolean('is_active').notNull().default(true),
   config: jsonb('config').notNull().default('{}'), // source-specific config
   lastFetchedAt: timestamp('last_fetched_at'),
+  // Reputation system fields
+  lastArticleAt: timestamp('last_article_at'),
+  decayAppliedAt: timestamp('decay_applied_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   // Permission: null = admin/global source, userId = user-created source
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -170,4 +177,63 @@ export const jobHistory = pgTable('job_history', {
   error: text('error'),
   startedAt: timestamp('started_at').notNull(),
   completedAt: timestamp('completed_at'),
+});
+
+// ============ Source Reputation System ============
+
+// Reliability history - track score changes over time
+export const reliabilityHistory = pgTable('reliability_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  oldScore: real('old_score').notNull(),
+  newScore: real('new_score').notNull(),
+  changeReason: text('change_reason').notNull(), // 'user_rating', 'decay', 'cross_reference', 'manual', 'anomaly_correction'
+  changeMetadata: jsonb('change_metadata').notNull().default('{}'),
+  changedAt: timestamp('changed_at').notNull().defaultNow(),
+});
+
+// User ratings for sources (1-5 stars + optional comment)
+export const sourceRatings = pgTable('source_ratings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  rating: integer('rating').notNull(), // 1-5
+  comment: text('comment'),
+  weight: real('weight').notNull().default(1.0), // based on user trust score
+  isFlagged: boolean('is_flagged').notNull().default(false),
+  flagReason: text('flag_reason'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Daily rating limits per user (anti-gaming)
+export const userRatingLimits = pgTable('user_rating_limits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date: timestamp('date').notNull().defaultNow(),
+  ratingCount: integer('rating_count').notNull().default(0),
+});
+
+// Cross-reference accuracy tracking
+export const crossReferenceResults = pgTable('cross_reference_results', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  contentId: uuid('content_id').notNull().references(() => content.id, { onDelete: 'cascade' }),
+  claimId: uuid('claim_id').references(() => articleClaims.id, { onDelete: 'set null' }),
+  wasAccurate: boolean('was_accurate').notNull(),
+  verificationSource: text('verification_source'),
+  confidence: real('confidence').notNull().default(0.5),
+  verifiedAt: timestamp('verified_at').notNull().defaultNow(),
+});
+
+// Rating anomaly log
+export const ratingAnomalies = pgTable('rating_anomalies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  anomalyType: text('anomaly_type').notNull(), // 'spike', 'coordinated', 'bot_suspected'
+  details: jsonb('details').notNull().default('{}'),
+  affectedRatingIds: jsonb('affected_rating_ids').notNull().default('[]'),
+  detectedAt: timestamp('detected_at').notNull().defaultNow(),
+  resolved: boolean('resolved').notNull().default(false),
+  resolutionAction: text('resolution_action'),
 });
