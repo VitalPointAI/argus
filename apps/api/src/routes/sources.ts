@@ -207,6 +207,33 @@ sourcesRoutes.get('/', async (c) => {
   return c.json({ success: true, data: enrichedSources });
 });
 
+// Get source stats (must be before /:id to avoid matching)
+sourcesRoutes.get('/stats', async (c) => {
+  try {
+    const totalSources = await db.select().from(sources);
+    const activeSources = totalSources.filter(s => s.isActive);
+    const avgReliability = totalSources.length > 0 
+      ? Math.round(totalSources.reduce((sum, s) => sum + (s.reliabilityScore || 50), 0) / totalSources.length)
+      : 50;
+    
+    // Get unique domains
+    const domainIds = new Set(totalSources.map(s => s.domainId).filter(Boolean));
+    
+    return c.json({
+      success: true,
+      data: {
+        total: totalSources.length,
+        active: activeSources.length,
+        avgReliability,
+        domains: domainIds.size,
+      }
+    });
+  } catch (error) {
+    console.error('Sources stats error:', error);
+    return c.json({ success: false, error: 'Failed to get stats' }, 500);
+  }
+});
+
 // Get source by ID
 sourcesRoutes.get('/:id', async (c) => {
   const user = c.get('user');
