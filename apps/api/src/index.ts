@@ -26,6 +26,7 @@ import humintRoutes from './routes/humint';
 import bountiesRoutes from './routes/bounties';
 import opsecRoutes from './routes/opsec';
 import zkRoutes from './routes/zk';
+import nftRoutes from './routes/nft';
 
 const app = new Hono();
 
@@ -65,6 +66,7 @@ app.route('/api/humint', humintRoutes);
 app.route('/api/bounties', bountiesRoutes);
 app.route('/api/opsec', opsecRoutes);
 app.route('/api/zk', zkRoutes);
+app.route('/api/nft', nftRoutes);
 
 // Root
 app.get('/', (c) => {

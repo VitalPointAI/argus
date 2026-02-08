@@ -22,6 +22,7 @@ export default function NavBar() {
     { href: '/search', label: 'Search' },
     { href: '/domains', label: 'Domains' },
     { href: '/sources', label: 'Sources' },
+    { href: '/marketplace', label: '🎨 NFTs' },
     { href: '/bounties', label: '📋 Bounties' },
     { href: '/briefings', label: 'Briefings' },
     { href: 'https://docs.argus.vitalpoint.ai', label: '📚 Docs', external: true },
