@@ -22,39 +22,19 @@ jobs:
           script: |
             cd /opt/argus
             
-            # Debug: show current commit before pull
-            echo "Before pull: $(git rev-parse HEAD)"
-            
             # Pull latest code
             git fetch origin main
             git reset --hard origin/main
             
-            # Debug: show commit after pull
-            echo "After pull: $(git rev-parse HEAD)"
-            
-            # Install dependencies if package.json changed
+            # Install dependencies
             npm install --production=false
             
-            # Debug: show pm2 process info
-            echo "PM2 status before restart:"
-            pm2 show argus-api | head -20
-            
-            # Force stop and start to ensure new code is loaded
-            pm2 stop argus-api || true
-            pm2 delete argus-api || true
-            
-            # Start fresh from the correct directory
-            cd /opt/argus/apps/api
-            pm2 start "npx tsx src/index.ts" --name argus-api
-            cd /opt/argus
-            
-            # Debug: show pm2 status after restart  
-            echo "PM2 status after restart:"
-            pm2 show argus-api | head -20
+            # Restart API
+            pm2 restart argus-api
             
             # Build and restart web
             cd apps/web
             npm run build
-            pm2 restart argus-web || pm2 start "npm run start" --name argus-web --cwd /opt/argus/apps/web
+            pm2 restart argus-web
             
             echo "Deploy complete: $(date)"
