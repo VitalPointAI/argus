@@ -20,7 +20,8 @@ phantomRoutes.get('/ping', (c) => {
   return c.json({ 
     pong: true, 
     timestamp: Date.now(),
-    initialized: isPhantomAuthInitialized()
+    initialized: isPhantomAuthInitialized(),
+    version: 'v2-debug-feb9'
   });
 });
 
