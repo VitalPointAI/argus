@@ -111,13 +111,9 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   
-  // Build conditions
-  // Note: confidenceScore can be NULL for unverified articles
-  // Use COALESCE to treat NULL as 50 (unverified default), or just allow NULL through with OR
+  // Build conditions - temporarily simplified for debugging
   const conditions = [
     gte(content.fetchedAt, since),
-    sql`(${content.confidenceScore} >= ${minConfidence} OR ${content.confidenceScore} IS NULL)`,
-    sql`LENGTH(${content.body}) >= 200`
   ];
   
   // Add domain filter if specified (from user preferences)
