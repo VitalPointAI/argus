@@ -27,6 +27,8 @@ import bountiesRoutes from './routes/bounties';
 import opsecRoutes from './routes/opsec';
 import zkRoutes from './routes/zk';
 import nftRoutes from './routes/nft';
+import phantomAuthRoutes from './routes/phantom-auth';
+import { initPhantomAuth } from './services/auth/phantom-auth';
 
 const app = new Hono();
 
@@ -67,6 +69,7 @@ app.route('/api/bounties', bountiesRoutes);
 app.route('/api/opsec', opsecRoutes);
 app.route('/api/zk', zkRoutes);
 app.route('/api/nft', nftRoutes);
+app.route('/api/phantom', phantomAuthRoutes); // Anonymous passkey auth for HUMINT
 
 // Root
 app.get('/', (c) => {
@@ -79,9 +82,23 @@ app.get('/', (c) => {
 
 const port = parseInt(process.env.PORT || '3001');
 
-console.log(`🦚 Argus API starting on port ${port}`);
+// Initialize services
+async function start() {
+  console.log(`🦚 Argus API starting on port ${port}`);
+  
+  // Initialize Phantom Auth for HUMINT
+  try {
+    await initPhantomAuth();
+    console.log('✅ Phantom Auth initialized');
+  } catch (error) {
+    console.warn('⚠️ Phantom Auth not initialized:', error instanceof Error ? error.message : 'Unknown error');
+    console.warn('   HUMINT registration will be unavailable until configured.');
+  }
+  
+  serve({
+    fetch: app.fetch,
+    port,
+  });
+}
 
-serve({
-  fetch: app.fetch,
-  port,
-});
+start();

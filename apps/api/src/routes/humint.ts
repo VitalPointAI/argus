@@ -21,6 +21,7 @@ import {
   getSupportedTokens,
   USDC_TOKEN_IDS
 } from '../services/payments/one-click';
+import { getPhantomUser, requirePhantomAuth, type PhantomUser } from './phantom-auth';
 
 // Helper to get authenticated user from context
 function getUser(c: any): { id: string } | null {
@@ -116,91 +117,43 @@ function calculateReputation(source: {
 // ============================================
 // SECURITY: HUMINT Registration
 // ============================================
-// This endpoint is DISABLED until Bastion wallet auth is integrated.
-// When enabled, it will:
-// 1. Verify the request comes from a wallet-only session (no OAuth identity)
-// 2. Cryptographically verify the signature against the public key
-// 3. Verify the challenge was issued by this server (prevent replay)
-// 4. Only then create the anonymous source record
-//
-// Frontend hiding buttons is NOT security - this API enforcement is.
+// Registration uses Phantom Auth (passkey-based anonymous authentication)
+// The source must be authenticated via /api/phantom/* endpoints first.
+// Their phantom identity (codename + NEAR account) is cryptographically verified.
 // ============================================
 
-humint.post('/register', async (c) => {
-  // SECURITY: Registration is disabled until Bastion auth is integrated
-  // This prevents any registration attempts until we can properly verify:
-  // - Wallet signature is valid
-  // - Session has NO OAuth identity attached
-  // - Challenge was issued by this server
-  return c.json({ 
-    success: false, 
-    error: 'HUMINT registration requires anonymous wallet authentication. This feature is not yet available.',
-    code: 'AUTH_NOT_CONFIGURED'
-  }, 503);
-  
-  // ============================================
-  // IMPLEMENTATION (to be enabled with Bastion):
-  // ============================================
-  /*
+humint.post('/register', requirePhantomAuth, async (c) => {
   try {
-    const body = await c.req.json();
-    const { publicKey, signature, challenge, bio, domains, regions, eventTypes } = body;
+    const phantomUser = c.get('phantomUser') as PhantomUser;
+    const body = await c.req.json().catch(() => ({}));
+    const { bio, domains, regions, eventTypes } = body;
     
-    if (!publicKey || !signature || !challenge) {
-      return c.json({ success: false, error: 'Missing required fields' }, 400);
-    }
-    
-    // SECURITY CHECK 1: Verify this is a wallet-only session
-    // If user has ANY OAuth identity (email, Google, Twitter), reject
-    const session = await getWalletSession(c);
-    if (!session) {
-      return c.json({ success: false, error: 'Wallet authentication required' }, 401);
-    }
-    if (session.hasOAuthIdentity) {
-      return c.json({ 
-        success: false, 
-        error: 'HUMINT registration requires anonymous wallet login. You are logged in with an identity provider.',
-        code: 'IDENTITY_ATTACHED'
-      }, 403);
-    }
-    
-    // SECURITY CHECK 2: Verify the challenge was issued by this server
-    const isValidChallenge = await verifyChallenge(challenge);
-    if (!isValidChallenge) {
-      return c.json({ success: false, error: 'Invalid or expired challenge' }, 401);
-    }
-    
-    // SECURITY CHECK 3: Cryptographically verify signature
-    const isValidSignature = await verifyEd25519Signature(publicKey, signature, challenge);
-    if (!isValidSignature) {
-      return c.json({ success: false, error: 'Invalid signature' }, 401);
-    }
-    
-    // SECURITY CHECK 4: Verify public key matches session
-    if (session.publicKey !== publicKey) {
-      return c.json({ success: false, error: 'Public key mismatch' }, 401);
-    }
-    
-    // All security checks passed - proceed with registration
+    // Check if already registered as HUMINT source
     const existing = await db.select()
       .from(humintSources)
-      .where(eq(humintSources.publicKey, publicKey))
+      .where(eq(humintSources.publicKey, phantomUser.mpcPublicKey))
       .limit(1);
     
     if (existing.length > 0) {
       return c.json({ 
         success: true, 
-        data: { codename: existing[0].codename },
+        data: { 
+          codename: existing[0].codename,
+          alreadyRegistered: true,
+        },
         message: 'Source already registered'
       });
     }
     
-    const codename = await generateUniqueCodename();
+    // Use the phantom codename (already generated during phantom auth)
+    const codename = phantomUser.codename;
     
+    // Create HUMINT source record
     const [source] = await db.insert(humintSources)
       .values({
         codename,
-        publicKey,
+        publicKey: phantomUser.mpcPublicKey,
+        nearAccountId: phantomUser.nearAccountId,
         bio: bio || null,
         domains: domains || [],
         regions: regions || [],
@@ -209,20 +162,23 @@ humint.post('/register', async (c) => {
       .returning();
     
     // Log registration (without identifying info)
-    console.log('HUMINT source registered:', { codename, publicKeyPrefix: publicKey.slice(0, 16) });
+    console.log('HUMINT source registered:', { 
+      codename, 
+      publicKeyPrefix: phantomUser.mpcPublicKey.slice(0, 16),
+      nearAccountPrefix: phantomUser.nearAccountId.slice(0, 20),
+    });
     
     return c.json({
       success: true,
       data: {
         codename: source.codename,
-        publicKey: source.publicKey,
+        nearAccountId: phantomUser.nearAccountId,
       }
     });
   } catch (error) {
     console.error('HUMINT registration error:', error);
     return c.json({ success: false, error: 'Registration failed' }, 500);
   }
-  */
 });
 
 // ============================================

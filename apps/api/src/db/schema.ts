@@ -265,6 +265,7 @@ export const humintSources = pgTable('humint_sources', {
   id: uuid('id').primaryKey().defaultRandom(),
   codename: text('codename').notNull().unique(),
   publicKey: text('public_key').notNull().unique(),
+  nearAccountId: text('near_account_id').unique(), // NEAR account from Phantom Auth MPC
   
   // Profile
   bio: text('bio'),
