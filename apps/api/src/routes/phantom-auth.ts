@@ -32,6 +32,20 @@ function checkPhantomInitialized(): boolean {
 // Registration
 // ============================================
 
+// NATO phonetic alphabet for codename generation
+const NATO_ALPHABET = [
+  'ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO', 'FOXTROT', 'GOLF', 'HOTEL',
+  'INDIA', 'JULIET', 'KILO', 'LIMA', 'MIKE', 'NOVEMBER', 'OSCAR', 'PAPA',
+  'QUEBEC', 'ROMEO', 'SIERRA', 'TANGO', 'UNIFORM', 'VICTOR', 'WHISKEY',
+  'XRAY', 'YANKEE', 'ZULU'
+];
+
+function generateCodename(): string {
+  const word = NATO_ALPHABET[Math.floor(Math.random() * NATO_ALPHABET.length)];
+  const num = Math.floor(Math.random() * 100);
+  return `${word}-${num}`;
+}
+
 /**
  * POST /phantom/register/start
  * Start passkey registration
@@ -48,7 +62,6 @@ phantomRoutes.post('/register/start', async (c) => {
     const tempUserId = crypto.randomUUID();
     
     // Generate codename for this user
-    const { generateCodename } = await import('@vitalpoint/near-phantom-auth/server');
     const codename = generateCodename();
     
     const { challengeId, options } = await auth.passkeyManager.startRegistration(
