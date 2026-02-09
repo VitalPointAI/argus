@@ -76,6 +76,7 @@ app.get('/', (c) => {
   return c.json({
     name: 'Argus API',
     version: '0.1.0',
+    build: 'feb9-debug-1600',
     status: 'operational',
   });
 });
