@@ -135,6 +135,214 @@ function AddDomainForm({ onDomainAdded, token }: { onDomainAdded: () => void; to
   );
 }
 
+// Telegram Connect Section Component
+function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: () => void }) {
+  const [status, setStatus] = useState<{ connected: boolean; chatId?: string; username?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [connectData, setConnectData] = useState<{ code: string; connectUrl: string; expiresAt: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token) {
+      fetchStatus();
+    }
+  }, [token]);
+
+  // Poll for connection status when waiting for user to connect
+  useEffect(() => {
+    if (!connectData || !token) return;
+
+    const interval = setInterval(async () => {
+      const res = await fetch(`${API_URL}/api/profile/telegram/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data.connected) {
+        setStatus(data.data);
+        setConnectData(null);
+        onUpdate();
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [connectData, token]);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/profile/telegram/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Telegram status:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/profile/telegram/connect`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectData(data.data);
+      } else {
+        setError(data.error || 'Failed to generate connect code');
+      }
+    } catch (err) {
+      setError('Failed to connect');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Telegram? You will no longer receive briefings via Telegram.')) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/profile/telegram/disconnect`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus({ connected: false });
+        onUpdate();
+      }
+    } catch (err) {
+      setError('Failed to disconnect');
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 mb-6">
+        <div className="animate-pulse h-20 bg-slate-200 dark:bg-slate-700 rounded"></div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 mb-6">
+      <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-2">
+        📱 Telegram Notifications
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+        Receive your personalized briefings directly in Telegram.
+      </p>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      {status?.connected ? (
+        // Connected state
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white text-lg">
+              ✓
+            </div>
+            <div>
+              <p className="font-medium text-green-800 dark:text-green-400">Connected to Telegram</p>
+              <p className="text-sm text-green-600 dark:text-green-500">
+                {status.username ? `@${status.username}` : `Chat ID: ${status.chatId}`}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            You'll receive briefings via <span className="font-medium">@argusbriefing_bot</span> at your scheduled delivery times.
+          </p>
+
+          <button
+            onClick={handleDisconnect}
+            className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+          >
+            Disconnect Telegram
+          </button>
+        </div>
+      ) : connectData ? (
+        // Waiting for user to connect
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="font-medium text-blue-800 dark:text-blue-400 mb-2">
+              Click the button below to connect:
+            </p>
+            <a
+              href={connectData.connectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0088cc] hover:bg-[#0077b5] text-white rounded-lg font-medium transition"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+              Open in Telegram
+            </a>
+          </div>
+
+          <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+            <p>Or manually:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2">
+              <li>Open Telegram and find <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">@argusbriefing_bot</span></li>
+              <li>Send: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">/start {connectData.code}</span></li>
+            </ol>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-argus-600 border-t-transparent"></div>
+            Waiting for connection...
+          </div>
+
+          <button
+            onClick={() => setConnectData(null)}
+            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        // Not connected state
+        <div className="space-y-4">
+          <button
+            onClick={handleConnect}
+            disabled={connecting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0088cc] hover:bg-[#0077b5] disabled:bg-slate-400 text-white rounded-lg font-medium transition"
+          >
+            {connecting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                Connecting...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                </svg>
+                Connect Telegram
+              </>
+            )}
+          </button>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Link your Telegram account to receive briefings via @argusbriefing_bot
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 interface NotificationEmails {
   addresses: string[];
   primary: string;
@@ -784,6 +992,9 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+
+        {/* Telegram Notifications */}
+        <TelegramSection token={token} onUpdate={fetchProfile} />
 
         {/* Save Button */}
         <div className="flex justify-end">

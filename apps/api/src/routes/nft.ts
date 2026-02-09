@@ -327,6 +327,13 @@ nft.get('/access/:tokenId/:accountId', async (c) => {
 /**
  * Get contract info
  */
+// NEAR RPC endpoints - FastNEAR for better performance
+const NEAR_RPC_URL = process.env.NEAR_RPC_URL || (
+  NEAR_NETWORK === 'mainnet' 
+    ? 'https://rpc.mainnet.fastnear.com'
+    : 'https://rpc.testnet.fastnear.com'
+);
+
 nft.get('/contract-info', async (c) => {
   return c.json({
     success: true,
@@ -334,9 +341,7 @@ nft.get('/contract-info', async (c) => {
       network: NEAR_NETWORK,
       nftContract: NFT_CONTRACT,
       dataRegistryContract: DATA_REGISTRY_CONTRACT,
-      rpcEndpoint: NEAR_NETWORK === 'mainnet' 
-        ? 'https://rpc.mainnet.near.org'
-        : 'https://rpc.testnet.near.org',
+      rpcEndpoint: NEAR_RPC_URL,
     }
   });
 });

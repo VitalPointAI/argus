@@ -231,6 +231,194 @@ profileRoutes.patch('/preferences/:section', async (c) => {
   return c.json({ success: true, data: currentPrefs });
 });
 
+// ============ Telegram Connect Flow ============
+
+// In-memory store for pending connect codes (in production, use Redis)
+const pendingTelegramCodes = new Map<string, { userId: string; expiresAt: Date }>();
+
+// Generate a connect code for the current user
+profileRoutes.post('/telegram/connect', async (c) => {
+  const authUser = c.get('user' as never) as { id: string } | null;
+  
+  if (!authUser) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  // Generate a unique 6-character code
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  // Store the code
+  pendingTelegramCodes.set(code, { userId: authUser.id, expiresAt });
+
+  // Clean up expired codes
+  for (const [key, value] of pendingTelegramCodes.entries()) {
+    if (value.expiresAt < new Date()) {
+      pendingTelegramCodes.delete(key);
+    }
+  }
+
+  const botUsername = 'argusbriefing_bot';
+  const connectUrl = `https://t.me/${botUsername}?start=${code}`;
+
+  return c.json({
+    success: true,
+    data: {
+      code,
+      connectUrl,
+      expiresAt: expiresAt.toISOString(),
+      instructions: `Click the link or open Telegram and send /start ${code} to @${botUsername}`,
+    },
+  });
+});
+
+// Disconnect Telegram
+profileRoutes.delete('/telegram/disconnect', async (c) => {
+  const authUser = c.get('user' as never) as { id: string } | null;
+  
+  if (!authUser) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  const [user] = await db.select({ preferences: users.preferences })
+    .from(users)
+    .where(eq(users.id, authUser.id));
+
+  if (!user) {
+    return c.json({ success: false, error: 'User not found' }, 404);
+  }
+
+  const currentPrefs = { ...defaultPreferences, ...(user.preferences as object) } as any;
+  currentPrefs.telegram = {
+    enabled: false,
+    chatId: null,
+    briefings: { enabled: false, deliveryTimes: ['06:00'] },
+  };
+
+  await db.update(users)
+    .set({ preferences: currentPrefs, updatedAt: new Date() })
+    .where(eq(users.id, authUser.id));
+
+  return c.json({ success: true, message: 'Telegram disconnected' });
+});
+
+// Webhook endpoint for Telegram bot (called by Telegram)
+profileRoutes.post('/telegram/webhook', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  
+  // Handle /start command with code
+  if (body.message?.text?.startsWith('/start')) {
+    const parts = body.message.text.split(' ');
+    const code = parts[1]?.toUpperCase();
+    const chatId = String(body.message.chat.id);
+    const username = body.message.from?.username || '';
+    const firstName = body.message.from?.first_name || 'there';
+
+    const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+    if (!code) {
+      // No code - just a regular /start
+      if (TELEGRAM_BOT_TOKEN) {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `👋 Hi ${firstName}!\n\nI'm the Argus Intelligence briefing bot.\n\nTo connect your Argus account:\n1. Go to argus.vitalpoint.ai/settings\n2. Click "Connect Telegram"\n3. Send me the code you receive\n\nOnce connected, you'll receive personalized intelligence briefings here!`,
+          }),
+        });
+      }
+      return c.json({ ok: true });
+    }
+
+    // Check if code is valid
+    const pending = pendingTelegramCodes.get(code);
+    
+    if (!pending || pending.expiresAt < new Date()) {
+      if (TELEGRAM_BOT_TOKEN) {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `❌ Invalid or expired code.\n\nPlease generate a new code from argus.vitalpoint.ai/settings`,
+          }),
+        });
+      }
+      return c.json({ ok: true });
+    }
+
+    // Link the account
+    const [user] = await db.select({ preferences: users.preferences, name: users.name })
+      .from(users)
+      .where(eq(users.id, pending.userId));
+
+    if (user) {
+      const currentPrefs = { ...defaultPreferences, ...(user.preferences as object) } as any;
+      currentPrefs.telegram = {
+        enabled: true,
+        chatId: chatId,
+        username: username,
+        briefings: {
+          enabled: true,
+          deliveryTimes: currentPrefs.email?.briefings?.deliveryTimes || ['06:00'],
+        },
+      };
+
+      await db.update(users)
+        .set({ preferences: currentPrefs, updatedAt: new Date() })
+        .where(eq(users.id, pending.userId));
+
+      // Remove the used code
+      pendingTelegramCodes.delete(code);
+
+      if (TELEGRAM_BOT_TOKEN) {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `✅ Connected!\n\nHi ${user.name}, your Argus account is now linked.\n\nYou'll receive intelligence briefings at your scheduled times. Manage your settings at argus.vitalpoint.ai/settings`,
+          }),
+        });
+      }
+    }
+
+    return c.json({ ok: true });
+  }
+
+  return c.json({ ok: true });
+});
+
+// Get pending code status (for polling from frontend)
+profileRoutes.get('/telegram/status', async (c) => {
+  const authUser = c.get('user' as never) as { id: string } | null;
+  
+  if (!authUser) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  const [user] = await db.select({ preferences: users.preferences })
+    .from(users)
+    .where(eq(users.id, authUser.id));
+
+  if (!user) {
+    return c.json({ success: false, error: 'User not found' }, 404);
+  }
+
+  const prefs = user.preferences as any;
+  const connected = !!(prefs?.telegram?.enabled && prefs?.telegram?.chatId);
+
+  return c.json({
+    success: true,
+    data: {
+      connected,
+      chatId: prefs?.telegram?.chatId || null,
+      username: prefs?.telegram?.username || null,
+    },
+  });
+});
+
 // Helper: deep merge objects
 function deepMerge(target: any, source: any): any {
   const result = { ...target };

@@ -158,11 +158,14 @@ export const briefings = pgTable('briefings', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   type: briefingTypeEnum('type').notNull(),
+  title: text('title'),  // Executive briefing title
+  content: text('content'), // Full markdown content
   summary: text('summary').notNull(),
   changes: jsonb('changes').notNull().default('[]'),
   forecasts: jsonb('forecasts').notNull().default('[]'),
   contentIds: jsonb('content_ids').notNull().default('[]'),
   generatedAt: timestamp('generated_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
   deliveredAt: timestamp('delivered_at'),
   deliveryChannels: jsonb('delivery_channels').notNull().default('[]'),
 });
