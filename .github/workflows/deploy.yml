@@ -29,8 +29,11 @@ jobs:
             # Install dependencies if package.json changed
             npm install --production=false
             
-            # Restart services
-            pm2 restart argus-api
+            # Restart services (delete and start fresh to pick up new code)
+            pm2 delete argus-api || true
+            cd apps/api
+            pm2 start src/index.ts --name argus-api --interpreter tsx
+            cd ..
             
             # Build and restart web (only if web files changed)
             cd apps/web
