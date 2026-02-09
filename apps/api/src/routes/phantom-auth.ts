@@ -43,18 +43,23 @@ phantomRoutes.post('/register/start', async (c) => {
 
   try {
     const auth = getPhantomAuth();
-    const { challengeId, options, codename, tempUserId } = 
-      await (auth as any).passkeyManager.startRegistration(
-        crypto.randomUUID(),
-        'Anonymous Source'
-      );
     
-    // Store temp user data in response
+    // Generate a temp user ID for this registration attempt
+    const tempUserId = crypto.randomUUID();
+    
+    // Generate codename for this user
+    const { generateCodename } = await import('@vitalpoint/near-phantom-auth/server');
+    const codename = generateCodename();
+    
+    const { challengeId, options } = await auth.passkeyManager.startRegistration(
+      tempUserId,
+      codename // Use codename as display name
+    );
+    
     return c.json({
       challengeId,
       options,
       codename,
-      tempUserId,
     });
   } catch (error) {
     console.error('[PhantomAuth] Registration start error:', error);
@@ -72,31 +77,42 @@ phantomRoutes.post('/register/finish', async (c) => {
   try {
     const auth = getPhantomAuth();
     const body = await c.req.json();
-    const { challengeId, response, tempUserId, codename } = body;
+    const { challengeId, response, codename } = body;
 
-    if (!challengeId || !response || !tempUserId || !codename) {
+    if (!challengeId || !response || !codename) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
 
-    // Verify passkey
-    const { verified, passkey } = await auth.passkeyManager.finishRegistration(
+    // Verify passkey - returns passkey data but doesn't save (user doesn't exist yet)
+    const { verified, passkeyData, tempUserId } = await auth.passkeyManager.finishRegistration(
       challengeId,
       response
     );
 
-    if (!verified || !passkey) {
+    if (!verified || !passkeyData || !tempUserId) {
       return c.json({ error: 'Passkey verification failed' }, 400);
     }
 
     // Create NEAR account via MPC
     const mpcAccount = await auth.mpcManager.createAccount(tempUserId);
 
-    // Create user
+    // Create user first (so foreign key works)
     const user = await auth.db.createUser({
       codename,
       nearAccountId: mpcAccount.nearAccountId,
       mpcPublicKey: mpcAccount.mpcPublicKey,
       derivationPath: mpcAccount.derivationPath,
+    });
+
+    // Now create passkey (user exists, foreign key is valid)
+    await auth.db.createPasskey({
+      credentialId: passkeyData.credentialId,
+      userId: user.id,
+      publicKey: passkeyData.publicKey,
+      counter: passkeyData.counter,
+      deviceType: passkeyData.deviceType,
+      backedUp: passkeyData.backedUp,
+      transports: passkeyData.transports,
     });
 
     // Create session
