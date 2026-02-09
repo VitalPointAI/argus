@@ -17,7 +17,11 @@ const phantomRoutes = new Hono();
 
 // Debug route - test if phantomRoutes are working
 phantomRoutes.get('/ping', (c) => {
-  return c.json({ pong: true, timestamp: Date.now() });
+  return c.json({ 
+    pong: true, 
+    timestamp: Date.now(),
+    initialized: isPhantomAuthInitialized()
+  });
 });
 
 // ============================================
