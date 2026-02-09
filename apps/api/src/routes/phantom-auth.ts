@@ -76,7 +76,12 @@ phantomRoutes.post('/register/start', async (c) => {
     });
   } catch (error) {
     console.error('[PhantomAuth] Registration start error:', error);
-    return c.json({ error: 'Registration failed' }, 500);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    return c.json({ 
+      error: 'Registration failed',
+      debug: { message: errMsg, stack: errStack?.split('\n').slice(0, 5) }
+    }, 500);
   }
 });
 
