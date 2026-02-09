@@ -113,10 +113,10 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   
   // Build conditions
   // Note: confidenceScore can be NULL for unverified articles
-  // Use COALESCE to treat NULL as 50 (unverified default)
+  // Use COALESCE to treat NULL as 50 (unverified default), or just allow NULL through with OR
   const conditions = [
     gte(content.fetchedAt, since),
-    sql`COALESCE(${content.confidenceScore}, 50) >= ${minConfidence}`,
+    sql`(${content.confidenceScore} >= ${minConfidence} OR ${content.confidenceScore} IS NULL)`,
     sql`LENGTH(${content.body}) >= 200`
   ];
   
