@@ -15,16 +15,17 @@ import {
 
 const phantomRoutes = new Hono();
 
+// Debug route - test if phantomRoutes are working
+phantomRoutes.get('/ping', (c) => {
+  return c.json({ pong: true, timestamp: Date.now() });
+});
+
 // ============================================
 // Helper to check initialization
 // ============================================
 
-function ensureInitialized(c: any): boolean {
-  if (!isPhantomAuthInitialized()) {
-    c.json({ error: 'Phantom Auth not initialized' }, 503);
-    return false;
-  }
-  return true;
+function checkPhantomInitialized(): boolean {
+  return isPhantomAuthInitialized();
 }
 
 // ============================================
@@ -36,7 +37,9 @@ function ensureInitialized(c: any): boolean {
  * Start passkey registration
  */
 phantomRoutes.post('/register/start', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) {
+    return c.json({ error: 'Phantom Auth not initialized' }, 503);
+  }
 
   try {
     const auth = getPhantomAuth();
@@ -64,7 +67,7 @@ phantomRoutes.post('/register/start', async (c) => {
  * Complete passkey registration
  */
 phantomRoutes.post('/register/finish', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -133,7 +136,7 @@ phantomRoutes.post('/register/finish', async (c) => {
  * Start passkey authentication
  */
 phantomRoutes.post('/login/start', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -163,7 +166,7 @@ phantomRoutes.post('/login/start', async (c) => {
  * Complete passkey authentication
  */
 phantomRoutes.post('/login/finish', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -220,7 +223,7 @@ phantomRoutes.post('/login/finish', async (c) => {
  * End session
  */
 phantomRoutes.post('/logout', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -244,7 +247,7 @@ phantomRoutes.post('/logout', async (c) => {
  * Get current session
  */
 phantomRoutes.get('/session', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -282,7 +285,7 @@ phantomRoutes.get('/session', async (c) => {
 // ============================================
 
 phantomRoutes.post('/recovery/wallet/link', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -315,7 +318,7 @@ phantomRoutes.post('/recovery/wallet/link', async (c) => {
 });
 
 phantomRoutes.post('/recovery/wallet/verify', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -376,7 +379,7 @@ phantomRoutes.post('/recovery/wallet/verify', async (c) => {
 // ============================================
 
 phantomRoutes.post('/recovery/ipfs/setup', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();
@@ -447,7 +450,7 @@ phantomRoutes.post('/recovery/ipfs/setup', async (c) => {
 });
 
 phantomRoutes.post('/recovery/ipfs/recover', async (c) => {
-  if (!ensureInitialized(c)) return c.res;
+  if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
 
   try {
     const auth = getPhantomAuth();

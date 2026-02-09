@@ -4,7 +4,7 @@ import { eq, desc, sql, and } from 'drizzle-orm';
 import { generateBriefing, createBriefing } from '../services/intelligence/briefing';
 import { generateLLMBriefing, generateFactCheckedBriefing } from '../services/intelligence/llm-briefing';
 import { generateExecutiveBriefing } from '../services/intelligence/executive-briefing';
-import { generateBriefingAudio } from '../services/tts/elevenlabs';
+import { generateBriefingAudio, getStatus as getTTSStatus, getVoices } from '../services/tts/index.js';
 
 export const briefingsRoutes = new Hono();
 
@@ -495,6 +495,27 @@ briefingsRoutes.post('/:id/delivered', async (c) => {
     .where(eq(briefings.id, id));
 
   return c.json({ success: true });
+});
+
+// TTS status and voices
+briefingsRoutes.get('/tts/status', async (c) => {
+  try {
+    const status = await getTTSStatus();
+    return c.json({ success: true, data: status });
+  } catch (error) {
+    console.error('TTS status error:', error);
+    return c.json({ success: false, error: 'Failed to get TTS status' }, 500);
+  }
+});
+
+briefingsRoutes.get('/tts/voices', async (c) => {
+  try {
+    const voices = await getVoices();
+    return c.json({ success: true, data: voices });
+  } catch (error) {
+    console.error('TTS voices error:', error);
+    return c.json({ success: false, error: 'Failed to get TTS voices' }, 500);
+  }
 });
 
 // Get briefing stats

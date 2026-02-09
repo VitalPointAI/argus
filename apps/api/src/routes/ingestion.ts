@@ -7,37 +7,9 @@ import { eq } from 'drizzle-orm';
 
 export const ingestionRoutes = new Hono();
 
-// Ingest a specific source
-ingestionRoutes.post('/:sourceId', async (c) => {
-  const sourceId = c.req.param('sourceId');
-  
-  try {
-    const [source] = await db.select().from(sources).where(eq(sources.id, sourceId));
-    
-    if (!source) {
-      return c.json({ success: false, error: 'Source not found' }, 404);
-    }
-    
-    let count = 0;
-    if (source.type === 'rss') {
-      count = await ingestRSSSource(sourceId);
-    } else if (source.type === 'youtube') {
-      const result = await ingestYouTubeVideo(source.url, sourceId);
-      count = result.success ? 1 : 0;
-    } else if (source.type === 'web') {
-      count = await ingestWebSource(sourceId);
-    } else {
-      return c.json({ success: false, error: `Ingestion not implemented for type: ${source.type}` }, 501);
-    }
-    
-    return c.json({ success: true, data: { sourceId, itemsIngested: count } });
-  } catch (error) {
-    return c.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }, 500);
-  }
-});
+// ============================================
+// SPECIFIC ROUTES FIRST (before :sourceId)
+// ============================================
 
 // Ingest all RSS sources
 ingestionRoutes.post('/rss/all', async (c) => {
@@ -50,7 +22,7 @@ ingestionRoutes.post('/rss/all', async (c) => {
       data: { 
         sourcesProcessed: results.length,
         totalItemsIngested: totalIngested,
-        details: results 
+        details: results
       } 
     });
   } catch (error) {
@@ -72,7 +44,7 @@ ingestionRoutes.post('/youtube/all', async (c) => {
       data: { 
         sourcesProcessed: results.length,
         totalItemsIngested: totalIngested,
-        details: results 
+        details: results
       } 
     });
   } catch (error) {
@@ -83,7 +55,7 @@ ingestionRoutes.post('/youtube/all', async (c) => {
   }
 });
 
-// Ingest all web sources
+// Ingest all Web sources
 ingestionRoutes.post('/web/all', async (c) => {
   try {
     const results = await ingestAllWebSources();
@@ -94,7 +66,7 @@ ingestionRoutes.post('/web/all', async (c) => {
       data: { 
         sourcesProcessed: results.length,
         totalItemsIngested: totalIngested,
-        details: results 
+        details: results
       } 
     });
   } catch (error) {
@@ -107,26 +79,20 @@ ingestionRoutes.post('/web/all', async (c) => {
 
 // Ingest a single YouTube video by URL
 ingestionRoutes.post('/youtube/video', async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const { url, sourceId } = body;
-
-  if (!url) {
-    return c.json({ success: false, error: 'URL required' }, 400);
-  }
-
   try {
-    // Use a default YouTube source if none provided
-    let targetSourceId = sourceId;
-    if (!targetSourceId) {
-      const [ytSource] = await db.select().from(sources).where(eq(sources.type, 'youtube')).limit(1);
-      if (!ytSource) {
-        return c.json({ success: false, error: 'No YouTube source configured' }, 400);
-      }
-      targetSourceId = ytSource.id;
+    const { url, sourceId: targetSourceId } = await c.req.json();
+    
+    if (!url) {
+      return c.json({ success: false, error: 'YouTube URL is required' }, 400);
     }
-
+    
     const result = await ingestYouTubeVideo(url, targetSourceId);
-    return c.json({ success: result.success, data: result });
+    
+    if (!result.success) {
+      return c.json({ success: false, error: result.error }, 400);
+    }
+    
+    return c.json({ success: true, data: result.video });
   } catch (error) {
     return c.json({ 
       success: false, 
@@ -192,4 +158,40 @@ ingestionRoutes.get('/status', async (c) => {
       recentlyFetched: lastFetched,
     }
   });
+});
+
+// ============================================
+// PARAMETERIZED ROUTE LAST
+// ============================================
+
+// Ingest a specific source by ID
+ingestionRoutes.post('/:sourceId', async (c) => {
+  const sourceId = c.req.param('sourceId');
+  
+  try {
+    const [source] = await db.select().from(sources).where(eq(sources.id, sourceId));
+    
+    if (!source) {
+      return c.json({ success: false, error: 'Source not found' }, 404);
+    }
+    
+    let count = 0;
+    if (source.type === 'rss') {
+      count = await ingestRSSSource(sourceId);
+    } else if (source.type === 'youtube') {
+      const result = await ingestYouTubeVideo(source.url, sourceId);
+      count = result.success ? 1 : 0;
+    } else if (source.type === 'web') {
+      count = await ingestWebSource(sourceId);
+    } else {
+      return c.json({ success: false, error: `Ingestion not implemented for type: ${source.type}` }, 501);
+    }
+    
+    return c.json({ success: true, data: { sourceId, itemsIngested: count } });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
 });
