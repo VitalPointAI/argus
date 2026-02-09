@@ -10,6 +10,7 @@ export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   
   const userMenuRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -205,20 +206,32 @@ export default function NavBar() {
                 </a>
               ))}
               
-              {/* More Links Section */}
+              {/* More Links Section - Collapsible */}
               <div className="border-t border-slate-700 mt-2 pt-2">
-                <span className="px-3 py-1 text-xs text-slate-500 uppercase tracking-wider">More</span>
-                {moreLinks.map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="py-2 px-3 rounded-lg hover:bg-slate-800 transition text-slate-300"
-                    {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  >
-                    {link.label}
-                  </a>
-                ))}
+                <button
+                  onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
+                  className="w-full py-2 px-3 rounded-lg hover:bg-slate-800 transition font-medium flex items-center justify-between"
+                >
+                  <span>More</span>
+                  <svg className={`w-4 h-4 transition-transform ${mobileMoreOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {mobileMoreOpen && (
+                  <div className="ml-3 border-l border-slate-700 pl-3">
+                    {moreLinks.map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="py-2 px-3 rounded-lg hover:bg-slate-800 transition text-slate-300 block"
+                        {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* User Section */}
