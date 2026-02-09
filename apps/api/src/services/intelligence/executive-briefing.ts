@@ -112,9 +112,11 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   
   // Build conditions
+  // Note: confidenceScore can be NULL for unverified articles
+  // Use COALESCE to treat NULL as 50 (unverified default)
   const conditions = [
     gte(content.fetchedAt, since),
-    gte(content.confidenceScore, minConfidence),
+    sql`COALESCE(${content.confidenceScore}, 50) >= ${minConfidence}`,
     sql`LENGTH(${content.body}) >= 200`
   ];
   
