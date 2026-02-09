@@ -16,12 +16,14 @@ import {
 const phantomRoutes = new Hono();
 
 // Debug route - test if phantomRoutes are working
+const BUILD_TIME = Date.now(); // Captured at module load time
 phantomRoutes.get('/ping', (c) => {
   return c.json({ 
     pong: true, 
     timestamp: Date.now(),
     initialized: isPhantomAuthInitialized(),
-    version: 'v2-debug-feb9'
+    version: 'v3-feb9-1600',
+    buildTime: BUILD_TIME
   });
 });
 
