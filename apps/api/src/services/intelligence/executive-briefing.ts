@@ -111,49 +111,63 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
   
-  // Build conditions - temporarily simplified for debugging
+  console.log(`[FetchArticles] hoursBack=${hoursBack}, since=${since.toISOString()}, maxArticles=${maxArticles}`);
+  
+  // Build conditions
   const conditions = [
     gte(content.fetchedAt, since),
   ];
   
   // Add domain filter if specified (from user preferences)
   if (options.domainIds && options.domainIds.length > 0) {
+    console.log(`[FetchArticles] Filtering by ${options.domainIds.length} domains`);
     conditions.push(inArray(sources.domainId, options.domainIds));
   }
   
-  const articles = await db
-    .select({
-      id: content.id,
-      title: content.title,
-      body: content.body,
-      url: content.url,
-      publishedAt: content.publishedAt,
-      confidenceScore: content.confidenceScore,
-      sourceId: sources.id,
-      sourceName: sources.name,
-      domain: domains.name,
-      domainSlug: domains.slug,
-      domainId: domains.id,
-    })
-    .from(content)
-    .leftJoin(sources, eq(content.sourceId, sources.id))
-    .leftJoin(domains, eq(sources.domainId, domains.id))
-    .where(and(...conditions))
-    .orderBy(desc(content.confidenceScore), desc(content.publishedAt))
-    .limit(maxArticles);
+  try {
+    const articles = await db
+      .select({
+        id: content.id,
+        title: content.title,
+        body: content.body,
+        url: content.url,
+        publishedAt: content.publishedAt,
+        confidenceScore: content.confidenceScore,
+        sourceId: sources.id,
+        sourceName: sources.name,
+        domain: domains.name,
+        domainSlug: domains.slug,
+        domainId: domains.id,
+      })
+      .from(content)
+      .leftJoin(sources, eq(content.sourceId, sources.id))
+      .leftJoin(domains, eq(sources.domainId, domains.id))
+      .where(and(...conditions))
+      .orderBy(desc(content.publishedAt))
+      .limit(maxArticles);
 
-  return articles.map(a => ({
-    id: a.id,
-    title: a.title,
-    body: a.body || '',
-    url: a.url,
-    source: a.sourceId || '',
-    sourceName: a.sourceName || 'Unknown',
-    domain: a.domain || 'Other',
-    domainSlug: a.domainSlug || 'other',
-    publishedAt: a.publishedAt,
-    confidenceScore: a.confidenceScore || 50,
-  }));
+    console.log(`[FetchArticles] Query returned ${articles.length} articles`);
+    
+    if (articles.length > 0) {
+      console.log(`[FetchArticles] First article: "${articles[0].title?.substring(0, 50)}..." from ${articles[0].sourceName}`);
+    }
+
+    return articles.map(a => ({
+      id: a.id,
+      title: a.title,
+      body: a.body || '',
+      url: a.url,
+      source: a.sourceId || '',
+      sourceName: a.sourceName || 'Unknown',
+      domain: a.domain || 'Other',
+      domainSlug: a.domainSlug || 'other',
+      publishedAt: a.publishedAt,
+      confidenceScore: a.confidenceScore || 50,
+    }));
+  } catch (queryError) {
+    console.error('[FetchArticles] Query failed:', queryError);
+    throw queryError;
+  }
 }
 
 /**
