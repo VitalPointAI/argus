@@ -46,18 +46,28 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Explicitly match protected routes
+  // Match protected routes and their sub-paths
   matcher: [
+    '/dashboard',
     '/dashboard/:path*',
+    '/briefings',
     '/briefings/:path*',
+    '/sources',
     '/sources/:path*',
+    '/search',
     '/search/:path*',
+    '/settings',
     '/settings/:path*',
+    '/admin',
     '/admin/:path*',
+    '/domains',
     '/domains/:path*',
+    '/marketplace',
     '/marketplace/:path*',
+    '/zk',
     '/zk/:path*',
     '/login',
+    '/register',
     '/register/:path*',
   ],
 };
