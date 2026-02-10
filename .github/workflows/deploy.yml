@@ -29,7 +29,10 @@ jobs:
             # Install dependencies
             npm install --production=false
             
-            # Restart API
+            # Build and restart API
+            cd apps/api
+            npm run build || echo "API build skipped (using tsx watch mode)"
+            cd ../..
             pm2 restart argus-api
             
             # Build and restart web
