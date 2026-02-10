@@ -75,7 +75,7 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
 }
 
 export default function Dashboard() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -84,16 +84,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
-      const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
       try {
+        // Use credentials: 'include' to send HttpOnly session cookie
         const [statsRes, contentRes, domainsRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/stats`, { headers }),
-          fetch(`${API_URL}/api/v1/intelligence?limit=20&minConfidence=50`, { headers }),
-          fetch(`${API_URL}/api/v1/domains`, { headers }),
+          fetch(`${API_URL}/api/v1/stats`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/v1/intelligence?limit=20&minConfidence=50`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/v1/domains`, { credentials: 'include' }),
         ]);
 
         if (statsRes.ok) {
@@ -115,7 +111,7 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, [token]);
+  }, []);
 
   // Sort content based on selected option
   const sortedContent = useMemo(() => {
@@ -167,7 +163,7 @@ export default function Dashboard() {
             Filtered: <span className="font-medium">{stats.activeSourceList.name}</span>
             <span className="text-xs text-slate-500">(click to change)</span>
           </a>
-        ) : token ? (
+        ) : user ? (
           <a 
             href="/sources"
             className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm"

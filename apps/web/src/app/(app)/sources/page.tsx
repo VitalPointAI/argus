@@ -34,7 +34,7 @@ interface SourceList {
 }
 
 export default function SourcesPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [sourceLists, setSourceLists] = useState<SourceList[]>([]);

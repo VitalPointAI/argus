@@ -155,7 +155,7 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
 
     const interval = setInterval(async () => {
       const res = await fetch(`${API_URL}/api/profile/telegram/status`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success && data.data.connected) {
@@ -171,7 +171,7 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
   const fetchStatus = async () => {
     try {
       const res = await fetch(`${API_URL}/api/profile/telegram/status`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
@@ -190,7 +190,7 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
     try {
       const res = await fetch(`${API_URL}/api/profile/telegram/connect`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
@@ -211,7 +211,7 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
     try {
       const res = await fetch(`${API_URL}/api/profile/telegram/disconnect`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
@@ -448,7 +448,7 @@ export default function SettingsPage() {
     setError(null);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {

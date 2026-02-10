@@ -479,7 +479,7 @@ export default function BriefingsPage() {
     
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/current`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -503,7 +503,7 @@ export default function BriefingsPage() {
     
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/history?limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -585,7 +585,7 @@ export default function BriefingsPage() {
     setExecutiveLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success && data.data) {

@@ -46,15 +46,18 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Explicitly match protected routes
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes (handled by API)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+    '/dashboard/:path*',
+    '/briefings/:path*',
+    '/sources/:path*',
+    '/search/:path*',
+    '/settings/:path*',
+    '/admin/:path*',
+    '/domains/:path*',
+    '/marketplace/:path*',
+    '/zk/:path*',
+    '/login',
+    '/register/:path*',
   ],
 };

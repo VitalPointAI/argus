@@ -22,7 +22,7 @@ interface HumintSource {
 }
 
 export default function HumintSourcesPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [sources, setSources] = useState<HumintSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

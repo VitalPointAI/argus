@@ -32,7 +32,7 @@ interface User {
 }
 
 export default function AdminPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -111,7 +111,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       const data = await res.json();

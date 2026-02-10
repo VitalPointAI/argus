@@ -27,7 +27,7 @@ interface ContractInfo {
 }
 
 export default function MarketplacePage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [listings, setListings] = useState<NftListing[]>([]);
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const [loading, setLoading] = useState(true);

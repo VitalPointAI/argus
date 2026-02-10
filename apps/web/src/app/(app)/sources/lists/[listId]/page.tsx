@@ -32,7 +32,7 @@ interface SourceList {
 
 export default function SourceListDetailPage() {
   const { listId } = useParams();
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [list, setList] = useState<SourceList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

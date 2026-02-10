@@ -12,6 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: null; // DEPRECATED: Token is now in HttpOnly cookie. Use credentials: 'include' in fetch.
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token: null, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
