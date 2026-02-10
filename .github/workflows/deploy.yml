@@ -33,12 +33,12 @@ jobs:
             cd apps/api
             npm run build || echo "API build skipped (using tsx watch mode)"
             cd ../..
-            pm2 restart argus-api
+            sudo pm2 restart argus-api
             
             # Build and restart web (clean build to avoid stale chunks)
             cd apps/web
             rm -rf .next
             npm run build
-            pm2 restart argus-web
+            sudo pm2 restart argus-web
             
             echo "Deploy complete: $(date)"
