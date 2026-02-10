@@ -113,6 +113,19 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   
   console.log(`[FetchArticles] hoursBack=${hoursBack}, since=${since.toISOString()}, maxArticles=${maxArticles}`);
   
+  // First, check total article count for debugging
+  try {
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(content);
+    console.log(`[FetchArticles] Total articles in database: ${countResult?.count}`);
+    
+    const [recentCount] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(content)
+      .where(gte(content.fetchedAt, since));
+    console.log(`[FetchArticles] Articles since ${since.toISOString()}: ${recentCount?.count}`);
+  } catch (countError) {
+    console.error('[FetchArticles] Count query failed:', countError);
+  }
+  
   // Build conditions
   const conditions = [
     gte(content.fetchedAt, since),
