@@ -35,11 +35,15 @@ jobs:
             cd ../..
             pm2 restart argus-api || pm2 start "npx tsx src/index.ts" --name argus-api --cwd /opt/argus/apps/api
             
-            # Build and restart web (clean build to avoid stale chunks)
+            # Build and restart web (aggressive cache clear)
             cd apps/web
             rm -rf .next
+            rm -rf node_modules/.cache
             npm run build
-            pm2 restart argus-web || pm2 start "npm run start -- -p 3002" --name argus-web --cwd /opt/argus/apps/web
+            
+            # Kill and restart to ensure fresh process
+            pm2 delete argus-web 2>/dev/null || true
+            pm2 start "npm run start -- -p 3002" --name argus-web --cwd /opt/argus/apps/web
             
             pm2 save
             echo "Deploy complete: $(date)"
