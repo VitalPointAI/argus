@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AuthProvider } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'Argus - Strategic Intelligence Platform',
@@ -12,8 +13,8 @@ export default function PublicLayout({
 }) {
   // Public pages don't need the navbar - they have their own design
   return (
-    <>
+    <AuthProvider>
       {children}
-    </>
+    </AuthProvider>
   );
 }
