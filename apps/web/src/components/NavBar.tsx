@@ -38,7 +38,7 @@ export default function NavBar() {
 
   // Primary navigation - core features
   const primaryLinks = [
-    { href: '/', label: 'Dashboard' },
+    { href: '/dashboard', label: 'Dashboard' },
     { href: '/briefings', label: 'Briefings' },
     { href: '/sources', label: 'Sources' },
     { href: '/search', label: 'Search' },
