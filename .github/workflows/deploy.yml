@@ -35,8 +35,9 @@ jobs:
             cd ../..
             pm2 restart argus-api
             
-            # Build and restart web
+            # Build and restart web (clean build to avoid stale chunks)
             cd apps/web
+            rm -rf .next
             npm run build
             pm2 restart argus-web
             
