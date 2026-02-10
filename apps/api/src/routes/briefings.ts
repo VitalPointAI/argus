@@ -509,6 +509,66 @@ briefingsRoutes.post('/:id/delivered', async (c) => {
   return c.json({ success: true });
 });
 
+// Debug endpoint to check article fetching
+briefingsRoutes.get('/debug/articles', async (c) => {
+  try {
+    const hoursBack = parseInt(c.req.query('hoursBack') || '24');
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+    
+    // Import db and content table
+    const { db, content, sources, domains } = await import('../db');
+    const { sql, gte, desc, and, eq } = await import('drizzle-orm');
+    
+    // Simple count
+    const [totalCount] = await db.select({ count: sql<number>`count(*)::int` }).from(content);
+    
+    // Count with date filter
+    const [recentCount] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(content)
+      .where(gte(content.fetchedAt, since));
+    
+    // Get some actual articles
+    const articles = await db
+      .select({
+        id: content.id,
+        title: content.title,
+        fetchedAt: content.fetchedAt,
+        sourceName: sources.name,
+        domain: domains.name,
+      })
+      .from(content)
+      .leftJoin(sources, eq(content.sourceId, sources.id))
+      .leftJoin(domains, eq(sources.domainId, domains.id))
+      .where(gte(content.fetchedAt, since))
+      .orderBy(desc(content.fetchedAt))
+      .limit(5);
+    
+    return c.json({
+      success: true,
+      data: {
+        hoursBack,
+        since: since.toISOString(),
+        now: new Date().toISOString(),
+        totalArticles: totalCount?.count,
+        recentArticles: recentCount?.count,
+        sampleArticles: articles.map(a => ({
+          title: a.title?.substring(0, 50),
+          fetchedAt: a.fetchedAt,
+          source: a.sourceName,
+          domain: a.domain,
+        })),
+      }
+    });
+  } catch (error) {
+    console.error('Debug articles error:', error);
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    }, 500);
+  }
+});
+
 // TTS status and voices
 briefingsRoutes.get('/tts/status', async (c) => {
   try {
