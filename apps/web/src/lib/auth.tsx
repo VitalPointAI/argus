@@ -23,6 +23,16 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Helper to set cookie (for middleware to read)
+function setCookie(name: string, value: string, days: number = 7) {
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -33,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem('argus_token');
     if (savedToken) {
       setToken(savedToken);
+      setCookie('argus_token', savedToken); // Sync to cookie for middleware
       fetchUser(savedToken);
     } else {
       setLoading(false);
@@ -52,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Token invalid, clear it
         localStorage.removeItem('argus_token');
+        deleteCookie('argus_token');
         setToken(null);
       }
     } catch (error) {
@@ -73,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(data.data.token);
         setUser(data.data.user);
         localStorage.setItem('argus_token', data.data.token);
+        setCookie('argus_token', data.data.token);
         return { success: true };
       }
       return { success: false, error: data.error || 'Login failed' };
@@ -93,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(data.data.token);
         setUser(data.data.user);
         localStorage.setItem('argus_token', data.data.token);
+        setCookie('argus_token', data.data.token);
         return { success: true };
       }
       return { success: false, error: data.error || 'Registration failed' };
@@ -105,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
     localStorage.removeItem('argus_token');
+    deleteCookie('argus_token');
   };
 
   return (
