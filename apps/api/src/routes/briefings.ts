@@ -241,7 +241,8 @@ briefingsRoutes.post('/executive', async (c) => {
   } = body;
 
   try {
-    console.log(`Generating executive ${type} briefing...`);
+    console.log(`[Briefing] Generating executive ${type} briefing...`);
+    console.log(`[Briefing] Options: hoursBack=${hoursBack}, minConfidence=${minConfidence}, maxArticles=${maxArticles}`);
     
     const briefing = await generateExecutiveBriefing({
       type,
@@ -251,19 +252,27 @@ briefingsRoutes.post('/executive', async (c) => {
       includeTTS,
     });
 
+    console.log(`[Briefing] Generated: ${briefing.summary?.totalStories || 0} stories, ${briefing.summary?.totalArticles || 0} articles`);
+
     // Always save when user is authenticated
     if (user) {
+      const markdownContent = briefing.markdownContent || '';
+      
+      console.log(`[Briefing] Saving for user ${user.id}...`);
+      
       const [saved] = await db.insert(briefings).values({
         userId: user.id,
         type,
-        title: briefing.title,
-        content: briefing.markdownContent,
-        summary: briefing.markdownContent.substring(0, 500),
+        title: briefing.title || 'Executive Briefing',
+        content: markdownContent,
+        summary: markdownContent.substring(0, 500) || 'No content generated',
         changes: [],
         forecasts: [],
         contentIds: [],
         deliveryChannels: ['web'],
       }).returning();
+
+      console.log(`[Briefing] Saved with ID: ${saved.id}`);
 
       return c.json({ 
         success: true, 
@@ -281,10 +290,13 @@ briefingsRoutes.post('/executive', async (c) => {
       data: briefing,
     });
   } catch (error) {
-    console.error('Executive briefing error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('[Briefing] Executive briefing error:', errorMessage);
+    if (errorStack) console.error('[Briefing] Stack:', errorStack);
     return c.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage || 'Unknown error generating briefing',
     }, 500);
   }
 });

@@ -294,7 +294,20 @@ RULES:
  * Generate the full executive briefing
  */
 export async function generateExecutiveBriefing(options: BriefingOptions): Promise<ExecutiveBriefing> {
-  const articles = await fetchArticles(options);
+  console.log(`[ExecBriefing] Starting generation with options:`, JSON.stringify(options));
+  
+  let articles: Article[];
+  try {
+    articles = await fetchArticles(options);
+    console.log(`[ExecBriefing] Fetched ${articles.length} articles`);
+  } catch (fetchError) {
+    console.error('[ExecBriefing] Failed to fetch articles:', fetchError);
+    throw new Error(`Failed to fetch articles: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+  }
+  
+  if (articles.length === 0) {
+    console.warn('[ExecBriefing] No articles found for briefing');
+  }
   
   // Group by domain
   const byDomain: Record<string, Article[]> = {};

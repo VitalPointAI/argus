@@ -157,15 +157,25 @@ export async function deliverScheduledBriefings(): Promise<{
         const prefs = user.preferences as any;
         const userDomains = prefs?.domains?.selected || [];
         
-        console.log(`[Delivery] Generating briefing for ${user.name}`);
+        console.log(`[Delivery] Generating briefing for ${user.name} (${user.email})`);
+        console.log(`[Delivery] User domains: ${userDomains.length > 0 ? userDomains.join(', ') : 'all'}`);
 
         // Generate user-specific briefing
-        const briefing = await generateExecutiveBriefing({
-          type: 'morning',
-          hoursBack: 14,
-          includeTTS: false,
-          domainIds: userDomains.length > 0 ? userDomains : undefined,
-        });
+        let briefing;
+        try {
+          briefing = await generateExecutiveBriefing({
+            type: 'morning',
+            hoursBack: 14,
+            includeTTS: false,
+            domainIds: userDomains.length > 0 ? userDomains : undefined,
+          });
+          console.log(`[Delivery] Briefing generated: ${briefing.summary?.totalStories || 0} stories`);
+        } catch (genError) {
+          const errMsg = genError instanceof Error ? genError.message : String(genError);
+          console.error(`[Delivery] Briefing generation failed for ${user.email}:`, errMsg);
+          result.errors.push(`Generation failed for ${user.email}: ${errMsg}`);
+          continue;
+        }
 
         result.generated++;
 
