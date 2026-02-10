@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { db, users } from '../db';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
@@ -10,6 +11,8 @@ export const authRoutes = new Hono();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'argus-secret-change-in-production';
 const SALT_ROUNDS = 10;
+const COOKIE_NAME = 'argus_session';
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -45,17 +48,47 @@ export function verifyToken(token: string): { userId: string; email: string } | 
 }
 
 /**
- * Auth middleware - extracts user from Authorization header
+ * Set session cookie (HttpOnly, Secure in production)
+ */
+function setSessionCookie(c: any, token: string) {
+  setCookie(c, COOKIE_NAME, token, {
+    path: '/',
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'Lax',
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  });
+}
+
+/**
+ * Clear session cookie
+ */
+function clearSessionCookie(c: any) {
+  deleteCookie(c, COOKIE_NAME, {
+    path: '/',
+  });
+}
+
+/**
+ * Auth middleware - extracts user from session cookie or Authorization header
  */
 export async function authMiddleware(c: any, next: any) {
-  const authHeader = c.req.header('Authorization');
+  // First try HttpOnly cookie (preferred)
+  let token = getCookie(c, COOKIE_NAME);
   
-  if (!authHeader?.startsWith('Bearer ')) {
+  // Fallback to Authorization header for API clients
+  if (!token) {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+  }
+  
+  if (!token) {
     c.set('user', null);
     return next();
   }
   
-  const token = authHeader.slice(7);
   const payload = verifyToken(token);
   
   if (payload) {
@@ -107,14 +140,14 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
     },
   }).returning();
   
-  // Generate token
+  // Generate token and set HttpOnly cookie
   const token = generateToken(user.id, user.email);
+  setSessionCookie(c, token);
   
   return c.json({
     success: true,
     data: {
       user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
-      token,
     },
   });
 });
@@ -135,21 +168,21 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
     return c.json({ success: false, error: 'Invalid credentials' }, 401);
   }
   
-  // Generate token
+  // Generate token and set HttpOnly cookie
   const token = generateToken(user.id, user.email);
+  setSessionCookie(c, token);
   
   return c.json({
     success: true,
     data: {
       user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
-      token,
     },
   });
 });
 
-// Logout (client-side token removal, but we can add token blacklist later)
+// Logout - clears HttpOnly cookie
 authRoutes.post('/logout', async (c) => {
-  // In a more complete implementation, we'd blacklist the token
+  clearSessionCookie(c);
   return c.json({ success: true });
 });
 

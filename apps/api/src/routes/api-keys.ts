@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
 import { Context, Next } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { db, users, apiKeys, apiKeyRateLimits } from '../db';
 import { eq, and, gte, desc } from 'drizzle-orm';
 import { createHash, randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
+
+const SESSION_COOKIE_NAME = 'argus_session';
 
 // User type from database
 interface User {
@@ -332,13 +335,31 @@ export async function apiKeyAuthMiddleware(c: Context, next: Next): Promise<Resp
 }
 
 /**
- * Combined auth middleware that accepts either JWT or API key
+ * Combined auth middleware that accepts session cookie, JWT header, or API key
+ * Priority: Cookie > Authorization header > X-API-Key
  */
 export async function combinedAuthMiddleware(c: Context, next: Next): Promise<Response | void> {
+  const sessionCookie = getCookie(c, SESSION_COOKIE_NAME);
   const authHeader = c.req.header('Authorization');
   const apiKey = c.req.header('X-API-Key');
   
-  // Try JWT first
+  // Try session cookie first (HttpOnly, most secure)
+  if (sessionCookie) {
+    try {
+      const decoded = jwt.verify(sessionCookie, JWT_SECRET) as { userId: string };
+      const [user] = await db.select().from(users).where(eq(users.id, decoded.userId)).limit(1);
+      
+      if (user) {
+        c.set('user' as never, user as never);
+        c.set('authMethod' as never, 'cookie' as never);
+        return next();
+      }
+    } catch {
+      // Cookie invalid, try other methods
+    }
+  }
+  
+  // Try Authorization header (for API clients)
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     try {

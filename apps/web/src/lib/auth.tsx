@@ -12,62 +12,38 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Helper to set cookie (for middleware to read)
-function setCookie(name: string, value: string, days: number = 7) {
-  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function deleteCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load token from localStorage on mount
+  // Check auth status on mount (cookie sent automatically)
   useEffect(() => {
-    const savedToken = localStorage.getItem('argus_token');
-    if (savedToken) {
-      setToken(savedToken);
-      setCookie('argus_token', savedToken); // Sync to cookie for middleware
-      fetchUser(savedToken);
-    } else {
-      setLoading(false);
-    }
+    checkAuth();
   }, []);
 
-  const fetchUser = async (authToken: string) => {
+  const checkAuth = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        credentials: 'include', // Send HttpOnly cookies
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
           setUser(data.data);
         }
-      } else {
-        // Token invalid, clear it
-        localStorage.removeItem('argus_token');
-        deleteCookie('argus_token');
-        setToken(null);
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
+      console.error('Auth check failed:', error);
     } finally {
       setLoading(false);
     }
@@ -78,14 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Receive and store HttpOnly cookie
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (data.success) {
-        setToken(data.data.token);
         setUser(data.data.user);
-        localStorage.setItem('argus_token', data.data.token);
-        setCookie('argus_token', data.data.token);
         return { success: true };
       }
       return { success: false, error: data.error || 'Login failed' };
@@ -99,14 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Receive and store HttpOnly cookie
         body: JSON.stringify({ email, password, name }),
       });
       const data = await res.json();
       if (data.success) {
-        setToken(data.data.token);
         setUser(data.data.user);
-        localStorage.setItem('argus_token', data.data.token);
-        setCookie('argus_token', data.data.token);
         return { success: true };
       }
       return { success: false, error: data.error || 'Registration failed' };
@@ -115,15 +87,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('argus_token');
-    deleteCookie('argus_token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

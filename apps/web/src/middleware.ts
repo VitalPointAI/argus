@@ -11,37 +11,35 @@ const protectedRoutes = [
   '/admin',
   '/domains',
   '/marketplace',
-  '/predictions',
-  '/bounties',
   '/zk',
 ];
 
-// Routes that are always public
-const publicRoutes = ['/', '/login', '/register', '/auth'];
+// Routes that should redirect to dashboard if already logged in
+const authRoutes = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  
+  // Get session token from HttpOnly cookie
+  const sessionToken = request.cookies.get('argus_session')?.value;
   
   // Check if route is protected
   const isProtectedRoute = protectedRoutes.some(route => 
     pathname === route || pathname.startsWith(`${route}/`)
   );
   
-  if (!isProtectedRoute) {
-    return NextResponse.next();
-  }
+  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
   
-  // Check for auth token in cookies
-  const token = request.cookies.get('argus_token')?.value;
-  
-  // Also check Authorization header (for API calls)
-  const authHeader = request.headers.get('authorization');
-  
-  if (!token && !authHeader) {
-    // Redirect to login
+  // No session + protected route = redirect to login
+  if (isProtectedRoute && !sessionToken) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+  
+  // Has session + auth route = redirect to dashboard
+  if (isAuthRoute && sessionToken) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
   return NextResponse.next();
@@ -55,8 +53,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
-     * - api routes (handled separately)
+     * - api routes (handled by API)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
   ],
 };
