@@ -17,7 +17,7 @@
     "@hono/zod-validator": "^0.4.2",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
     "@mozilla/readability": "^0.6.0",
-    "@vitalpoint/near-phantom-auth": "github:jim-agent/near-phantom-auth#main",
+    "@vitalpoint/near-phantom-auth": "^0.1.1",
     "bcrypt": "^6.0.0",
     "circomlibjs": "^0.1.7",
     "dotenv": "^16.4.7",
