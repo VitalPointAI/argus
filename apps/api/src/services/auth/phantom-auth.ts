@@ -2,23 +2,42 @@
  * Phantom Auth Integration
  * 
  * Anonymous passkey authentication for HUMINT sources using @vitalpoint/near-phantom-auth
+ * 
+ * NOTE: Uses dynamic imports to fail gracefully if package not built
  */
 
-import { createAnonAuth, type AnonAuthInstance } from '@vitalpoint/near-phantom-auth/server';
-import { createPostgresAdapter, POSTGRES_SCHEMA } from '@vitalpoint/near-phantom-auth/server';
 import { db } from '../../db';
 import { Pool } from 'pg';
 
+// Dynamic import types
+type AnonAuthInstance = any;
+
 let phantomAuth: AnonAuthInstance | null = null;
+let phantomAuthAvailable = true;
 
 /**
  * Initialize Phantom Auth
  * 
- * Call this during server startup
+ * Call this during server startup. Uses dynamic imports to fail gracefully.
  */
-export async function initPhantomAuth(): Promise<AnonAuthInstance> {
+export async function initPhantomAuth(): Promise<AnonAuthInstance | null> {
   if (phantomAuth) {
     return phantomAuth;
+  }
+
+  if (!phantomAuthAvailable) {
+    return null;
+  }
+
+  // Try to dynamically import the phantom auth package
+  let createAnonAuth: any;
+  try {
+    const mod = await import('@vitalpoint/near-phantom-auth/server');
+    createAnonAuth = mod.createAnonAuth;
+  } catch (e) {
+    console.warn('[PhantomAuth] Package not available, HUMINT registration disabled:', e instanceof Error ? e.message : e);
+    phantomAuthAvailable = false;
+    return null;
   }
 
   const databaseUrl = process.env.DATABASE_URL;
