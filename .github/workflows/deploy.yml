@@ -22,12 +22,12 @@ jobs:
           script: |
             cd /opt/argus
             
+            # Fix permissions at start of every deploy
+            sudo chown -R deploy:deploy /opt/argus
+            
             # Pull latest code
             git fetch origin main
             git reset --hard origin/main
-            
-            # Fix permissions (from old root PM2 runs)
-            sudo chown -R deploy:deploy /opt/argus || true
             
             # Clean install if permission issues persist
             if ! npm install --production=false 2>/dev/null; then
@@ -46,12 +46,9 @@ jobs:
             # Build and restart web (aggressive cache clear)
             cd apps/web
             
-            # Force remove .next with sudo (required due to root-owned files)
-            echo "Removing .next with sudo..."
-            sudo rm -rf .next
-            echo ".next removal complete (exit code: $?)"
-            
-            rm -rf node_modules/.cache
+            # Always use sudo for .next removal and ensure proper ownership
+            sudo rm -rf .next node_modules/.cache
+            sudo chown -R deploy:deploy /opt/argus/apps/web
             
             # Web build - MUST succeed
             npm run build
