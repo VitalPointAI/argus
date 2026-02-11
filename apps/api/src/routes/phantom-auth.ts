@@ -160,7 +160,7 @@ phantomRoutes.post('/register/finish', async (c) => {
     setCookie(c, 'phantom_session', session.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'Lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
@@ -252,7 +252,7 @@ phantomRoutes.post('/login/finish', async (c) => {
     setCookie(c, 'phantom_session', session.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'Lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
@@ -540,7 +540,7 @@ phantomRoutes.post('/recovery/ipfs/recover', async (c) => {
     setCookie(c, 'phantom_session', session.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'Lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
