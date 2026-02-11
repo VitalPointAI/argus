@@ -21,7 +21,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// In production, use origin (nginx proxies /api to API server)
+// In dev, use localhost:3001
+function getApiBase() {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    // Production: use same origin (nginx proxies /api)
+    if (window.location.hostname !== 'localhost') {
+      return window.location.origin;
+    }
+  }
+  return 'http://localhost:3001';
+}
+
+const API_BASE = getApiBase();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
