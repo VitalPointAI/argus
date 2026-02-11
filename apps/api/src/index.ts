@@ -70,6 +70,7 @@ app.route('/api/opsec', opsecRoutes);
 app.route('/api/zk', zkRoutes);
 app.route('/api/nft', nftRoutes);
 app.route('/api/phantom', phantomAuthRoutes); // Anonymous passkey auth for HUMINT
+app.route('/api/auth/passkey', phantomAuthRoutes); // Also mount at standard path
 
 // Root
 app.get('/', (c) => {
