@@ -249,9 +249,12 @@ phantomRoutes.post('/login/finish', async (c) => {
     });
 
     // Set session cookie
+    const isSecure = process.env.NODE_ENV === 'production';
+    console.log('[PhantomAuth] Setting cookie - sessionId:', session.id, '| secure:', isSecure, '| NODE_ENV:', process.env.NODE_ENV);
+    
     setCookie(c, 'phantom_session', session.id, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure,
       sameSite: 'Lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
@@ -301,6 +304,10 @@ phantomRoutes.get('/session', async (c) => {
   try {
     const auth = getPhantomAuth();
     const sessionId = getCookie(c, 'phantom_session');
+    
+    // Debug: log all cookies received
+    const allCookies = c.req.header('cookie') || 'none';
+    console.log('[PhantomAuth] Session check - cookies:', allCookies, '| phantom_session:', sessionId || 'not found');
 
     if (!sessionId) {
       return c.json({ authenticated: false });
