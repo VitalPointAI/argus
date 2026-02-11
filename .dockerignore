@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+*/node_modules
+
+# Build outputs
+.next
+dist
+*.tsbuildinfo
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment (will be passed via docker-compose)
+.env
+.env.*
+!.env.example
+
+# Docs
+docs
+*.md
+!README.md
+
+# Tests
+**/*.test.ts
+**/*.spec.ts
+coverage
+
+# Misc
+.DS_Store
+*.log

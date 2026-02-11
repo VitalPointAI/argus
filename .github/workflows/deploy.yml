@@ -3,7 +3,7 @@ name: Deploy Argus
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -22,44 +22,17 @@ jobs:
           script: |
             cd /opt/argus
             
-            # Fix permissions at start of every deploy
-            sudo chown -R deploy:deploy /opt/argus
-            
             # Pull latest code
             git fetch origin main
             git reset --hard origin/main
             
-            # Clean install if permission issues persist
-            if ! npm install --production=false 2>/dev/null; then
-              echo "npm install failed, trying clean install..."
-              sudo rm -rf node_modules package-lock.json
-              npm install --production=false
-            fi
+            # Build and deploy with Docker Compose
+            docker compose down || true
+            docker compose build --no-cache
+            docker compose up -d
             
-            # Build and restart API (kill and restart for clean state)
-            cd apps/api
-            npm run build || echo "API build skipped (using tsx watch mode)"
-            cd ../..
-            pm2 delete argus-api 2>/dev/null || true
-            pm2 start "npx tsx src/index.ts" --name argus-api --cwd /opt/argus/apps/api
+            # Clean up old images
+            docker image prune -f
             
-            # Build and restart web (aggressive cache clear)
-            cd apps/web
-            
-            # Always use sudo for .next removal and ensure proper ownership
-            sudo rm -rf .next node_modules/.cache
-            sudo chown -R deploy:deploy /opt/argus/apps/web
-            
-            # Web build - MUST succeed
-            npm run build
-            if [ $? -ne 0 ]; then
-              echo "ERROR: Web build failed!"
-              exit 1
-            fi
-            
-            # Kill and restart to ensure fresh process
-            pm2 delete argus-web 2>/dev/null || true
-            pm2 start "npm run start -- -p 3002" --name argus-web --cwd /opt/argus/apps/web
-            
-            pm2 save
             echo "Deploy complete: $(date)"
+            docker compose ps
