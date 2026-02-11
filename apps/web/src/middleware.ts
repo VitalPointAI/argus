@@ -22,9 +22,9 @@ export function middleware(request: NextRequest) {
   
   // Check for session from either auth system:
   // - argus_session: Standard user auth (email/OAuth)
-  // - anon_session: HUMINT passkey auth
+  // - phantom_session: HUMINT passkey auth
   const standardSession = request.cookies.get('argus_session')?.value;
-  const passkeySession = request.cookies.get('anon_session')?.value;
+  const passkeySession = request.cookies.get('phantom_session')?.value;
   const hasSession = standardSession || passkeySession;
   
   // Check if route is protected
