@@ -114,6 +114,58 @@ function SourceRegistrationContent() {
               </p>
             </div>
 
+            {/* Privacy Tips - Collapsible */}
+            <details className="mb-6 group">
+              <summary className="cursor-pointer bg-slate-700/50 hover:bg-slate-700 rounded-lg p-3 text-sm font-medium text-slate-200 flex items-center justify-between transition">
+                <span>🛡️ Passkey Storage Privacy Tips</span>
+                <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-2 bg-slate-700/30 rounded-lg p-4 text-sm text-slate-300 space-y-3">
+                <p className="text-slate-400">
+                  Your passkey's identifier (codename) is stored in your chosen password manager. 
+                  For maximum anonymity, consider these options:
+                </p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-400 font-bold">★★★</span>
+                    <div>
+                      <strong className="text-slate-200">Hardware Security Key</strong>
+                      <p className="text-slate-400 text-xs">YubiKey, Titan Key, etc. Passkey never leaves the physical device. No cloud sync.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-yellow-400 font-bold">★★☆</span>
+                    <div>
+                      <strong className="text-slate-200">Separate Password Manager</strong>
+                      <p className="text-slate-400 text-xs">Create a Bitwarden/1Password account with anonymous email (ProtonMail). No link to real identity.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-yellow-400 font-bold">★★☆</span>
+                    <div>
+                      <strong className="text-slate-200">Device-Only Storage</strong>
+                      <p className="text-slate-400 text-xs">Some devices allow local-only passkeys (no cloud sync). High privacy but no backup.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-orange-400 font-bold">★☆☆</span>
+                    <div>
+                      <strong className="text-slate-200">Google/Apple/Microsoft</strong>
+                      <p className="text-slate-400 text-xs">Convenient but syncs to your account. Provider can see codename + domain association.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 pt-2 border-t border-slate-600">
+                  💡 Tip: When your device prompts to save the passkey, look for "Use another device" or storage options to choose your preferred method.
+                </p>
+              </div>
+            </details>
+
             {/* WebAuthn Check */}
             {!webAuthnSupported && (
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-6">
