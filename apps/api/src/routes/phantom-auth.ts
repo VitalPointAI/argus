@@ -105,7 +105,15 @@ phantomRoutes.post('/register/finish', async (c) => {
     const { challengeId, response, codename } = body;
 
     if (!challengeId || !response || !codename) {
-      return c.json({ error: 'Missing required fields' }, 400);
+      return c.json({ 
+        error: 'Missing required fields',
+        received: { 
+          hasChallengeId: !!challengeId, 
+          hasResponse: !!response, 
+          hasCodename: !!codename 
+        },
+        hint: 'Make sure to send back the codename from register/start'
+      }, 400);
     }
 
     // Verify passkey - returns passkey data but doesn't save (user doesn't exist yet)
