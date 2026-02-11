@@ -3,8 +3,227 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
+
+// ============================================
+// HUMINT Source Settings Component
+// ============================================
+function HumintSettings({ user }: { user: { codename: string; nearAccountId?: string } }) {
+  const { logout } = useAuth();
+  const router = useRouter();
+  const [nearBalance, setNearBalance] = useState<string | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+
+  useEffect(() => {
+    if (user.nearAccountId) {
+      fetchNearBalance();
+    }
+  }, [user.nearAccountId]);
+
+  const fetchNearBalance = async () => {
+    if (!user.nearAccountId) return;
+    setLoadingBalance(true);
+    try {
+      // Query NEAR RPC for account balance
+      const res = await fetch('https://rpc.mainnet.near.org', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'dontcare',
+          method: 'query',
+          params: {
+            request_type: 'view_account',
+            finality: 'final',
+            account_id: user.nearAccountId,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.result?.amount) {
+        // Convert yoctoNEAR to NEAR (1 NEAR = 10^24 yoctoNEAR)
+        const nearAmount = parseFloat(data.result.amount) / 1e24;
+        setNearBalance(nearAmount.toFixed(4));
+      }
+    } catch (error) {
+      console.error('Failed to fetch NEAR balance:', error);
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Source Account</h1>
+        <p className="text-slate-500 dark:text-slate-400 mb-8">
+          Manage your anonymous HUMINT source identity
+        </p>
+
+        {/* Identity Card */}
+        <section className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center text-3xl">
+              🎭
+            </div>
+            <div>
+              <p className="text-sm text-purple-400 font-medium">CODENAME</p>
+              <p className="text-2xl font-bold text-white font-mono">{user.codename}</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-700/50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Account Type</span>
+              <span className="text-sm font-medium text-purple-400">Anonymous Source</span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Your identity is protected. Only your codename is visible to others.
+            </p>
+          </div>
+        </section>
+
+        {/* NEAR Wallet */}
+        <section className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <span>💎</span> NEAR Wallet
+          </h2>
+
+          {user.nearAccountId ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-slate-400 mb-1">Account ID</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-slate-700/50 px-3 py-2 rounded-lg text-sm font-mono text-slate-200 break-all">
+                    {user.nearAccountId}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(user.nearAccountId!)}
+                    className="p-2 text-slate-400 hover:text-white transition"
+                    title="Copy"
+                  >
+                    📋
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-slate-400 mb-1">Balance</p>
+                <div className="flex items-center gap-2">
+                  {loadingBalance ? (
+                    <div className="animate-pulse bg-slate-700 h-8 w-24 rounded"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">
+                      {nearBalance !== null ? `${nearBalance} Ⓝ` : 'Unable to fetch'}
+                    </p>
+                  )}
+                  <button
+                    onClick={fetchNearBalance}
+                    disabled={loadingBalance}
+                    className="text-sm text-slate-400 hover:text-white transition"
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-700">
+                <p className="text-sm text-slate-400 mb-2">Receive payments for verified intel</p>
+                <a
+                  href={`https://nearblocks.io/address/${user.nearAccountId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-argus-400 hover:text-argus-300 flex items-center gap-1"
+                >
+                  View on NearBlocks →
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-slate-400 mb-2">No NEAR account linked</p>
+              <p className="text-sm text-slate-500">
+                A NEAR account will be created when you submit your first intel report.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Capabilities */}
+        <section className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-4">
+            What You Can Do
+          </h2>
+          <ul className="space-y-3">
+            <li className="flex items-center gap-3 text-slate-300">
+              <span className="text-green-400">✓</span>
+              Submit intelligence reports anonymously
+            </li>
+            <li className="flex items-center gap-3 text-slate-300">
+              <span className="text-green-400">✓</span>
+              Claim bounties for verified information
+            </li>
+            <li className="flex items-center gap-3 text-slate-300">
+              <span className="text-green-400">✓</span>
+              Build reputation under your codename
+            </li>
+            <li className="flex items-center gap-3 text-slate-300">
+              <span className="text-green-400">✓</span>
+              Receive direct tips in NEAR
+            </li>
+          </ul>
+
+          <div className="mt-6">
+            <Link
+              href="/sources/humint"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition"
+            >
+              Submit Intel Report →
+            </Link>
+          </div>
+        </section>
+
+        {/* Security Notice */}
+        <section className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 mb-6">
+          <h3 className="font-semibold text-yellow-200 mb-2">🔐 Security Notice</h3>
+          <ul className="text-sm text-yellow-100/80 space-y-2">
+            <li>• Your passkey is stored only on this device</li>
+            <li>• If you lose access to this device, you cannot recover this account</li>
+            <li>• Consider using the same device consistently for submissions</li>
+            <li>• Never share your device with untrusted parties</li>
+          </ul>
+        </section>
+
+        {/* Logout */}
+        <div className="flex justify-between items-center">
+          <Link
+            href="/dashboard"
+            className="text-slate-400 hover:text-white transition"
+          >
+            ← Back to Dashboard
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 text-red-400 hover:text-red-300 transition"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Standard User Settings (existing code below)
+// ============================================
 
 // Add New Domain Form Component
 function AddDomainForm({ onDomainAdded }: { onDomainAdded: () => void }) {
@@ -390,8 +609,14 @@ interface UserProfile {
 }
 
 export default function SettingsPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading, isHumint } = useAuth();
   const router = useRouter();
+
+  // Show HUMINT-specific settings for source accounts
+  if (!authLoading && user && isHumint) {
+    const humintUser = user as { codename: string; nearAccountId?: string };
+    return <HumintSettings user={humintUser} />;
+  }
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
