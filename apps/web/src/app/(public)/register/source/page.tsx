@@ -271,9 +271,9 @@ function SourceRegistrationContent() {
 }
 
 export default function SourceRegistrationPage() {
-  // Rebuild trigger: 2026-02-11
+  // Rebuild trigger: 2026-02-11-v2
   return (
-    <AnonAuthProvider apiUrl={`${API_BASE}/api/auth/passkey`}>
+    <AnonAuthProvider apiUrl={`${API_BASE}/api/phantom`}>
       <SourceRegistrationContent />
     </AnonAuthProvider>
   );
