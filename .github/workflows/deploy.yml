@@ -29,8 +29,12 @@ jobs:
             # Fix permissions (from old root PM2 runs)
             sudo chown -R deploy:deploy /opt/argus || true
             
-            # Install dependencies
-            npm install --production=false
+            # Clean install if permission issues persist
+            if ! npm install --production=false 2>/dev/null; then
+              echo "npm install failed, trying clean install..."
+              sudo rm -rf node_modules package-lock.json
+              npm install --production=false
+            fi
             
             # Build and restart API (kill and restart for clean state)
             cd apps/api
