@@ -6,6 +6,33 @@ import Link from 'next/link';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
+// Helper: base64url to Uint8Array (WebAuthn uses base64url, not standard base64)
+function base64urlToBuffer(base64url: string): Uint8Array {
+  // Convert base64url to standard base64
+  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  // Add padding if needed
+  const padLen = (4 - (base64.length % 4)) % 4;
+  const padded = base64 + '='.repeat(padLen);
+  // Decode
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Helper: ArrayBuffer to base64url
+function bufferToBase64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  const base64 = btoa(binary);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 export default function SourceRegistrationPage() {
   const [step, setStep] = useState<'info' | 'register' | 'success'>('info');
   const [codename, setCodename] = useState('');
@@ -39,10 +66,10 @@ export default function SourceRegistrationPage() {
       // Create passkey using WebAuthn
       const credential = await navigator.credentials.create({
         publicKey: {
-          challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
+          challenge: base64urlToBuffer(options.challenge),
           rp: options.rp,
           user: {
-            id: Uint8Array.from(atob(options.user.id), c => c.charCodeAt(0)),
+            id: base64urlToBuffer(options.user.id),
             name: options.user.name,
             displayName: options.user.displayName,
           },
@@ -70,11 +97,11 @@ export default function SourceRegistrationPage() {
           codename: generatedCodename,
           response: {
             id: credential.id,
-            rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+            rawId: bufferToBase64url(credential.rawId),
             type: credential.type,
             response: {
-              clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(attestationResponse.clientDataJSON))),
-              attestationObject: btoa(String.fromCharCode(...new Uint8Array(attestationResponse.attestationObject))),
+              clientDataJSON: bufferToBase64url(attestationResponse.clientDataJSON),
+              attestationObject: bufferToBase64url(attestationResponse.attestationObject),
               transports: attestationResponse.getTransports?.() || [],
             },
           },
@@ -118,12 +145,12 @@ export default function SourceRegistrationPage() {
       // Get passkey assertion
       const credential = await navigator.credentials.get({
         publicKey: {
-          challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
+          challenge: base64urlToBuffer(options.challenge),
           rpId: options.rpId,
           timeout: options.timeout,
           userVerification: options.userVerification,
           allowCredentials: options.allowCredentials?.map((cred: { id: string; type: string; transports?: string[] }) => ({
-            id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0)),
+            id: base64urlToBuffer(cred.id),
             type: cred.type,
             transports: cred.transports,
           })),
@@ -145,14 +172,14 @@ export default function SourceRegistrationPage() {
           challengeId,
           response: {
             id: credential.id,
-            rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+            rawId: bufferToBase64url(credential.rawId),
             type: credential.type,
             response: {
-              clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(assertionResponse.clientDataJSON))),
-              authenticatorData: btoa(String.fromCharCode(...new Uint8Array(assertionResponse.authenticatorData))),
-              signature: btoa(String.fromCharCode(...new Uint8Array(assertionResponse.signature))),
+              clientDataJSON: bufferToBase64url(assertionResponse.clientDataJSON),
+              authenticatorData: bufferToBase64url(assertionResponse.authenticatorData),
+              signature: bufferToBase64url(assertionResponse.signature),
               userHandle: assertionResponse.userHandle 
-                ? btoa(String.fromCharCode(...new Uint8Array(assertionResponse.userHandle)))
+                ? bufferToBase64url(assertionResponse.userHandle)
                 : undefined,
             },
           },
