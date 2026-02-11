@@ -26,6 +26,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             
+            # Fix permissions (from old root PM2 runs)
+            sudo chown -R deploy:deploy /opt/argus || true
+            
             # Install dependencies
             npm install --production=false
             

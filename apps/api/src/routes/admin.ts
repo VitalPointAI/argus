@@ -1,11 +1,9 @@
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { db, users, sources, content, briefings, domains, apiKeys } from '../db';
 import { eq, desc, count, and, gte, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'argus-secret-change-in-production';
-
-export const adminRoutes = new Hono();
 
 interface AdminUser {
   id: string;
@@ -14,10 +12,16 @@ interface AdminUser {
   isAdmin: boolean;
 }
 
+type Variables = {
+  adminUser: AdminUser;
+};
+
+export const adminRoutes = new Hono<{ Variables: Variables }>();
+
 /**
  * Middleware to verify admin status
  */
-async function requireAdmin(c: any, next: () => Promise<void>) {
+async function requireAdmin(c: Context<{ Variables: Variables }>, next: () => Promise<void>) {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Not authenticated' }, 401);
