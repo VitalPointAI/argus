@@ -12,7 +12,7 @@ RUN npm install
 
 # Force install latest phantom-auth and remove any workspace duplicate
 RUN npm cache clean --force && \
-    npm install @vitalpoint/near-phantom-auth@0.2.7 && \
+    npm install @vitalpoint/near-phantom-auth@0.2.9 && \
     rm -rf apps/api/node_modules/@vitalpoint
 
 # Copy source code
