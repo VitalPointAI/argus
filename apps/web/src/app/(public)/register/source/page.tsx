@@ -179,27 +179,77 @@ function SourceRegistrationContent() {
               </p>
             </div>
 
+            {/* Recommended Hardware - Collapsible */}
+            <details className="mb-4 group">
+              <summary className="cursor-pointer bg-green-900/30 hover:bg-green-900/50 border border-green-500/30 rounded-lg p-3 text-sm font-medium text-green-200 flex items-center justify-between transition">
+                <span>🔑 Recommended Hardware Keys</span>
+                <span className="text-green-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-2 bg-green-900/20 border border-green-500/20 rounded-lg p-4 text-sm space-y-3">
+                <p className="text-green-100/80">
+                  Hardware security keys provide the highest level of anonymity. Your passkey never leaves the physical device.
+                </p>
+                
+                <div className="space-y-3">
+                  <a 
+                    href="https://www.nitrokey.com/products/nitrokeys" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 transition border border-slate-700 hover:border-green-500/50"
+                  >
+                    <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center text-xl">🔐</div>
+                    <div className="flex-1">
+                      <div className="font-medium text-white">Nitrokey</div>
+                      <div className="text-xs text-slate-400">Open-source, made in Germany. ~€50-70</div>
+                    </div>
+                    <div className="text-green-400 text-xs font-medium">Recommended</div>
+                  </a>
+                  
+                  <a 
+                    href="https://www.yubico.com/store/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 transition border border-slate-700 hover:border-slate-500"
+                  >
+                    <div className="w-10 h-10 bg-slate-500/20 rounded-lg flex items-center justify-center text-xl">🔑</div>
+                    <div className="flex-1">
+                      <div className="font-medium text-white">YubiKey</div>
+                      <div className="text-xs text-slate-400">Industry standard. ~$50-70</div>
+                    </div>
+                  </a>
+                  
+                  <a 
+                    href="https://onlykey.io/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 transition border border-slate-700 hover:border-slate-500"
+                  >
+                    <div className="w-10 h-10 bg-slate-500/20 rounded-lg flex items-center justify-center text-xl">⌨️</div>
+                    <div className="flex-1">
+                      <div className="font-medium text-white">OnlyKey</div>
+                      <div className="text-xs text-slate-400">Physical PIN entry. ~$50</div>
+                    </div>
+                  </a>
+                </div>
+
+                <p className="text-xs text-slate-500 pt-2 border-t border-slate-600">
+                  When registering, choose "Use security key" or "Use another device" to use your hardware key.
+                </p>
+              </div>
+            </details>
+
             {/* Privacy Tips - Collapsible */}
             <details className="mb-6 group">
               <summary className="cursor-pointer bg-slate-700/50 hover:bg-slate-700 rounded-lg p-3 text-sm font-medium text-slate-200 flex items-center justify-between transition">
-                <span>🛡️ Passkey Storage Privacy Tips</span>
+                <span>🛡️ Software Privacy Options</span>
                 <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="mt-2 bg-slate-700/30 rounded-lg p-4 text-sm text-slate-300 space-y-3">
                 <p className="text-slate-400">
-                  Your passkey's identifier (codename) is stored in your chosen password manager. 
-                  For maximum anonymity, consider these options:
+                  No hardware key? Here are software alternatives ranked by privacy:
                 </p>
                 
                 <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-400 font-bold">★★★</span>
-                    <div>
-                      <strong className="text-slate-200">Hardware Security Key</strong>
-                      <p className="text-slate-400 text-xs">YubiKey, Titan Key, etc. Passkey never leaves the physical device. No cloud sync.</p>
-                    </div>
-                  </div>
-                  
                   <div className="flex items-start gap-2">
                     <span className="text-yellow-400 font-bold">★★☆</span>
                     <div>
@@ -226,7 +276,7 @@ function SourceRegistrationContent() {
                 </div>
 
                 <p className="text-xs text-slate-500 pt-2 border-t border-slate-600">
-                  💡 Tip: When your device prompts to save the passkey, look for "Use another device" or storage options to choose your preferred method.
+                  💡 Tip: When your device prompts to save the passkey, look for "Use another device" or storage options.
                 </p>
               </div>
             </details>
