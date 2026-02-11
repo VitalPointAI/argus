@@ -3,18 +3,18 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy all package files (root + workspace)
+# Copy all package files
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 
-# Install ALL dependencies including phantom-auth
+# Install dependencies
 RUN npm install
+
+# Force install latest phantom-auth (clear cache first)
+RUN npm cache clean --force && npm install @vitalpoint/near-phantom-auth@0.2.3
 
 # Copy source code
 COPY apps/api ./apps/api
-
-# Install phantom-auth explicitly in case it's missing
-RUN npm install @vitalpoint/near-phantom-auth@latest
 
 WORKDIR /app/apps/api
 
