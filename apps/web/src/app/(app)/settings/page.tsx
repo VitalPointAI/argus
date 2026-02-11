@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
 // Add New Domain Form Component
-function AddDomainForm({ onDomainAdded, token }: { onDomainAdded: () => void; token: string | null }) {
+function AddDomainForm({ onDomainAdded }: { onDomainAdded: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [newDomainName, setNewDomainName] = useState('');
   const [newDomainDesc, setNewDomainDesc] = useState('');
@@ -17,7 +17,7 @@ function AddDomainForm({ onDomainAdded, token }: { onDomainAdded: () => void; to
 
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDomainName.trim() || !token) return;
+    if (!newDomainName.trim()) return;
 
     setAdding(true);
     setError(null);
@@ -26,10 +26,8 @@ function AddDomainForm({ onDomainAdded, token }: { onDomainAdded: () => void; to
     try {
       const res = await fetch(`${API_URL}/api/domains`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           name: newDomainName.trim(),
           description: newDomainDesc.trim() || undefined,
@@ -427,10 +425,10 @@ export default function SettingsPage() {
       router.push('/login');
       return;
     }
-    if (!token) return; // Wait for token to be available
+    // Token is now in HttpOnly cookie - no need to wait for it
     fetchProfile();
     fetchDomains();
-  }, [user, authLoading, token]);
+  }, [user, authLoading]);
 
   const fetchDomains = async () => {
     try {
@@ -480,40 +478,32 @@ export default function SettingsPage() {
       // Update name
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name }),
       });
 
       // Update domain preferences
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/preferences/domains`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ selected: selectedDomains }),
       });
 
       // Update notification emails
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/preferences/notificationEmails`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(notificationEmails),
       });
 
       // Update email preferences
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/preferences/email`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(emailPrefs),
       });
 
@@ -756,7 +746,7 @@ export default function SettingsPage() {
           )}
 
           {/* Add New Domain */}
-          <AddDomainForm onDomainAdded={fetchDomains} token={token} />
+          <AddDomainForm onDomainAdded={fetchDomains} />
         </section>
 
         {/* Email Notifications */}
