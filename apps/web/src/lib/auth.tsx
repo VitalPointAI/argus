@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       // Try HUMINT passkey auth
-      const passkeyRes = await fetch(`${getApiBase()}/api/auth/passkey/session`, {
+      const passkeyRes = await fetch(`${getApiBase()}/api/phantom/session`, {
         credentials: 'include',
       });
       if (passkeyRes.ok) {
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           credentials: 'include',
         }),
-        fetch(`${getApiBase()}/api/auth/passkey/logout`, {
+        fetch(`${getApiBase()}/api/phantom/logout`, {
           method: 'POST',
           credentials: 'include',
         }),
