@@ -60,7 +60,7 @@ export default function SourceManagePageWrapper() {
 }
 
 function SourceManagePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);

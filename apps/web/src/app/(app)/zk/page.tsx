@@ -15,7 +15,7 @@ interface ProofResult {
 }
 
 export default function ZKProofsPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState<'location' | 'reputation' | 'info'>('info');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ProofResult | null>(null);

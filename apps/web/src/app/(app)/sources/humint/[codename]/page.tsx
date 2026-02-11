@@ -38,7 +38,7 @@ interface HumintSource {
 
 export default function HumintSourceProfilePage() {
   const { codename } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [source, setSource] = useState<HumintSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
