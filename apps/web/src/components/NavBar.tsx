@@ -5,7 +5,12 @@ import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function NavBar() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isHumint } = useAuth();
+  
+  // Get display name based on user type
+  const displayName = user?.type === 'humint' ? user.codename : (user as any)?.name || 'User';
+  const displayEmail = user?.type === 'humint' ? 'HUMINT Source' : (user as any)?.email || '';
+  const displayInitial = displayName.charAt(0).toUpperCase();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -117,10 +122,10 @@ export default function NavBar() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800 transition"
                 >
-                  <div className="w-7 h-7 rounded-full bg-argus-600 flex items-center justify-center text-sm font-medium">
-                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${isHumint ? 'bg-purple-600' : 'bg-argus-600'}`}>
+                    {isHumint ? '🎭' : displayInitial}
                   </div>
-                  <span className="text-sm font-medium max-w-[100px] truncate">{user.name}</span>
+                  <span className="text-sm font-medium max-w-[100px] truncate">{displayName}</span>
                   <svg className={`w-4 h-4 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -129,8 +134,8 @@ export default function NavBar() {
                 {userMenuOpen && (
                   <div className="absolute top-full right-0 mt-1 w-48 bg-slate-800 rounded-lg shadow-lg border border-slate-700 py-1 z-50">
                     <div className="px-4 py-2 border-b border-slate-700">
-                      <p className="text-sm font-medium truncate">{user.name}</p>
-                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                      <p className="text-sm font-medium truncate">{displayName}</p>
+                      <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
                     </div>
                     <a
                       href="/settings"
@@ -139,7 +144,7 @@ export default function NavBar() {
                     >
                       ⚙️ Settings
                     </a>
-                    {user.isAdmin && (
+                    {!isHumint && (user as any).isAdmin && (
                       <a
                         href="/admin"
                         onClick={() => setUserMenuOpen(false)}
@@ -241,12 +246,12 @@ export default function NavBar() {
                 ) : user ? (
                   <>
                     <div className="px-3 py-2 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-argus-600 flex items-center justify-center text-sm font-medium">
-                        {user.name?.charAt(0).toUpperCase() || 'U'}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${isHumint ? 'bg-purple-600' : 'bg-argus-600'}`}>
+                        {isHumint ? '🎭' : displayInitial}
                       </div>
                       <div>
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-xs text-slate-400">{user.email}</p>
+                        <p className="font-medium">{displayName}</p>
+                        <p className="text-xs text-slate-400">{displayEmail}</p>
                       </div>
                     </div>
                     <a
@@ -256,7 +261,7 @@ export default function NavBar() {
                     >
                       ⚙️ Settings
                     </a>
-                    {user.isAdmin && (
+                    {!isHumint && (user as any).isAdmin && (
                       <a
                         href="/admin"
                         onClick={() => setMobileMenuOpen(false)}

@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface User {
+// User can be either a standard user (email) or HUMINT source (codename)
+interface StandardUser {
+  type: 'standard';
   id: string;
   email: string;
   name: string;
@@ -10,10 +12,20 @@ interface User {
   preferences?: Record<string, unknown>;
 }
 
+interface HumintUser {
+  type: 'humint';
+  id: string;
+  codename: string;
+  nearAccountId?: string;
+}
+
+type User = StandardUser | HumintUser;
+
 interface AuthContextType {
   user: User | null;
   token: null; // DEPRECATED: Token is now in HttpOnly cookie. Use credentials: 'include' in fetch.
   loading: boolean;
+  isHumint: boolean; // Helper to check if user is HUMINT source
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -46,13 +58,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch(`${getApiBase()}/api/auth/me`, {
-        credentials: 'include', // Send HttpOnly cookies
+      // Try standard auth first
+      const standardRes = await fetch(`${getApiBase()}/api/auth/me`, {
+        credentials: 'include',
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setUser(data.data);
+      if (standardRes.ok) {
+        const data = await standardRes.json();
+        if (data.success && data.data) {
+          setUser({ type: 'standard', ...data.data });
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Try HUMINT passkey auth
+      const passkeyRes = await fetch(`${getApiBase()}/api/auth/passkey/session`, {
+        credentials: 'include',
+      });
+      if (passkeyRes.ok) {
+        const data = await passkeyRes.json();
+        if (data.authenticated && data.codename) {
+          setUser({
+            type: 'humint',
+            id: data.codename, // Use codename as ID for display
+            codename: data.codename,
+            nearAccountId: data.nearAccountId,
+          });
+          setLoading(false);
+          return;
         }
       }
     } catch (error) {
@@ -102,18 +135,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(`${getApiBase()}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      // Logout from both auth systems
+      await Promise.allSettled([
+        fetch(`${getApiBase()}/api/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        }),
+        fetch(`${getApiBase()}/api/auth/passkey/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        }),
+      ]);
     } catch (error) {
       console.error('Logout failed:', error);
     }
     setUser(null);
   };
 
+  const isHumint = user?.type === 'humint';
+
   return (
-    <AuthContext.Provider value={{ user, token: null, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token: null, loading, isHumint, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

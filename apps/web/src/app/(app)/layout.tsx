@@ -11,13 +11,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Server-side auth check - just verify cookie exists
-  // API will validate the token when requests are made
+  // Server-side auth check - verify any valid session exists
+  // Supports both standard auth (argus_session) and HUMINT passkey auth (anon_session)
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('argus_session')?.value;
+  const standardSession = cookieStore.get('argus_session')?.value;
+  const passkeySession = cookieStore.get('anon_session')?.value;
   
-  // No session cookie = redirect to login
-  if (!sessionToken) {
+  // No session cookie from either auth system = redirect to login
+  if (!standardSession && !passkeySession) {
     redirect('/login');
   }
 

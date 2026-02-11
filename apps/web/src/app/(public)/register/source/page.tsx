@@ -26,14 +26,18 @@ function SourceRegistrationContent() {
     clearError,
   } = useAnonAuth();
 
-  // On successful auth, show success screen
+  // On successful auth, show success or redirect
   useEffect(() => {
     if (isAuthenticated && codename) {
-      // Both registration and login show success screen
-      // (HUMINT users have separate dashboard - TODO)
-      setStep('success');
+      if (step === 'register') {
+        // New registration - show success screen with codename
+        setStep('success');
+      } else {
+        // Existing user login - redirect to dashboard
+        router.push('/dashboard');
+      }
     }
-  }, [isAuthenticated, codename, step]);
+  }, [isAuthenticated, codename, step, router]);
 
   const handleStartRegistration = async () => {
     clearError();

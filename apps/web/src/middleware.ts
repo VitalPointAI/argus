@@ -20,8 +20,12 @@ const authRoutes = ['/login', '/register'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Get session token from HttpOnly cookie
-  const sessionToken = request.cookies.get('argus_session')?.value;
+  // Check for session from either auth system:
+  // - argus_session: Standard user auth (email/OAuth)
+  // - anon_session: HUMINT passkey auth
+  const standardSession = request.cookies.get('argus_session')?.value;
+  const passkeySession = request.cookies.get('anon_session')?.value;
+  const hasSession = standardSession || passkeySession;
   
   // Check if route is protected
   const isProtectedRoute = protectedRoutes.some(route => 
@@ -31,14 +35,15 @@ export function middleware(request: NextRequest) {
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
   
   // No session + protected route = redirect to login
-  if (isProtectedRoute && !sessionToken) {
+  if (isProtectedRoute && !hasSession) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
   
   // Has session + auth route = redirect to dashboard
-  if (isAuthRoute && sessionToken) {
+  // (but allow /register/source for HUMINT users to manage their account)
+  if (isAuthRoute && hasSession && !pathname.startsWith('/register/source')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
