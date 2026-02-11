@@ -3,13 +3,37 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
+  const { login } = useAuth();
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading('email');
+
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        router.push('/dashboard');
+      } else {
+        setError(result.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleOAuthLogin = async (provider: 'google' | 'github' | 'twitter') => {
     setError('');
@@ -110,6 +134,71 @@ export default function LoginPage() {
           </div>
 
           {/* Divider */}
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 border-t border-slate-700" />
+            <span className="text-slate-500 text-sm">or</span>
+            <div className="flex-1 border-t border-slate-700" />
+          </div>
+
+          {/* Email/Password Login */}
+          {showEmailForm ? (
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-argus-500 focus:border-transparent"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-argus-500 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading !== null}
+                className="w-full px-4 py-3 bg-argus-600 hover:bg-argus-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+              >
+                {loading === 'email' ? 'Signing in...' : 'Sign In'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEmailForm(false)}
+                className="w-full text-sm text-slate-400 hover:text-white transition"
+              >
+                ← Back to other options
+              </button>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowEmailForm(true)}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Continue with Email
+            </button>
+          )}
+
+          {/* Another Divider */}
           <div className="flex items-center gap-4 my-6">
             <div className="flex-1 border-t border-slate-700" />
             <span className="text-slate-500 text-sm">or</span>
