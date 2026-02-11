@@ -30,9 +30,7 @@ Strategic intelligence platform with:
 - Bastion auth integration (waiting for Aaron to push code)
 
 ### ⏳ BLOCKED
-- AWS SES email delivery (need credentials from Aaron)
-- XTTS TTS server (need URL from Aaron)
-- ONE_CLICK_JWT (need from partners portal)
+- Signal channel delivery (need 2nd phone number)
 
 ---
 
@@ -99,15 +97,15 @@ _Goal: Bulletproof authenticity, bias detection_
 
 ---
 
-## Phase 5: Delivery & Alerts
+## Phase 5: Delivery & Alerts ✅ MOSTLY COMPLETE
 _Goal: Multi-channel, real-time intelligence_
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Email delivery (AWS SES) | P0 | 🔧 Built, waiting for credentials |
+| Email delivery (AWS SES) | P0 | ✅ |
 | Scheduled briefing delivery (user preferences) | P0 | ✅ |
 | Executive briefing format | P0 | ✅ |
-| TTS audio briefings | P1 | 🔧 Backend ready, waiting for XTTS URL |
+| TTS audio briefings | P1 | ✅ (XTTS integrated) |
 | Real-time breaking news alerts | P1 | ❌ |
 | Custom alert rules (keywords, confidence threshold) | P2 | ❌ |
 | Signal channel delivery | P2 | ❌ (need 2nd phone) |
@@ -196,11 +194,13 @@ _Goal: More source types_
 ---
 
 ## Dependencies
-- **AWS SES credentials**: Needed for email delivery
-- **XTTS server URL**: Needed for TTS audio briefings
-- **Bastion auth code**: Needed for wallet login (Aaron pushing)
-- **ONE_CLICK_JWT**: Needed for cross-chain payments (from partners portal)
 - **Second phone number**: Needed for Signal channel
+
+### ✅ Resolved
+- AWS SES credentials - configured
+- XTTS server - integrated (http://3.99.226.201:5002)
+- ONE_CLICK_JWT - configured
+- Phantom auth - implemented (replaces Bastion)
 
 ---
 

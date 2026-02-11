@@ -242,4 +242,68 @@ opsec.get('/connection-check', (c) => {
   });
 });
 
+// ============================================
+// Escrow Denominations (Privacy-Critical)
+// ============================================
+
+import { 
+  ZEC_DENOMINATIONS, 
+  validateBountyAmount, 
+  getValidBountyAmounts,
+  WITHDRAWAL_DELAY,
+  MIN_POOL_SIZE 
+} from '../services/payments/escrow';
+
+// Get available denominations
+opsec.get('/denominations', (c) => {
+  return c.json({
+    success: true,
+    data: {
+      denominations: ZEC_DENOMINATIONS,
+      validAmounts: getValidBountyAmounts().slice(0, 50), // First 50 valid amounts
+      minAmount: Math.min(...ZEC_DENOMINATIONS),
+      maxSingleDenom: Math.max(...ZEC_DENOMINATIONS),
+      privacyRules: {
+        fixedDenominations: 'Only standard amounts allowed to prevent fingerprinting',
+        timeDelay: `Withdrawals delayed ${WITHDRAWAL_DELAY.minMs / 3600000}-${WITHDRAWAL_DELAY.maxMs / 3600000} hours`,
+        poolSize: `Minimum ${MIN_POOL_SIZE} deposits per denomination before withdrawals`,
+      },
+    },
+  });
+});
+
+// Validate/preview bounty amount breakdown
+opsec.post('/validate-bounty-amount', async (c) => {
+  try {
+    const { amountZec, amountUsdc, zecPrice } = await c.req.json();
+    
+    // Calculate ZEC amount if USD provided
+    let zec = amountZec;
+    if (!zec && amountUsdc) {
+      const price = zecPrice || 30; // Default ZEC price estimate
+      zec = amountUsdc / price;
+    }
+    
+    if (!zec || zec <= 0) {
+      return c.json({ success: false, error: 'Amount required' }, 400);
+    }
+    
+    const result = validateBountyAmount(zec);
+    
+    return c.json({
+      success: true,
+      data: {
+        requestedAmount: zec,
+        ...result,
+        withdrawalCount: result.denominations.length,
+        estimatedDelivery: `${result.denominations.length * 2}-${result.denominations.length * 48} hours`,
+        privacyNote: 'Payout split into standard denominations with time delays for privacy',
+      },
+    });
+  } catch (error) {
+    console.error('Bounty validation error:', error);
+    return c.json({ success: false, error: 'Validation failed' }, 500);
+  }
+});
+
 export default opsec;
