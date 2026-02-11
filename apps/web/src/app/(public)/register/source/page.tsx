@@ -217,19 +217,6 @@ function SourceRegistrationContent() {
                       <div className="text-xs text-slate-400">Industry standard. ~$50-70</div>
                     </div>
                   </a>
-                  
-                  <a 
-                    href="https://onlykey.io/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 transition border border-slate-700 hover:border-slate-500"
-                  >
-                    <div className="w-10 h-10 bg-slate-500/20 rounded-lg flex items-center justify-center text-xl">⌨️</div>
-                    <div className="flex-1">
-                      <div className="font-medium text-white">OnlyKey</div>
-                      <div className="text-xs text-slate-400">Physical PIN entry. ~$50</div>
-                    </div>
-                  </a>
                 </div>
 
                 <p className="text-xs text-slate-500 pt-2 border-t border-slate-600">
