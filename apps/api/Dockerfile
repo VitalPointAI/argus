@@ -11,7 +11,7 @@ COPY apps/api/package*.json ./apps/api/
 RUN npm install
 
 # Force install latest phantom-auth (clear cache first)
-RUN npm cache clean --force && npm install @vitalpoint/near-phantom-auth@0.2.3
+RUN npm cache clean --force && npm install @vitalpoint/near-phantom-auth@0.2.4
 
 # Copy source code
 COPY apps/api ./apps/api

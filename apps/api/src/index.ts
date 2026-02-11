@@ -90,11 +90,14 @@ async function start() {
   
   // Initialize Phantom Auth for HUMINT
   try {
-    await initPhantomAuth();
-    console.log('✅ Phantom Auth initialized');
+    const phantomAuth = await initPhantomAuth();
+    if (phantomAuth) {
+      console.log('✅ Phantom Auth initialized');
+    } else {
+      console.warn('⚠️ Phantom Auth not available - HUMINT registration disabled');
+    }
   } catch (error) {
-    console.warn('⚠️ Phantom Auth not initialized:', error instanceof Error ? error.message : 'Unknown error');
-    console.warn('   HUMINT registration will be unavailable until configured.');
+    console.warn('⚠️ Phantom Auth error:', error instanceof Error ? error.message : 'Unknown error');
   }
   
   serve({
