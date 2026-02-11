@@ -45,8 +45,12 @@ jobs:
             
             # Build and restart web (aggressive cache clear)
             cd apps/web
-            # Use sudo to remove .next if permission denied (from old root PM2 runs)
-            sudo rm -rf .next || rm -rf .next
+            
+            # Force remove .next with sudo (required due to root-owned files)
+            echo "Removing .next with sudo..."
+            sudo rm -rf .next
+            echo ".next removal complete (exit code: $?)"
+            
             rm -rf node_modules/.cache
             
             # Web build - MUST succeed
