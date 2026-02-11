@@ -47,7 +47,8 @@ export default function AdminPage() {
         router.push('/login');
         return;
       }
-      if (!user.isAdmin) {
+      // Only standard users can be admins
+      if (user.type !== 'standard' || !user.isAdmin) {
         setError('Admin access required');
         setLoading(false);
         return;
