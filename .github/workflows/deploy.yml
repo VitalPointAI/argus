@@ -29,11 +29,12 @@ jobs:
             # Install dependencies
             npm install --production=false
             
-            # Build and restart API
+            # Build and restart API (kill and restart for clean state)
             cd apps/api
             npm run build || echo "API build skipped (using tsx watch mode)"
             cd ../..
-            pm2 restart argus-api || pm2 start "npx tsx src/index.ts" --name argus-api --cwd /opt/argus/apps/api
+            pm2 delete argus-api 2>/dev/null || true
+            pm2 start "npx tsx src/index.ts" --name argus-api --cwd /opt/argus/apps/api
             
             # Build and restart web (aggressive cache clear)
             cd apps/web
