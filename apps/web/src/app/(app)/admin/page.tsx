@@ -161,7 +161,7 @@ export default function AdminPage() {
             <h1 className="text-2xl font-bold text-blue-400">Admin Panel</h1>
           </div>
           <div className="text-sm text-slate-400">
-            Logged in as <span className="text-slate-200">{user?.name}</span>
+            Logged in as <span className="text-slate-200">{user?.type === 'standard' ? user.name : user?.codename}</span>
           </div>
         </div>
       </header>
