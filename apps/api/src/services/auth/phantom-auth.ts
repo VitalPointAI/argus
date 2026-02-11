@@ -58,6 +58,17 @@ export async function initPhantomAuth(): Promise<AnonAuthInstance | null> {
   // Determine NEAR network
   const nearNetwork = (process.env.NEAR_NETWORK || 'testnet') as 'testnet' | 'mainnet';
 
+  // Treasury config for auto-funding new accounts (mainnet)
+  let treasuryConfig = undefined;
+  if (process.env.NEAR_TREASURY_ACCOUNT && process.env.NEAR_TREASURY_PRIVATE_KEY) {
+    treasuryConfig = {
+      account: process.env.NEAR_TREASURY_ACCOUNT,
+      privateKey: process.env.NEAR_TREASURY_PRIVATE_KEY,
+      fundingAmount: process.env.NEAR_FUNDING_AMOUNT || '0.01',
+    };
+    console.log('[PhantomAuth] Treasury configured:', treasuryConfig.account);
+  }
+
   // Build IPFS recovery config if available
   let ipfsConfig = undefined;
   if (process.env.PINATA_API_KEY && process.env.PINATA_API_SECRET) {
@@ -84,6 +95,7 @@ export async function initPhantomAuth(): Promise<AnonAuthInstance | null> {
     rpName,
     nearNetwork,
     ipfsConfigured: !!ipfsConfig,
+    treasuryConfigured: !!treasuryConfig,
   });
 
   phantomAuth = createAnonAuth({
@@ -105,6 +117,11 @@ export async function initPhantomAuth(): Promise<AnonAuthInstance | null> {
       wallet: true, // Enable NEAR wallet recovery
       ipfs: ipfsConfig, // Enable IPFS recovery if configured
     },
+    mpc: treasuryConfig ? {
+      treasuryAccount: treasuryConfig.account,
+      treasuryPrivateKey: treasuryConfig.privateKey,
+      fundingAmount: treasuryConfig.fundingAmount,
+    } : undefined,
   });
 
   // Initialize database schema
