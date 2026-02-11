@@ -21,22 +21,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// In production, use origin (nginx proxies /api to API server)
-// In dev, use localhost:3001
-function getApiBase() {
+// Get API base URL at runtime (not build time)
+function getApiBase(): string {
+  // Check env var first
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined') {
-    // Production: use same origin (nginx proxies /api)
-    if (window.location.hostname !== 'localhost') {
-      return window.location.origin;
-    }
+  // In browser: use same origin in production (nginx proxies /api)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return ''; // Empty = relative URL = same origin
   }
+  // Dev fallback
   return 'http://localhost:3001';
 }
-
-const API_BASE = getApiBase();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -49,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/me`, {
+      const res = await fetch(`${getApiBase()}/api/auth/me`, {
         credentials: 'include', // Send HttpOnly cookies
       });
       if (res.ok) {
@@ -67,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${getApiBase()}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // Receive and store HttpOnly cookie
@@ -86,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (email: string, password: string, name: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
+      const res = await fetch(`${getApiBase()}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // Receive and store HttpOnly cookie
@@ -105,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(`${API_BASE}/api/auth/logout`, {
+      await fetch(`${getApiBase()}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
