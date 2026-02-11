@@ -34,7 +34,7 @@ function SourceRegistrationContent() {
         setStep('success');
       } else if (step === 'info') {
         // Logged in with existing passkey - redirect to dashboard
-        router.push('/sources/me');
+        router.push('/dashboard');
       }
     }
   }, [isAuthenticated, codename, step, router]);
@@ -259,10 +259,10 @@ function SourceRegistrationContent() {
           </div>
 
           <Link
-            href="/sources/me"
+            href="/dashboard"
             className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition text-center"
           >
-            Go to Source Dashboard
+            Go to Dashboard
           </Link>
         </div>
       </div>
