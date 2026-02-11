@@ -74,15 +74,15 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
               🎭
             </div>
             <div>
-              <p className="text-sm text-purple-400 font-medium">CODENAME</p>
-              <p className="text-2xl font-bold text-white font-mono">{user.codename}</p>
+              <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">CODENAME</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white font-mono">{user.codename}</p>
             </div>
           </div>
 
-          <div className="bg-slate-700/50 rounded-lg p-4">
+          <div className="bg-slate-100 dark:bg-slate-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-400">Account Type</span>
-              <span className="text-sm font-medium text-purple-400">Anonymous Source</span>
+              <span className="text-sm text-slate-600 dark:text-slate-400">Account Type</span>
+              <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Anonymous Source</span>
             </div>
             <p className="text-xs text-slate-500">
               Your identity is protected. Only your codename is visible to others.
@@ -99,14 +99,14 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
           {user.nearAccountId ? (
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Account ID</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Account ID</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-slate-700/50 px-3 py-2 rounded-lg text-sm font-mono text-slate-200 break-all">
+                  <code className="flex-1 bg-slate-100 dark:bg-slate-700/50 px-3 py-2 rounded-lg text-sm font-mono text-slate-800 dark:text-slate-200 break-all">
                     {user.nearAccountId}
                   </code>
                   <button
                     onClick={() => navigator.clipboard.writeText(user.nearAccountId!)}
-                    className="p-2 text-slate-400 hover:text-white transition"
+                    className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
                     title="Copy"
                   >
                     📋
@@ -115,32 +115,32 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
               </div>
 
               <div>
-                <p className="text-sm text-slate-400 mb-1">Balance</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Balance</p>
                 <div className="flex items-center gap-2">
                   {loadingBalance ? (
-                    <div className="animate-pulse bg-slate-700 h-8 w-24 rounded"></div>
+                    <div className="animate-pulse bg-slate-200 dark:bg-slate-700 h-8 w-24 rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">
                       {nearBalance !== null ? `${nearBalance} Ⓝ` : 'Unable to fetch'}
                     </p>
                   )}
                   <button
                     onClick={fetchNearBalance}
                     disabled={loadingBalance}
-                    className="text-sm text-slate-400 hover:text-white transition"
+                    className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
                   >
                     🔄
                   </button>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-700">
-                <p className="text-sm text-slate-400 mb-2">Receive payments for verified intel</p>
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Receive payments for verified intel</p>
                 <a
                   href={`https://nearblocks.io/address/${user.nearAccountId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-argus-400 hover:text-argus-300 flex items-center gap-1"
+                  className="text-sm text-argus-600 hover:text-argus-500 dark:text-argus-400 dark:hover:text-argus-300 flex items-center gap-1"
                 >
                   View on NearBlocks →
                 </a>
@@ -148,7 +148,7 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
             </div>
           ) : (
             <div className="text-center py-6">
-              <p className="text-slate-400 mb-2">No NEAR account linked</p>
+              <p className="text-slate-600 dark:text-slate-400 mb-2">No NEAR account linked</p>
               <p className="text-sm text-slate-500">
                 A NEAR account will be created when you submit your first intel report.
               </p>
@@ -162,20 +162,20 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
             What You Can Do
           </h2>
           <ul className="space-y-3">
-            <li className="flex items-center gap-3 text-slate-300">
-              <span className="text-green-400">✓</span>
+            <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+              <span className="text-green-500 dark:text-green-400">✓</span>
               Submit intelligence reports anonymously
             </li>
-            <li className="flex items-center gap-3 text-slate-300">
-              <span className="text-green-400">✓</span>
+            <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+              <span className="text-green-500 dark:text-green-400">✓</span>
               Claim bounties for verified information
             </li>
-            <li className="flex items-center gap-3 text-slate-300">
-              <span className="text-green-400">✓</span>
+            <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+              <span className="text-green-500 dark:text-green-400">✓</span>
               Build reputation under your codename
             </li>
-            <li className="flex items-center gap-3 text-slate-300">
-              <span className="text-green-400">✓</span>
+            <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+              <span className="text-green-500 dark:text-green-400">✓</span>
               Receive direct tips in NEAR
             </li>
           </ul>
@@ -191,9 +191,9 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
         </section>
 
         {/* Security Notice */}
-        <section className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 mb-6">
-          <h3 className="font-semibold text-yellow-200 mb-2">🔐 Security Notice</h3>
-          <ul className="text-sm text-yellow-100/80 space-y-2">
+        <section className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-500/30 rounded-xl p-6 mb-6">
+          <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">🔐 Security Notice</h3>
+          <ul className="text-sm text-yellow-700 dark:text-yellow-100/80 space-y-2">
             <li>• Your passkey is stored only on this device</li>
             <li>• If you lose access to this device, you cannot recover this account</li>
             <li>• Consider using the same device consistently for submissions</li>
@@ -205,7 +205,7 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
         <div className="flex justify-between items-center">
           <Link
             href="/dashboard"
-            className="text-slate-400 hover:text-white transition"
+            className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
           >
             ← Back to Dashboard
           </Link>
