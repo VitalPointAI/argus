@@ -206,7 +206,7 @@ function SourceRegistrationContent() {
                   </a>
                   
                   <a 
-                    href="https://www.yubico.com/store/" 
+                    href="https://amzn.to/3ZwsEgn" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 transition border border-slate-700 hover:border-slate-500"
