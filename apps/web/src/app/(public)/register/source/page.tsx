@@ -10,8 +10,56 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
+// Platform detection for sync disable instructions
+function getPlatformInstructions(): { platform: string; instructions: string[] } {
+  if (typeof navigator === 'undefined') return { platform: 'Unknown', instructions: [] };
+  
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad/.test(ua)) {
+    return {
+      platform: 'iOS',
+      instructions: [
+        'Go to Settings → Passwords',
+        'Tap "Password Options"',
+        'Turn OFF "iCloud Keychain"',
+        'Now create your passkey - it will stay on this device only',
+      ],
+    };
+  }
+  if (/Android/.test(ua)) {
+    return {
+      platform: 'Android',
+      instructions: [
+        'Go to Settings → Google → Auto-fill',
+        'Tap "Google Password Manager"',
+        'Disable sync (or use a different password manager)',
+        'Now create your passkey - it will stay on this device only',
+      ],
+    };
+  }
+  if (/Chrome/.test(ua)) {
+    return {
+      platform: 'Chrome',
+      instructions: [
+        'Go to chrome://settings/passwords',
+        'Turn OFF "Offer to save passwords"',
+        'Or: When prompted, choose "Use another device" and select a hardware key',
+      ],
+    };
+  }
+  return {
+    platform: 'Your Browser',
+    instructions: [
+      'Check your browser/OS password settings',
+      'Disable cloud sync for passwords/passkeys',
+      'Or use a hardware security key (YubiKey, etc.)',
+    ],
+  };
+}
+
 function SourceRegistrationContent() {
-  const [step, setStep] = useState<'info' | 'register' | 'success'>('info');
+  const [step, setStep] = useState<'info' | 'privacy-setup' | 'register' | 'privacy-warning' | 'success'>('info');
+  const [acknowledgedWarning, setAcknowledgedWarning] = useState(false);
   const router = useRouter();
   
   const {
@@ -24,20 +72,27 @@ function SourceRegistrationContent() {
     register,
     login,
     clearError,
+    credentialCloudSynced,
   } = useAnonAuth();
 
-  // On successful auth, show success or redirect
+  // On successful auth, show success or redirect (with privacy warning check)
   useEffect(() => {
     if (isAuthenticated && codename) {
       if (step === 'register') {
-        // New registration - show success screen with codename
-        setStep('success');
+        // New registration - check if we need to show privacy warning
+        if (credentialCloudSynced && !acknowledgedWarning) {
+          setStep('privacy-warning');
+        } else {
+          setStep('success');
+        }
+      } else if (step === 'privacy-warning') {
+        // Already on warning screen, stay there
       } else {
         // Existing user login - redirect to dashboard
         router.push('/dashboard');
       }
     }
-  }, [isAuthenticated, codename, step, router]);
+  }, [isAuthenticated, codename, step, router, credentialCloudSynced, acknowledgedWarning]);
 
   const handleStartRegistration = async () => {
     clearError();
@@ -45,9 +100,19 @@ function SourceRegistrationContent() {
     await register();
   };
 
+  const handlePrivacySetup = () => {
+    clearError();
+    setStep('privacy-setup');
+  };
+
   const handlePasskeyLogin = async () => {
     clearError();
     await login();
+  };
+
+  const handleContinueWithWarning = () => {
+    setAcknowledgedWarning(true);
+    setStep('success');
   };
 
   // Info screen
@@ -182,7 +247,15 @@ function SourceRegistrationContent() {
                 disabled={!webAuthnSupported || isLoading}
                 className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Creating...' : 'Create New Source Account'}
+                {isLoading ? 'Creating...' : 'Quick Setup'}
+              </button>
+              
+              <button
+                onClick={handlePrivacySetup}
+                disabled={!webAuthnSupported || isLoading}
+                className="w-full py-3 bg-green-700 hover:bg-green-600 text-white font-medium rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <span>🛡️</span> Privacy Setup
               </button>
               
               <button
@@ -207,6 +280,75 @@ function SourceRegistrationContent() {
                 Sign in with OAuth
               </Link>
             </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Privacy Setup screen - instructions to disable sync before registration
+  if (step === 'privacy-setup') {
+    const { platform, instructions } = getPlatformInstructions();
+    
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="max-w-lg w-full mx-4">
+          <div className="bg-slate-800 rounded-2xl p-8 border border-green-500/30">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center text-3xl mx-auto mb-4">
+                🛡️
+              </div>
+              <h1 className="text-2xl font-bold text-white">Privacy Setup</h1>
+              <p className="text-green-300 mt-2">Maximum anonymity configuration</p>
+            </div>
+
+            {/* Best Option */}
+            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 mb-6">
+              <h3 className="font-semibold text-green-200 mb-2">🔑 Best Option: Hardware Security Key</h3>
+              <p className="text-sm text-green-100/80">
+                Use a YubiKey or similar hardware key. Your passkey never touches the cloud.
+                When prompted, choose "Use security key" or "Use another device".
+              </p>
+            </div>
+
+            {/* Platform-specific instructions */}
+            <div className="bg-slate-700/50 rounded-xl p-4 mb-6">
+              <h3 className="font-medium text-slate-200 mb-3">
+                📱 Disable Cloud Sync ({platform})
+              </h3>
+              <ol className="text-sm text-slate-300 space-y-2">
+                {instructions.map((instruction, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-green-400 font-bold">{i + 1}.</span>
+                    <span>{instruction}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* Alternative */}
+            <div className="bg-slate-700/30 rounded-lg p-3 mb-6">
+              <p className="text-sm text-slate-400">
+                <strong className="text-slate-300">Alternative:</strong> Create a separate 
+                Bitwarden account with an anonymous email (ProtonMail/Tutanota) and use that 
+                to store this passkey.
+              </p>
+            </div>
+
+            <button
+              onClick={handleStartRegistration}
+              disabled={isLoading}
+              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+            >
+              {isLoading ? 'Creating...' : 'I\'m Ready - Create Passkey'}
+            </button>
+
+            <button
+              onClick={() => { setStep('info'); clearError(); }}
+              className="w-full py-3 mt-3 text-slate-400 hover:text-white transition"
+            >
+              ← Go Back
+            </button>
           </div>
         </div>
       </div>
@@ -267,6 +409,71 @@ function SourceRegistrationContent() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Privacy Warning screen - shown after registration if cloud-synced detected
+  if (step === 'privacy-warning') {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="max-w-lg w-full mx-4">
+          <div className="bg-slate-800 rounded-2xl p-8 border border-orange-500/30">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center text-3xl mx-auto mb-4">
+                ⚠️
+              </div>
+              <h1 className="text-2xl font-bold text-white">Privacy Notice</h1>
+              <p className="text-orange-300 mt-2">Your passkey may be cloud-synced</p>
+            </div>
+
+            <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-4 mb-6">
+              <p className="text-sm text-orange-100">
+                Your passkey appears to be stored in your device's built-in authenticator 
+                (like iCloud Keychain or Google Password Manager), which syncs to your account.
+              </p>
+              <p className="text-sm text-orange-100 mt-3">
+                <strong>This means:</strong> Your codename (<span className="font-mono">{codename}</span>) 
+                may be visible to Apple/Google/Microsoft, potentially linking your anonymous identity 
+                to your real account.
+              </p>
+            </div>
+
+            <div className="bg-slate-700/50 rounded-xl p-4 mb-6">
+              <h3 className="font-medium text-slate-200 mb-2">Your options:</h3>
+              <ul className="text-sm text-slate-300 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400">1.</span>
+                  <span><strong>Continue anyway</strong> - Your intelligence submissions are still anonymous to us, just not to your password manager provider.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400">2.</span>
+                  <span><strong>Delete &amp; retry</strong> - Remove this passkey from your password manager, then register again with a hardware key or local-only storage.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={handleContinueWithWarning}
+                className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition"
+              >
+                Continue Anyway
+              </button>
+              
+              <button
+                onClick={() => { setStep('info'); clearError(); }}
+                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition"
+              >
+                I'll Delete &amp; Try Again
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 text-center mt-4">
+              Note: To delete this passkey, check your password manager settings.
+            </p>
           </div>
         </div>
       </div>
