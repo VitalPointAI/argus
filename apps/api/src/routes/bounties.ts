@@ -158,6 +158,24 @@ bounties.get('/', async (c) => {
 });
 
 // ============================================
+// List Categories (must be before /:id)
+// ============================================
+
+bounties.get('/categories', async (c) => {
+  try {
+    const categories = await db.select()
+      .from(bountyCategories)
+      .where(eq(bountyCategories.enabled, true))
+      .orderBy(bountyCategories.name);
+    
+    return c.json({ success: true, data: categories });
+  } catch (error) {
+    console.error('List categories error:', error);
+    return c.json({ success: false, error: 'Failed to list categories' }, 500);
+  }
+});
+
+// ============================================
 // Get Single Bounty
 // ============================================
 
@@ -497,24 +515,6 @@ bounties.get('/stats/summary', async (c) => {
   } catch (error) {
     console.error('Stats error:', error);
     return c.json({ success: false, error: 'Failed to get stats' }, 500);
-  }
-});
-
-// ============================================
-// Admin: List Categories
-// ============================================
-
-bounties.get('/categories', async (c) => {
-  try {
-    const categories = await db.select()
-      .from(bountyCategories)
-      .where(eq(bountyCategories.enabled, true))
-      .orderBy(bountyCategories.name);
-    
-    return c.json({ success: true, data: categories });
-  } catch (error) {
-    console.error('List categories error:', error);
-    return c.json({ success: false, error: 'Failed to list categories' }, 500);
   }
 });
 
