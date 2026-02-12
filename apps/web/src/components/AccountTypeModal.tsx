@@ -120,15 +120,6 @@ export function AccountTypeModal({ isOpen, onClose }: AccountTypeModalProps) {
           </button>
         </div>
 
-        {/* Info box */}
-        {selectedType === 'source' && (
-          <div className="mt-4 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg">
-            <p className="text-sm text-purple-200">
-              <strong>⚠️ Important:</strong> HUMINT accounts cannot be upgraded to standard accounts, as this would compromise your anonymity.
-            </p>
-          </div>
-        )}
-
         {/* Continue button */}
         <button
           onClick={handleContinue}
