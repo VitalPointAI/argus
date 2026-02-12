@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 interface AccountTypeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSourceSelected?: () => void;
 }
 
-export function AccountTypeModal({ isOpen, onClose }: AccountTypeModalProps) {
+export function AccountTypeModal({ isOpen, onClose, onSourceSelected }: AccountTypeModalProps) {
   const router = useRouter();
   const [selectedType, setSelectedType] = useState<'user' | 'source' | null>(null);
 
@@ -17,10 +18,15 @@ export function AccountTypeModal({ isOpen, onClose }: AccountTypeModalProps) {
   const handleContinue = () => {
     if (selectedType === 'user') {
       router.push('/login');
+      onClose();
     } else if (selectedType === 'source') {
-      router.push('/register/source');
+      if (onSourceSelected) {
+        onSourceSelected();
+      } else {
+        router.push('/register/source');
+        onClose();
+      }
     }
-    onClose();
   };
 
   return (

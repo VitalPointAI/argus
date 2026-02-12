@@ -3,9 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AccountTypeModal } from '@/components/AccountTypeModal';
+import { SourceRegistrationModal } from '@/components/SourceRegistrationModal';
 
 export default function LandingPage() {
-  const [showModal, setShowModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showSourceModal, setShowSourceModal] = useState(false);
+
+  const handleSourceSelected = () => {
+    setShowAccountModal(false);
+    setShowSourceModal(true);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
@@ -43,7 +50,7 @@ export default function LandingPage() {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => setShowAccountModal(true)}
               className="px-8 py-4 bg-gradient-to-r from-argus-600 to-argus-500 hover:from-argus-500 hover:to-argus-400 text-white font-semibold rounded-xl shadow-lg shadow-argus-500/30 transition-all transform hover:scale-105"
             >
               Get Started
@@ -203,7 +210,7 @@ export default function LandingPage() {
                 </li>
               </ul>
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => setShowAccountModal(true)}
                 className="w-full py-3 bg-argus-600 hover:bg-argus-500 text-white font-medium rounded-lg transition"
               >
                 Sign Up as User
@@ -235,15 +242,15 @@ export default function LandingPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-purple-400 mt-1">✓</span>
-                  <span>Earn crypto for verified intel</span>
+                  <span>Earn for verified intel</span>
                 </li>
               </ul>
-              <Link
-                href="/register/source"
-                className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition text-center"
+              <button
+                onClick={() => setShowSourceModal(true)}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition"
               >
                 Register as Source
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -259,7 +266,7 @@ export default function LandingPage() {
             Join thousands of analysts, researchers, and sources using Argus to stay ahead.
           </p>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => setShowAccountModal(true)}
             className="px-8 py-4 bg-white text-slate-900 font-semibold rounded-xl shadow-lg hover:bg-slate-100 transition-all transform hover:scale-105"
           >
             Get Started Free
@@ -295,8 +302,15 @@ export default function LandingPage() {
 
       {/* Account Type Modal */}
       <AccountTypeModal 
-        isOpen={showModal} 
-        onClose={() => setShowModal(false)} 
+        isOpen={showAccountModal} 
+        onClose={() => setShowAccountModal(false)}
+        onSourceSelected={handleSourceSelected}
+      />
+
+      {/* Source Registration Modal */}
+      <SourceRegistrationModal
+        isOpen={showSourceModal}
+        onClose={() => setShowSourceModal(false)}
       />
     </div>
   );
