@@ -25,6 +25,8 @@ import { profileRoutes } from './routes/profile';
 import humintRoutes from './routes/humint';
 import bountiesRoutes from './routes/bounties';
 import opsecRoutes from './routes/opsec';
+import subscriptionsRoutes from './routes/subscriptions';
+import feedRoutes from './routes/feed';
 import zkRoutes from './routes/zk';
 import nftRoutes from './routes/nft';
 import phantomAuthRoutes from './routes/phantom-auth';
@@ -73,6 +75,8 @@ app.route('/api/nft', nftRoutes);
 app.route('/api/phantom', phantomAuthRoutes); // Anonymous passkey auth for HUMINT
 app.route('/api/auth/passkey', phantomAuthRoutes); // Also mount at standard path
 app.route('/api/escrow', escrowRoutes); // ZEC escrow and withdrawal system
+app.route('/api/subscriptions', subscriptionsRoutes); // Subscriber approval workflow
+app.route('/api/feed', feedRoutes); // Source feed items (intel published here)
 
 // Root
 app.get('/', (c) => {

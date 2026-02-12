@@ -4,8 +4,10 @@
 
 import { Hono } from 'hono';
 import { db } from '../db';
-import { intelBounties, humintSources, humintSubmissions, users, bountyCategories, bountyBlockedKeywords } from '../db/schema';
+import { intelBounties, humintSources, humintSubmissions, users, bountyCategories, bountyBlockedKeywords, notifications } from '../db/schema';
 import { eq, desc, sql, and, gte, or, ilike, inArray } from 'drizzle-orm';
+import { reviewBountyRequest } from '../services/compliance/ai-compliance-agent';
+import { notifyComplianceIssue, notifyComplianceApproved } from '../services/notifications';
 
 const bounties = new Hono();
 
@@ -277,9 +279,8 @@ bounties.post('/', async (c) => {
       }, 400);
     }
     
-    // Determine review status based on category
-    const reviewStatus = categoryRecord.autoApprove ? 'auto_approved' : 'pending';
-    
+    // Run AI compliance review
+    // First create the bounty in pending state
     const [bounty] = await db.insert(intelBounties)
       .values({
         creatorId: anonymous ? null : user.id,
@@ -295,7 +296,7 @@ bounties.post('/', async (c) => {
         intendedUse,
         legalAttestationAt: new Date(),
         category,
-        reviewStatus,
+        reviewStatus: 'pending', // Start as pending, AI will determine final status
       })
       .returning();
     
@@ -304,23 +305,75 @@ bounties.post('/', async (c) => {
       title: bounty.title, 
       reward: bounty.rewardUsdc,
       category,
-      reviewStatus,
       anonymous
     });
     
-    // Different response based on review status
-    if (reviewStatus === 'pending') {
+    // Run AI compliance review
+    try {
+      const complianceResult = await reviewBountyRequest(bounty.id);
+      
+      if (complianceResult.status === 'rejected') {
+        // Update bounty status
+        await db.update(intelBounties)
+          .set({ reviewStatus: 'rejected', rejectionReason: complianceResult.message })
+          .where(eq(intelBounties.id, bounty.id));
+        
+        return c.json({
+          success: false,
+          error: 'Your request could not be approved',
+          complianceMessage: complianceResult.message,
+          issues: complianceResult.issues,
+        }, 400);
+      }
+      
+      if (complianceResult.status === 'needs_revision') {
+        // Notify user
+        if (!anonymous && user.id) {
+          await notifyComplianceIssue(
+            user.id, 
+            'bounty_request', 
+            title, 
+            complianceResult.issues.map(i => i.description)
+          );
+        }
+        
+        return c.json({
+          success: true,
+          data: bounty,
+          needsRevision: true,
+          complianceMessage: complianceResult.message,
+          issues: complianceResult.issues,
+          reviewId: complianceResult.reviewId,
+          message: 'Your bounty needs some adjustments before it can be published. Please review the issues and update your request.'
+        });
+      }
+      
+      // Approved! Update status based on category auto-approve rules
+      const finalStatus = categoryRecord.autoApprove ? 'auto_approved' : 'approved';
+      await db.update(intelBounties)
+        .set({ reviewStatus: finalStatus })
+        .where(eq(intelBounties.id, bounty.id));
+      
+      // Notify if applicable
+      if (!anonymous && user.id) {
+        await notifyComplianceApproved(user.id, 'bounty_request', title);
+      }
+      
+      return c.json({
+        success: true,
+        data: { ...bounty, reviewStatus: finalStatus },
+        message: 'Your bounty has been approved and is now visible to sources!'
+      });
+      
+    } catch (complianceError) {
+      console.error('AI compliance review error:', complianceError);
+      // If AI review fails, fall back to pending for manual review
       return c.json({
         success: true,
         data: bounty,
-        message: 'Your bounty has been submitted for review. It will be visible to sources once approved (usually within 24 hours).'
+        message: 'Your bounty has been submitted for review. It will be visible to sources once approved.'
       });
     }
-    
-    return c.json({
-      success: true,
-      data: bounty
-    });
   } catch (error) {
     console.error('Create bounty error:', error);
     return c.json({ success: false, error: 'Failed to create bounty' }, 500);

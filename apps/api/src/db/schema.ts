@@ -288,6 +288,11 @@ export const humintSources = pgTable('humint_sources', {
   totalEarningsUsdc: real('total_earnings_usdc').notNull().default(0),
   subscriberCount: integer('subscriber_count').notNull().default(0),
   
+  // Subscriber requirements
+  minSubscriberReputation: integer('min_subscriber_reputation').default(0),
+  requireApproval: boolean('require_approval').notNull().default(true),
+  autoApproveAboveReputation: integer('auto_approve_above_reputation').default(80),
+  
   // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   lastActiveAt: timestamp('last_active_at'),
@@ -385,7 +390,15 @@ export const sourceSubscriptions = pgTable('source_subscriptions', {
   expiresAt: timestamp('expires_at').notNull(),
   amountPaidUsdc: real('amount_paid_usdc'),
   paymentTxHash: text('payment_tx_hash'),
-  status: text('status').notNull().default('active'),
+  status: text('status').notNull().default('pending'), // 'pending', 'active', 'expired', 'cancelled', 'revoked'
+  
+  // Approval workflow
+  approvalStatus: text('approval_status').notNull().default('pending'), // 'pending', 'approved', 'rejected'
+  approvalRequestedAt: timestamp('approval_requested_at').defaultNow(),
+  approvedAt: timestamp('approved_at'),
+  rejectionReason: text('rejection_reason'),
+  subscriberMessage: text('subscriber_message'), // Why they want to subscribe
+  
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -505,5 +518,133 @@ export const humintEscrowTransactions = pgTable('humint_escrow_transactions', {
   balanceAfter: real('balance_after').notNull(),
   
   note: text('note'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============ Subscriber Reputation ============
+
+export const subscriberReputation = pgTable('subscriber_reputation', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  
+  // Activity metrics
+  accountAgeDays: integer('account_age_days').notNull().default(0),
+  bountiesPosted: integer('bounties_posted').notNull().default(0),
+  bountiesFulfilled: integer('bounties_fulfilled').notNull().default(0),
+  subscriptionsCount: integer('subscriptions_count').notNull().default(0),
+  tipsGivenCount: integer('tips_given_count').notNull().default(0),
+  totalSpentUsdc: real('total_spent_usdc').notNull().default(0),
+  
+  // Trust signals
+  emailVerified: boolean('email_verified').notNull().default(false),
+  identityVerified: boolean('identity_verified').notNull().default(false),
+  vouchedByCount: integer('vouched_by_count').notNull().default(0),
+  
+  // Negative signals
+  reportsAgainst: integer('reports_against').notNull().default(0),
+  subscriptionsRevoked: integer('subscriptions_revoked').notNull().default(0),
+  
+  // Computed score
+  reputationScore: integer('reputation_score').notNull().default(10),
+  
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// ============ AI Compliance Reviews ============
+
+export const complianceReviews = pgTable('compliance_reviews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // What's being reviewed
+  contentType: text('content_type').notNull(), // 'bounty_request', 'intel_submission', 'source_profile'
+  contentId: uuid('content_id').notNull(),
+  
+  // Review details
+  status: text('status').notNull().default('pending'), // 'pending', 'approved', 'needs_revision', 'rejected'
+  aiModel: text('ai_model'),
+  aiAnalysis: jsonb('ai_analysis'),
+  
+  // Issues found
+  issuesFound: jsonb('issues_found').default([]),
+  riskScore: integer('risk_score').notNull().default(0),
+  
+  // Resolution
+  revisionRequestedAt: timestamp('revision_requested_at'),
+  revisionMessage: text('revision_message'),
+  userResponse: text('user_response'),
+  
+  // Final decision
+  finalStatus: text('final_status'),
+  finalReason: text('final_reason'),
+  reviewedAt: timestamp('reviewed_at'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const complianceRules = pgTable('compliance_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  ruleType: text('rule_type').notNull(), // 'keyword', 'pattern', 'category', 'ai_check'
+  appliesTo: text('applies_to').notNull(), // 'bounty_request', 'intel_submission', 'all'
+  
+  ruleName: text('rule_name').notNull(),
+  ruleConfig: jsonb('rule_config').notNull(),
+  
+  action: text('action').notNull(), // 'flag', 'require_revision', 'auto_reject'
+  severity: text('severity').notNull(), // 'low', 'medium', 'high', 'critical'
+  messageTemplate: text('message_template'),
+  
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============ Source Feed Items ============
+
+export const sourceFeedItems = pgTable('source_feed_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  
+  // Content
+  submissionId: uuid('submission_id').references(() => humintSubmissions.id),
+  title: text('title').notNull(),
+  summary: text('summary'),
+  contentPreview: text('content_preview'),
+  
+  // Bounty connection
+  fulfillsBountyId: uuid('fulfills_bounty_id').references(() => intelBounties.id),
+  
+  // Visibility
+  visibility: text('visibility').notNull().default('subscribers'), // 'public', 'subscribers', 'premium'
+  
+  // Engagement
+  viewCount: integer('view_count').notNull().default(0),
+  reactionCount: integer('reaction_count').notNull().default(0),
+  
+  // Compliance
+  complianceReviewId: uuid('compliance_review_id').references(() => complianceReviews.id),
+  
+  publishedAt: timestamp('published_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============ Notifications ============
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Notification details
+  type: text('type').notNull(), // 'bounty_fulfilled', 'subscription_request', 'new_feed_item', etc.
+  title: text('title').notNull(),
+  body: text('body'),
+  data: jsonb('data'),
+  
+  // Status
+  read: boolean('read').notNull().default(false),
+  readAt: timestamp('read_at'),
+  
+  // Delivery
+  deliveredVia: jsonb('delivered_via').default([]),
+  
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
