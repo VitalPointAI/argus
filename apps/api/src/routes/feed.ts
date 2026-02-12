@@ -35,11 +35,10 @@ feed.post('/publish', async (c) => {
     const { 
       sourceId, // Would come from authenticated source session
       title,
-      content,
+      body: content, // 'body' in schema, 'content' in API for clarity
       summary,
-      region,
-      eventType,
-      verificationNotes,
+      locationRegion,
+      eventTag,
       fulfillsBountyId,
       visibility = 'subscribers',
       // ZK Proofs for bounty fulfillment
@@ -92,15 +91,20 @@ feed.post('/publish', async (c) => {
     }
 
     // Create the underlying submission record
+    // Generate content hash and signature (placeholder for now)
+    const contentHash = require('crypto').createHash('sha256').update(content).digest('hex');
+    const signature = contentHash; // In production, this would be a proper signature
+    
     const [submission] = await db.insert(humintSubmissions)
       .values({
         sourceId,
         title,
-        content,
-        region,
-        eventType,
-        verificationNotes,
-        status: 'pending',
+        body: content,
+        locationRegion,
+        eventTag,
+        contentHash,
+        signature,
+        verificationStatus: 'pending',
       })
       .returning();
 
@@ -110,7 +114,7 @@ feed.post('/publish', async (c) => {
     if (complianceResult.status === 'rejected') {
       // Update submission status
       await db.update(humintSubmissions)
-        .set({ status: 'rejected' })
+        .set({ verificationStatus: 'rejected' })
         .where(eq(humintSubmissions.id, submission.id));
 
       return c.json({
@@ -124,7 +128,7 @@ feed.post('/publish', async (c) => {
     if (complianceResult.status === 'needs_revision') {
       // Update submission status
       await db.update(humintSubmissions)
-        .set({ status: 'needs_revision' })
+        .set({ verificationStatus: 'needs_revision' })
         .where(eq(humintSubmissions.id, submission.id));
 
       return c.json({
@@ -201,9 +205,9 @@ feed.post('/publish', async (c) => {
       })
       .returning();
 
-    // Update submission to published
+    // Update submission to verified/published
     await db.update(humintSubmissions)
-      .set({ status: 'published' })
+      .set({ verificationStatus: 'verified' })
       .where(eq(humintSubmissions.id, submission.id));
 
     // Update source stats
@@ -417,7 +421,7 @@ feed.get('/:id', async (c) => {
         title: item.feedItem.title,
         summary: item.feedItem.summary,
         // Only show full content to authorized users
-        content: hasAccess ? item.submission?.content : null,
+        content: hasAccess ? item.submission?.body : null,
         contentPreview: item.feedItem.contentPreview,
         publishedAt: item.feedItem.publishedAt,
         visibility: item.feedItem.visibility,
@@ -430,9 +434,9 @@ feed.get('/:id', async (c) => {
           regions: item.source?.regions,
         },
         submission: hasAccess ? {
-          region: item.submission?.region,
-          eventType: item.submission?.eventType,
-          verificationNotes: item.submission?.verificationNotes,
+          region: item.submission?.locationRegion,
+          eventType: item.submission?.eventTag,
+          verificationStatus: item.submission?.verificationStatus,
         } : null,
         fulfilledBounty: item.bounty ? {
           id: item.bounty.id,

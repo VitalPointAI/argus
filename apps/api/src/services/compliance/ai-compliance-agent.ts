@@ -5,7 +5,22 @@
 import { db } from '../../db';
 import { complianceReviews, complianceRules, intelBounties, humintSubmissions, notifications } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
-import { getNearAICompletion } from '../nearai';
+import { callNearAI } from '../nearai';
+
+// Wrapper for Near AI completion
+async function getNearAICompletion(
+  systemPrompt: string,
+  userPrompt: string,
+  options?: { temperature?: number; maxTokens?: number }
+): Promise<string> {
+  const result = await callNearAI({
+    systemPrompt,
+    userPrompt,
+    temperature: options?.temperature ?? 0.3,
+    maxTokens: options?.maxTokens ?? 2000,
+  });
+  return result.content || '';
+}
 
 interface ComplianceIssue {
   type: string;
@@ -142,10 +157,9 @@ export async function reviewIntelSubmission(submissionId: string): Promise<Compl
   const contentToReview = `
 INTEL SUBMISSION:
 Title: ${submission.title}
-Content: ${submission.content}
-Region: ${submission.region || 'Not specified'}
-Event Type: ${submission.eventType || 'Not specified'}
-Verification Notes: ${submission.verificationNotes || 'None'}
+Content: ${submission.body}
+Region: ${submission.locationRegion || 'Not specified'}
+Event Type: ${submission.eventTag || 'Not specified'}
   `.trim();
 
   return await runComplianceReview('intel_submission', submissionId, contentToReview);
