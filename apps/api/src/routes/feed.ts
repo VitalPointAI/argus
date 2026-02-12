@@ -12,8 +12,9 @@ import {
   users 
 } from '../db/schema';
 import { eq, and, desc, inArray, or } from 'drizzle-orm';
-import { reviewIntelSubmission } from '../services/compliance/ai-compliance-agent';
+import { reviewIntelSubmission, verifyProofSubmission } from '../services/compliance/ai-compliance-agent';
 import { notifyBountyFulfilled, notifyNewFeedItem } from '../services/notifications';
+import { zkProofSubmissions } from '../db/schema';
 
 const feed = new Hono();
 
@@ -40,7 +41,9 @@ feed.post('/publish', async (c) => {
       eventType,
       verificationNotes,
       fulfillsBountyId,
-      visibility = 'subscribers' 
+      visibility = 'subscribers',
+      // ZK Proofs for bounty fulfillment
+      proofs = [] // Array of {requirementIndex, proofType, proofData, publicInputs}
     } = body;
 
     if (!sourceId || !title || !content) {
@@ -58,6 +61,7 @@ feed.post('/publish', async (c) => {
     }
 
     // If fulfilling a bounty, verify it exists and is open
+    let bountyToFulfill = null;
     if (fulfillsBountyId) {
       const [bounty] = await db.select()
         .from(intelBounties)
@@ -69,6 +73,21 @@ feed.post('/publish', async (c) => {
 
       if (!bounty) {
         return c.json({ success: false, error: 'Bounty not found or not open' }, 404);
+      }
+      
+      bountyToFulfill = bounty;
+      
+      // Check if bounty has proof requirements
+      const requirements = (bounty.proofRequirements as any[]) || [];
+      const requiredProofs = requirements.filter(r => r.required);
+      
+      if (requiredProofs.length > 0 && (!proofs || proofs.length === 0)) {
+        return c.json({
+          success: false,
+          error: 'This bounty requires proof submissions',
+          proofRequirements: requirements,
+          message: 'Please provide ZK proofs to verify your submission meets the bounty requirements.',
+        }, 400);
       }
     }
 
@@ -115,6 +134,55 @@ feed.post('/publish', async (c) => {
         issues: complianceResult.issues,
         reviewId: complianceResult.reviewId,
       }, 400);
+    }
+
+    // Verify ZK proofs if fulfilling a bounty
+    if (fulfillsBountyId && proofs && proofs.length > 0) {
+      try {
+        const proofVerification = await verifyProofSubmission(submission.id, fulfillsBountyId, proofs);
+        
+        if (!proofVerification.allVerified) {
+          const failedProofs = proofVerification.results.filter(r => !r.verified);
+          
+          return c.json({
+            success: false,
+            error: 'Some proof verifications failed',
+            proofResults: proofVerification.results,
+            failedRequirements: failedProofs.map(f => ({
+              index: f.requirementIndex,
+              message: f.message,
+            })),
+          }, 400);
+        }
+        
+        // Store verified proofs
+        for (const proof of proofs) {
+          const result = proofVerification.results.find(r => r.requirementIndex === proof.requirementIndex);
+          await db.insert(zkProofSubmissions)
+            .values({
+              submissionId: submission.id,
+              bountyId: fulfillsBountyId,
+              sourceId,
+              requirementIndex: proof.requirementIndex,
+              proofType: proof.proofType,
+              proofData: proof.proofData,
+              publicInputs: proof.publicInputs,
+              verificationStatus: result?.verified ? 'verified' : 'failed',
+              verifiedAt: new Date(),
+              verificationResult: result,
+            });
+        }
+        
+        console.log('ZK proofs verified:', { submissionId: submission.id, bountyId: fulfillsBountyId, count: proofs.length });
+        
+      } catch (proofError) {
+        console.error('Proof verification error:', proofError);
+        return c.json({
+          success: false,
+          error: 'Failed to verify proofs',
+          details: String(proofError),
+        }, 500);
+      }
     }
 
     // Compliance approved - create feed item

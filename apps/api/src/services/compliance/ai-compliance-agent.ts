@@ -64,6 +64,46 @@ Respond in JSON format:
   "message": "Brief explanation for the user"
 }`;
 
+const PROOF_REQUIREMENTS_PROMPT = `You are an AI agent that identifies what proof/evidence would be required to verify an intelligence submission.
+
+For the given bounty request, determine what ZK (zero-knowledge) proofs a source would need to provide to verify their submission WITHOUT revealing sensitive source information.
+
+AVAILABLE PROOF TYPES:
+1. location_proximity - Prove presence near coordinates without revealing exact location
+   params: {target_lat, target_lng, radius_km}
+   
+2. timestamp_range - Prove content captured within time window
+   params: {not_before: ISO datetime, not_after: ISO datetime}
+   
+3. document_contains - Prove document has keywords without revealing full content
+   params: {required_keywords: string[], document_type?: string}
+   
+4. image_metadata - Prove image has certain EXIF properties
+   params: {min_resolution?: {width, height}, device_type?: string, has_gps?: boolean}
+   
+5. multi_source_corroboration - Require multiple independent sources
+   params: {min_witnesses: number}
+   
+6. verifiable_credential - Prove possession of credential
+   params: {credential_type: string, issuer?: string}
+
+7. satellite_imagery_match - Prove imagery matches reference
+   params: {reference_hash?: string, location: {lat, lng}, max_time_delta_hours?: number}
+
+Respond in JSON format:
+{
+  "proof_requirements": [
+    {
+      "template": "template_name",
+      "params": { ... template-specific parameters ... },
+      "description": "Human-readable description of what this proves",
+      "required": true/false,
+      "weight": 1-10 (importance for verification)
+    }
+  ],
+  "verification_notes": "Any additional notes about verification approach"
+}`;
+
 export async function reviewBountyRequest(bountyId: string): Promise<ComplianceResult> {
   // Get bounty details
   const [bounty] = await db.select()
@@ -251,6 +291,239 @@ export async function submitRevision(
   }
 
   throw new Error('Unknown content type');
+}
+
+// ============================================
+// Generate Proof Requirements for Bounty
+// ============================================
+
+interface ProofRequirement {
+  template: string;
+  params: Record<string, any>;
+  description: string;
+  required: boolean;
+  weight: number;
+}
+
+interface ProofRequirementsResult {
+  requirements: ProofRequirement[];
+  verificationNotes?: string;
+}
+
+export async function generateProofRequirements(bountyId: string): Promise<ProofRequirementsResult> {
+  // Get bounty details
+  const [bounty] = await db.select()
+    .from(intelBounties)
+    .where(eq(intelBounties.id, bountyId))
+    .limit(1);
+
+  if (!bounty) {
+    throw new Error('Bounty not found');
+  }
+
+  const contentToAnalyze = `
+INTEL BOUNTY REQUEST:
+Title: ${bounty.title}
+Description: ${bounty.description}
+Category: ${bounty.category}
+Regions: ${bounty.regions?.join(', ') || 'None specified'}
+Domains: ${bounty.domains?.join(', ') || 'None specified'}
+Intended Use: ${bounty.intendedUse || 'Not specified'}
+  `.trim();
+
+  try {
+    const aiResponse = await getNearAICompletion(
+      PROOF_REQUIREMENTS_PROMPT,
+      `Analyze this bounty and determine what proof requirements would validate a legitimate response:\n\n${contentToAnalyze}`,
+      { temperature: 0.2, maxTokens: 1500 }
+    );
+
+    // Parse response
+    let analysis;
+    try {
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse proof requirements:', aiResponse);
+      // Default requirements
+      analysis = {
+        proof_requirements: [
+          {
+            template: 'timestamp_range',
+            params: { not_before: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), not_after: new Date().toISOString() },
+            description: 'Content must be recent (within last 7 days)',
+            required: true,
+            weight: 5
+          }
+        ],
+        verification_notes: 'Default requirements applied due to parsing error'
+      };
+    }
+
+    // Update bounty with requirements
+    await db.update(intelBounties)
+      .set({
+        proofRequirements: analysis.proof_requirements,
+        proofRequirementsGeneratedAt: new Date(),
+        proofRequirementsAiModel: 'nearai/deepseek-v3',
+      })
+      .where(eq(intelBounties.id, bountyId));
+
+    return {
+      requirements: analysis.proof_requirements || [],
+      verificationNotes: analysis.verification_notes,
+    };
+
+  } catch (error) {
+    console.error('Proof requirements generation error:', error);
+    throw error;
+  }
+}
+
+// Verify submitted proofs against requirements
+export async function verifyProofSubmission(
+  submissionId: string,
+  bountyId: string,
+  proofs: Array<{
+    requirementIndex: number;
+    proofType: string;
+    proofData: any;
+    publicInputs?: any;
+  }>
+): Promise<{
+  allVerified: boolean;
+  results: Array<{
+    requirementIndex: number;
+    verified: boolean;
+    message: string;
+  }>;
+}> {
+  // Get bounty and its requirements
+  const [bounty] = await db.select()
+    .from(intelBounties)
+    .where(eq(intelBounties.id, bountyId))
+    .limit(1);
+
+  if (!bounty) {
+    throw new Error('Bounty not found');
+  }
+
+  const requirements = (bounty.proofRequirements as ProofRequirement[]) || [];
+  const results: Array<{ requirementIndex: number; verified: boolean; message: string }> = [];
+
+  for (const proof of proofs) {
+    const requirement = requirements[proof.requirementIndex];
+    if (!requirement) {
+      results.push({
+        requirementIndex: proof.requirementIndex,
+        verified: false,
+        message: 'Requirement not found',
+      });
+      continue;
+    }
+
+    // For now, do basic verification based on proof type
+    // In production, this would call actual ZK verification circuits
+    const verificationResult = await verifyProof(requirement, proof);
+    results.push({
+      requirementIndex: proof.requirementIndex,
+      verified: verificationResult.verified,
+      message: verificationResult.message,
+    });
+  }
+
+  // Check all required proofs are present and verified
+  const requiredIndices = requirements
+    .map((r, i) => r.required ? i : -1)
+    .filter(i => i >= 0);
+
+  const allRequiredVerified = requiredIndices.every(i => 
+    results.find(r => r.requirementIndex === i)?.verified
+  );
+
+  return {
+    allVerified: allRequiredVerified,
+    results,
+  };
+}
+
+// Basic proof verification (placeholder for actual ZK verification)
+async function verifyProof(
+  requirement: ProofRequirement,
+  proof: { proofType: string; proofData: any; publicInputs?: any }
+): Promise<{ verified: boolean; message: string }> {
+  // TODO: Integrate actual ZK verification
+  // For now, do basic sanity checks
+  
+  if (proof.proofType !== requirement.template) {
+    return { verified: false, message: `Proof type mismatch: expected ${requirement.template}, got ${proof.proofType}` };
+  }
+
+  // Check proof data exists
+  if (!proof.proofData) {
+    return { verified: false, message: 'No proof data provided' };
+  }
+
+  // Template-specific validation
+  switch (requirement.template) {
+    case 'timestamp_range': {
+      const { not_before, not_after } = requirement.params;
+      const { timestamp } = proof.publicInputs || {};
+      if (!timestamp) {
+        return { verified: false, message: 'No timestamp in public inputs' };
+      }
+      const ts = new Date(timestamp);
+      if (ts < new Date(not_before) || ts > new Date(not_after)) {
+        return { verified: false, message: 'Timestamp outside allowed range' };
+      }
+      return { verified: true, message: 'Timestamp verified within range' };
+    }
+
+    case 'location_proximity': {
+      const { target_lat, target_lng, radius_km } = requirement.params;
+      const { lat, lng, distance_km } = proof.publicInputs || {};
+      if (distance_km === undefined) {
+        // If distance not provided, accept the proof but note it
+        return { verified: true, message: 'Location proof accepted (distance not verified)' };
+      }
+      if (distance_km > radius_km) {
+        return { verified: false, message: `Location ${distance_km}km from target exceeds ${radius_km}km radius` };
+      }
+      return { verified: true, message: `Location verified within ${radius_km}km radius` };
+    }
+
+    case 'document_contains': {
+      const { keyword_matches } = proof.publicInputs || {};
+      const { required_keywords } = requirement.params;
+      if (!keyword_matches || !Array.isArray(keyword_matches)) {
+        return { verified: false, message: 'No keyword matches in public inputs' };
+      }
+      const allFound = required_keywords.every((kw: string) => 
+        keyword_matches.includes(kw.toLowerCase())
+      );
+      if (!allFound) {
+        return { verified: false, message: 'Not all required keywords found in document' };
+      }
+      return { verified: true, message: 'Document contains all required keywords' };
+    }
+
+    case 'multi_source_corroboration': {
+      const { min_witnesses } = requirement.params;
+      const { witness_count } = proof.publicInputs || {};
+      if (!witness_count || witness_count < min_witnesses) {
+        return { verified: false, message: `Need ${min_witnesses} witnesses, got ${witness_count || 0}` };
+      }
+      return { verified: true, message: `Corroborated by ${witness_count} sources` };
+    }
+
+    default:
+      // Accept other proof types with basic check
+      return { verified: true, message: `Proof accepted (${requirement.template})` };
+  }
 }
 
 // Quick pre-check before full AI review (uses keyword blocklist)

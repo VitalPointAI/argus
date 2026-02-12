@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { db } from '../db';
 import { intelBounties, humintSources, humintSubmissions, users, bountyCategories, bountyBlockedKeywords, notifications } from '../db/schema';
 import { eq, desc, sql, and, gte, or, ilike, inArray } from 'drizzle-orm';
-import { reviewBountyRequest } from '../services/compliance/ai-compliance-agent';
+import { reviewBountyRequest, generateProofRequirements } from '../services/compliance/ai-compliance-agent';
 import { notifyComplianceIssue, notifyComplianceApproved } from '../services/notifications';
 
 const bounties = new Hono();
@@ -354,6 +354,16 @@ bounties.post('/', async (c) => {
         .set({ reviewStatus: finalStatus })
         .where(eq(intelBounties.id, bounty.id));
       
+      // Generate proof requirements for valid bounty submissions
+      let proofRequirements;
+      try {
+        proofRequirements = await generateProofRequirements(bounty.id);
+        console.log('Proof requirements generated:', { bountyId: bounty.id, count: proofRequirements.requirements.length });
+      } catch (proofError) {
+        console.error('Failed to generate proof requirements:', proofError);
+        // Non-fatal - bounty can still be created
+      }
+      
       // Notify if applicable
       if (!anonymous && user.id) {
         await notifyComplianceApproved(user.id, 'bounty_request', title);
@@ -362,6 +372,7 @@ bounties.post('/', async (c) => {
       return c.json({
         success: true,
         data: { ...bounty, reviewStatus: finalStatus },
+        proofRequirements: proofRequirements?.requirements || [],
         message: 'Your bounty has been approved and is now visible to sources!'
       });
       

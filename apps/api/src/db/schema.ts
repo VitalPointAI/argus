@@ -424,6 +424,11 @@ export const intelBounties = pgTable('intel_bounties', {
   reviewedAt: timestamp('reviewed_at'),
   rejectionReason: text('rejection_reason'),
   
+  // ZK Proof Requirements (AI-generated)
+  proofRequirements: jsonb('proof_requirements').default([]), // Array of proof requirements
+  proofRequirementsGeneratedAt: timestamp('proof_requirements_generated_at'),
+  proofRequirementsAiModel: text('proof_requirements_ai_model'),
+  
   status: text('status').notNull().default('open'), // open, claimed, paid, expired, cancelled
   expiresAt: timestamp('expires_at'),
   
@@ -645,6 +650,51 @@ export const notifications = pgTable('notifications', {
   
   // Delivery
   deliveredVia: jsonb('delivered_via').default([]),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============ ZK Proof System ============
+
+// Proof templates (reusable definitions)
+export const zkProofTemplates = pgTable('zk_proof_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  name: text('name').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  
+  proofType: text('proof_type').notNull(), // 'location', 'timestamp', 'document', 'image', 'multi_witness', 'credential'
+  circuitId: text('circuit_id'), // Reference to deployed ZK circuit
+  
+  parameterSchema: jsonb('parameter_schema').notNull(), // JSON Schema for params
+  verificationMethod: text('verification_method').notNull().default('server'),
+  
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Submitted proofs from sources
+export const zkProofSubmissions = pgTable('zk_proof_submissions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  submissionId: uuid('submission_id').notNull().references(() => humintSubmissions.id, { onDelete: 'cascade' }),
+  bountyId: uuid('bounty_id').references(() => intelBounties.id),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id),
+  
+  requirementIndex: integer('requirement_index').notNull(),
+  proofTemplateId: uuid('proof_template_id').references(() => zkProofTemplates.id),
+  
+  proofType: text('proof_type').notNull(),
+  proofData: jsonb('proof_data').notNull(),
+  publicInputs: jsonb('public_inputs'),
+  
+  verificationStatus: text('verification_status').notNull().default('pending'),
+  verifiedAt: timestamp('verified_at'),
+  verificationResult: jsonb('verification_result'),
+  
+  witnessCount: integer('witness_count').notNull().default(1),
+  requiredWitnesses: integer('required_witnesses').notNull().default(1),
   
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
