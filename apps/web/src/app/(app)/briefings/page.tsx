@@ -588,6 +588,12 @@ export default function BriefingsPage() {
         credentials: 'include',
       });
       const data = await res.json();
+      console.log('[Briefing Debug] Loaded historical briefing:', {
+        id,
+        contentLength: data.data?.content?.length,
+        contentPreview: data.data?.content?.substring(0, 100),
+        contentEnd: data.data?.content?.substring(-100),
+      });
       if (data.success && data.data) {
         setExecutiveBriefing({
           title: data.data.title,

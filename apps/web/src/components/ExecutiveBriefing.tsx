@@ -177,6 +177,7 @@ interface Props {
 
 // Render markdown content as formatted JSX
 function MarkdownRenderer({ content }: { content: string }) {
+  console.log('[MarkdownRenderer] Content length:', content?.length, 'Preview:', content?.substring(0, 100));
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   
