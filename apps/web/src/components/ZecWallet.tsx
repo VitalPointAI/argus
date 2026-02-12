@@ -5,6 +5,109 @@ import { useState, useEffect, useCallback } from 'react';
 // Fixed denominations for privacy (prevents amount fingerprinting)
 const DENOMINATIONS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25];
 
+// Guide component for using ZEC after withdrawal
+function UsingYourZecGuide() {
+  const [expanded, setExpanded] = useState(false);
+  
+  return (
+    <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 rounded-lg p-4 text-left border border-slate-200 dark:border-slate-600">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between"
+      >
+        <h3 className="font-semibold flex items-center gap-2">
+          <span>💡</span> Using Your ZEC
+        </h3>
+        <span className="text-slate-400">{expanded ? '▼' : '▶'}</span>
+      </button>
+      
+      {expanded && (
+        <div className="mt-4 space-y-4 text-sm">
+          {/* Maximum Privacy */}
+          <div>
+            <h4 className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2 mb-2">
+              🛡️ Maximum Privacy (Recommended)
+            </h4>
+            <ul className="space-y-2 text-slate-600 dark:text-slate-400">
+              <li className="flex items-start gap-2">
+                <span className="text-green-500">•</span>
+                <span>
+                  <strong>SideShift.ai</strong> - Swap ZEC to BTC, ETH, XMR, USDC. 
+                  No account, no KYC under ~$2.5k. Accepts shielded z-addresses directly.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-500">•</span>
+                <span>
+                  <strong>TradeOgre</strong> - Privacy-focused exchange. 
+                  No KYC. ZEC trading pairs available.
+                </span>
+              </li>
+            </ul>
+          </div>
+          
+          {/* Good Privacy */}
+          <div>
+            <h4 className="font-medium text-yellow-700 dark:text-yellow-400 flex items-center gap-2 mb-2">
+              ⚡ Quick Conversion
+            </h4>
+            <ul className="space-y-2 text-slate-600 dark:text-slate-400">
+              <li className="flex items-start gap-2">
+                <span className="text-yellow-500">•</span>
+                <span>
+                  <strong>ChangeNow</strong> / <strong>StealthEx</strong> - 
+                  No account swaps. Unshield to t-address first.
+                </span>
+              </li>
+            </ul>
+          </div>
+          
+          {/* Tips */}
+          <div className="bg-white/50 dark:bg-slate-600/50 rounded-lg p-3">
+            <h4 className="font-medium mb-2 flex items-center gap-2">
+              ⚠️ Privacy Tips
+            </h4>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-400 text-xs">
+              <li>• Never send directly from payment z-address to a KYC exchange</li>
+              <li>• Use intermediate wallets if converting to fiat</li>
+              <li>• Consider swapping to XMR (Monero) for additional privacy</li>
+              <li>• P2P trades (LocalMonero, AgoraDesk) avoid exchanges entirely</li>
+            </ul>
+          </div>
+          
+          {/* Links */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <a
+              href="https://sideshift.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs hover:bg-green-200 dark:hover:bg-green-900/50 transition"
+            >
+              SideShift.ai →
+            </a>
+            <a
+              href="https://tradeogre.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-full text-xs hover:bg-slate-300 dark:hover:bg-slate-500 transition"
+            >
+              TradeOgre →
+            </a>
+            <a
+              href="https://changenow.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-full text-xs hover:bg-slate-300 dark:hover:bg-slate-500 transition"
+            >
+              ChangeNow →
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface WalletState {
   hasWallet: boolean;
   zAddress: string | null;
@@ -462,6 +565,11 @@ export default function ZecWallet({
             </code>
           </div>
         )}
+        
+        {/* Using Your ZEC Guide */}
+        <div className="mt-6">
+          <UsingYourZecGuide />
+        </div>
       </div>
     );
   }
@@ -481,9 +589,12 @@ export default function ZecWallet({
           </p>
         </div>
         
+        {/* Using Your ZEC Guide */}
+        <UsingYourZecGuide />
+        
         <button
           onClick={() => setStep('withdraw')}
-          className="px-6 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+          className="mt-4 px-6 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition"
         >
           Back to Dashboard
         </button>
