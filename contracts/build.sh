@@ -23,6 +23,13 @@ cargo build --target wasm32-unknown-unknown --release
 cp target/wasm32-unknown-unknown/release/source_list_nft.wasm ../out/
 cd ..
 
+# Build intel-registry
+echo "📦 Building intel-registry..."
+cd intel-registry
+cargo build --target wasm32-unknown-unknown --release
+cp target/wasm32-unknown-unknown/release/intel_registry.wasm ../out/
+cd ..
+
 echo "✅ Contracts built successfully!"
 echo ""
 echo "Output files:"

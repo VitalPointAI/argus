@@ -79,45 +79,8 @@ Respond in JSON format:
   "message": "Brief explanation for the user"
 }`;
 
-const PROOF_REQUIREMENTS_PROMPT = `You are an AI agent that identifies what proof/evidence would be required to verify an intelligence submission.
-
-For the given bounty request, determine what ZK (zero-knowledge) proofs a source would need to provide to verify their submission WITHOUT revealing sensitive source information.
-
-AVAILABLE PROOF TYPES:
-1. location_proximity - Prove presence near coordinates without revealing exact location
-   params: {target_lat, target_lng, radius_km}
-   
-2. timestamp_range - Prove content captured within time window
-   params: {not_before: ISO datetime, not_after: ISO datetime}
-   
-3. document_contains - Prove document has keywords without revealing full content
-   params: {required_keywords: string[], document_type?: string}
-   
-4. image_metadata - Prove image has certain EXIF properties
-   params: {min_resolution?: {width, height}, device_type?: string, has_gps?: boolean}
-   
-5. multi_source_corroboration - Require multiple independent sources
-   params: {min_witnesses: number}
-   
-6. verifiable_credential - Prove possession of credential
-   params: {credential_type: string, issuer?: string}
-
-7. satellite_imagery_match - Prove imagery matches reference
-   params: {reference_hash?: string, location: {lat, lng}, max_time_delta_hours?: number}
-
-Respond in JSON format:
-{
-  "proof_requirements": [
-    {
-      "template": "template_name",
-      "params": { ... template-specific parameters ... },
-      "description": "Human-readable description of what this proves",
-      "required": true/false,
-      "weight": 1-10 (importance for verification)
-    }
-  ],
-  "verification_notes": "Any additional notes about verification approach"
-}`;
+// Proof requirements prompt moved to proof-inference.ts for better organization
+import { inferProofRequirements, validateProofParams, PROOF_TEMPLATES, ProofRequirement } from './proof-inference';
 
 export async function reviewBountyRequest(bountyId: string): Promise<ComplianceResult> {
   // Get bounty details
@@ -311,17 +274,19 @@ export async function submitRevision(
 // Generate Proof Requirements for Bounty
 // ============================================
 
-interface ProofRequirement {
-  template: string;
-  params: Record<string, any>;
-  description: string;
-  required: boolean;
-  weight: number;
-}
-
 interface ProofRequirementsResult {
   requirements: ProofRequirement[];
   verificationNotes?: string;
+  analysis?: {
+    claimType: string;
+    keyAssertions: string[];
+    riskLevel: string;
+    sourceSafetyConcerns: string[];
+  };
+  confidenceThresholds?: {
+    minimum: string;
+    high: string;
+  };
 }
 
 export async function generateProofRequirements(bountyId: string): Promise<ProofRequirementsResult> {
@@ -335,61 +300,40 @@ export async function generateProofRequirements(bountyId: string): Promise<Proof
     throw new Error('Bounty not found');
   }
 
-  const contentToAnalyze = `
-INTEL BOUNTY REQUEST:
-Title: ${bounty.title}
-Description: ${bounty.description}
-Category: ${bounty.category}
-Regions: ${bounty.regions?.join(', ') || 'None specified'}
-Domains: ${bounty.domains?.join(', ') || 'None specified'}
-Intended Use: ${bounty.intendedUse || 'Not specified'}
-  `.trim();
-
   try {
-    const aiResponse = await getNearAICompletion(
-      PROOF_REQUIREMENTS_PROMPT,
-      `Analyze this bounty and determine what proof requirements would validate a legitimate response:\n\n${contentToAnalyze}`,
-      { temperature: 0.2, maxTokens: 1500 }
-    );
+    // Use the improved inference system
+    const inference = await inferProofRequirements({
+      title: bounty.title,
+      description: bounty.description,
+      category: bounty.category || 'general',
+      regions: bounty.regions as string[] | undefined,
+      domains: bounty.domains as string[] | undefined,
+      intendedUse: bounty.intendedUse || undefined,
+    });
 
-    // Parse response
-    let analysis;
-    try {
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found');
+    // Validate all proof parameters
+    const validatedRequirements = inference.requirements.map(req => {
+      const validation = validateProofParams(req.template, req.params);
+      if (!validation.valid) {
+        console.warn(`Invalid params for ${req.template}:`, validation.errors);
       }
-    } catch (parseError) {
-      console.error('Failed to parse proof requirements:', aiResponse);
-      // Default requirements
-      analysis = {
-        proof_requirements: [
-          {
-            template: 'timestamp_range',
-            params: { not_before: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), not_after: new Date().toISOString() },
-            description: 'Content must be recent (within last 7 days)',
-            required: true,
-            weight: 5
-          }
-        ],
-        verification_notes: 'Default requirements applied due to parsing error'
-      };
-    }
+      return req;
+    });
 
     // Update bounty with requirements
     await db.update(intelBounties)
       .set({
-        proofRequirements: analysis.proof_requirements,
+        proofRequirements: validatedRequirements,
         proofRequirementsGeneratedAt: new Date(),
         proofRequirementsAiModel: 'nearai/deepseek-v3',
       })
       .where(eq(intelBounties.id, bountyId));
 
     return {
-      requirements: analysis.proof_requirements || [],
-      verificationNotes: analysis.verification_notes,
+      requirements: validatedRequirements,
+      verificationNotes: inference.verificationStrategy,
+      analysis: inference.analysis,
+      confidenceThresholds: inference.confidenceThresholds,
     };
 
   } catch (error) {

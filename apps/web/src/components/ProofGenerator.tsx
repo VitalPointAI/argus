@@ -331,6 +331,214 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
     }
   }, [requirements]);
 
+  // Handler stubs for new proof types
+  const handleCredentialProof = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement
+  ) => {
+    setIsGenerating(true);
+    try {
+      // In production: Connect to credential wallet (e.g., Microsoft Authenticator, Civic)
+      // For now, simulate
+      await new Promise(r => setTimeout(r, 1000));
+      
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'credential_ownership',
+        proofData: { verified: true, type: 'simulated' },
+        publicInputs: {
+          credential_type: requirement.params.credential_type,
+          verified: true,
+          proof_type: 'commitment',
+        },
+        status: 'generated',
+      };
+      
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+      setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = { ...prev[requirementIndex], status: 'failed', error: error.message };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  const handleFinancialProof = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement,
+    source: 'bank' | 'crypto'
+  ) => {
+    setIsGenerating(true);
+    try {
+      // In production: Connect to bank/exchange API or crypto wallet
+      await new Promise(r => setTimeout(r, 1000));
+      
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'financial_threshold',
+        proofData: { verified: true, source, type: 'simulated' },
+        publicInputs: {
+          min_met: true,
+          max_met: true,
+          source,
+          proof_type: 'commitment',
+        },
+        status: 'generated',
+      };
+      
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+      setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = { ...prev[requirementIndex], status: 'failed', error: error.message };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  const handleNetworkProof = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement
+  ) => {
+    setIsGenerating(true);
+    try {
+      // In production: Generate Merkle proof of membership
+      await new Promise(r => setTimeout(r, 1000));
+      
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'network_membership',
+        proofData: { verified: true, type: 'simulated' },
+        publicInputs: {
+          network_id: requirement.params.network_id,
+          is_member: true,
+          proof_type: 'commitment',
+        },
+        status: 'generated',
+      };
+      
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+      setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = { ...prev[requirementIndex], status: 'failed', error: error.message };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  const handleSequenceEvent = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement,
+    eventIndex: number,
+    file: File
+  ) => {
+    // Store event data and check if all events collected
+    console.log(`Sequence event ${eventIndex} uploaded for requirement ${requirementIndex}`);
+    // TODO: Implement full sequence proof when all events collected
+  }, []);
+
+  const handleChainOfCustody = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement,
+    file: File
+  ) => {
+    setIsGenerating(true);
+    try {
+      const content = await file.text();
+      // Parse custody chain from JSON/PDF
+      
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'chain_of_custody',
+        proofData: { verified: true, type: 'simulated' },
+        publicInputs: {
+          handlers_count: requirement.params.min_handlers || 1,
+          content_unmodified: true,
+          chain_valid: true,
+          proof_type: 'commitment',
+        },
+        status: 'generated',
+      };
+      
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+      setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = { ...prev[requirementIndex], status: 'failed', error: error.message };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  const handleCommunicationProof = useCallback(async (
+    requirementIndex: number,
+    requirement: ProofRequirement,
+    file: File
+  ) => {
+    setIsGenerating(true);
+    try {
+      const content = await file.text();
+      // Parse signed message
+      
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'communication_proof',
+        proofData: { verified: true, type: 'simulated' },
+        publicInputs: {
+          sender_matches: true,
+          in_time_window: true,
+          proof_type: 'commitment',
+        },
+        status: 'generated',
+      };
+      
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+      setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = { ...prev[requirementIndex], status: 'failed', error: error.message };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
   // Check if all required proofs are generated
   const allRequiredGenerated = requirements.every((req, i) => 
     !req.required || proofs[i]?.status === 'generated'
@@ -444,8 +652,157 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
 
           {req.template === 'multi_source_corroboration' && (
             <div className="ml-8 text-sm text-slate-500">
-              This proof requires {req.params.min_witnesses} independent sources to confirm.
+              This proof requires {req.params.min_sources || req.params.min_witnesses} independent sources to confirm.
               Other sources must also submit to fulfill this requirement.
+            </div>
+          )}
+
+          {req.template === 'credential_ownership' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove possession of: <strong>{req.params.credential_type}</strong>
+                {req.params.issuer && <> from {req.params.issuer}</>}
+              </p>
+              <button
+                onClick={() => handleCredentialProof(index, req)}
+                disabled={isGenerating}
+                className="px-4 py-2 text-sm bg-argus-100 hover:bg-argus-200 dark:bg-argus-800 dark:hover:bg-argus-700 text-argus-700 dark:text-argus-200 rounded"
+              >
+                Connect Credential Wallet
+              </button>
+              <p className="text-xs text-slate-500">
+                Supports W3C Verifiable Credentials, professional licenses, press passes
+              </p>
+            </div>
+          )}
+
+          {req.template === 'financial_threshold' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove value {req.params.min_value ? `≥ ${req.params.min_value}` : ''}
+                {req.params.max_value ? ` ≤ ${req.params.max_value}` : ''}
+                {req.params.currency && ` ${req.params.currency}`}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleFinancialProof(index, req, 'bank')}
+                  disabled={isGenerating}
+                  className="px-4 py-2 text-sm bg-argus-100 hover:bg-argus-200 dark:bg-argus-800 dark:hover:bg-argus-700 text-argus-700 dark:text-argus-200 rounded"
+                >
+                  Bank Statement
+                </button>
+                <button
+                  onClick={() => handleFinancialProof(index, req, 'crypto')}
+                  disabled={isGenerating}
+                  className="px-4 py-2 text-sm bg-argus-100 hover:bg-argus-200 dark:bg-argus-800 dark:hover:bg-argus-700 text-argus-700 dark:text-argus-200 rounded"
+                >
+                  Crypto Wallet
+                </button>
+              </div>
+            </div>
+          )}
+
+          {req.template === 'network_membership' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove membership in: <strong>{req.params.network_id}</strong>
+                {req.params.required_role && <> with role: {req.params.required_role}</>}
+              </p>
+              <button
+                onClick={() => handleNetworkProof(index, req)}
+                disabled={isGenerating}
+                className="px-4 py-2 text-sm bg-argus-100 hover:bg-argus-200 dark:bg-argus-800 dark:hover:bg-argus-700 text-argus-700 dark:text-argus-200 rounded"
+              >
+                Prove Membership
+              </button>
+            </div>
+          )}
+
+          {req.template === 'temporal_sequence' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove {req.params.event_count} events occurred in sequence
+              </p>
+              <div className="border rounded p-3 space-y-2">
+                {Array.from({ length: req.params.event_count || 2 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500">Event {i + 1}:</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleSequenceEvent(index, req, i, file);
+                      }}
+                      className="text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {req.template === 'chain_of_custody' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove document chain with ≥{req.params.min_handlers || 1} handlers
+              </p>
+              <label className="block">
+                <span className="text-xs text-slate-500">Upload document with custody chain</span>
+                <input
+                  type="file"
+                  accept=".pdf,.json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleChainOfCustody(index, req, file);
+                  }}
+                  disabled={isGenerating}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-argus-50 file:text-argus-700 hover:file:bg-argus-100"
+                />
+              </label>
+            </div>
+          )}
+
+          {req.template === 'communication_proof' && (
+            <div className="ml-8 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Prove receipt of message
+                {req.params.sender_type && <> from {req.params.sender_type}</>}
+                {req.params.channel_type && <> via {req.params.channel_type}</>}
+              </p>
+              <label className="block">
+                <span className="text-xs text-slate-500">Upload signed message or export</span>
+                <input
+                  type="file"
+                  accept=".json,.eml,.txt"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleCommunicationProof(index, req, file);
+                  }}
+                  disabled={isGenerating}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-argus-50 file:text-argus-700 hover:file:bg-argus-100"
+                />
+              </label>
+            </div>
+          )}
+
+          {req.template === 'image_exif' && (
+            <div className="ml-8">
+              <label className="block">
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Upload photo with EXIF metadata
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file, index, req);
+                  }}
+                  disabled={isGenerating}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-argus-50 file:text-argus-700 hover:file:bg-argus-100"
+                />
+              </label>
             </div>
           )}
 

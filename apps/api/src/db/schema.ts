@@ -696,5 +696,62 @@ export const zkProofSubmissions = pgTable('zk_proof_submissions', {
   witnessCount: integer('witness_count').notNull().default(1),
   requiredWitnesses: integer('required_witnesses').notNull().default(1),
   
+  // On-chain NEAR proof registration
+  onChainTxHash: varchar('on_chain_tx_hash', { length: 128 }),
+  onChainBlockHeight: integer('on_chain_block_height'),
+  onChainTimestamp: timestamp('on_chain_timestamp'),
+  onChainContract: varchar('on_chain_contract', { length: 128 }),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============ NEAR On-Chain Proof Registry ============
+
+// Cached source reputation from NEAR intel-registry contract
+export const nearSourceReputation = pgTable('near_source_reputation', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceHash: varchar('source_hash', { length: 64 }).notNull().unique(),
+  codename: varchar('codename', { length: 100 }), // Nullable for privacy
+  reputationScore: integer('reputation_score').notNull().default(0),
+  totalProofs: integer('total_proofs').notNull().default(0),
+  verifiedProofs: integer('verified_proofs').notNull().default(0),
+  refutedProofs: integer('refuted_proofs').notNull().default(0),
+  totalAttestations: integer('total_attestations').notNull().default(0),
+  avgConfidence: integer('avg_confidence').notNull().default(0),
+  firstProofBlock: integer('first_proof_block'),
+  lastProofBlock: integer('last_proof_block'),
+  lastSyncedAt: timestamp('last_synced_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Audit trail of all proofs registered on NEAR blockchain
+export const nearProofRegistrations = pgTable('near_proof_registrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  proofId: varchar('proof_id', { length: 64 }).notNull().unique(),
+  submissionId: uuid('submission_id').references(() => zkProofSubmissions.id),
+  sourceHash: varchar('source_hash', { length: 64 }).notNull(),
+  intelHash: varchar('intel_hash', { length: 64 }).notNull(),
+  commitment: varchar('commitment', { length: 64 }).notNull(),
+  proofType: varchar('proof_type', { length: 50 }).notNull(),
+  blockHeight: integer('block_height').notNull(),
+  blockTimestamp: timestamp('block_timestamp').notNull(),
+  contractId: varchar('contract_id', { length: 128 }).notNull(),
+  metadata: jsonb('metadata'),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  attestationCount: integer('attestation_count').notNull().default(0),
+  avgConfidence: integer('avg_confidence').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Attestations synced from on-chain
+export const nearAttestations = pgTable('near_attestations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  proofId: varchar('proof_id', { length: 64 }).notNull(),
+  attestorAccount: varchar('attestor_account', { length: 128 }).notNull(),
+  confidence: integer('confidence').notNull(),
+  note: text('note'),
+  blockHeight: integer('block_height').notNull(),
+  blockTimestamp: timestamp('block_timestamp').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

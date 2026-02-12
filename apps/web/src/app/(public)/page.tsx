@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AccountTypeModal } from '@/components/AccountTypeModal';
 import { SourceRegistrationModal } from '@/components/SourceRegistrationModal';
@@ -8,6 +9,18 @@ import { SourceRegistrationModal } from '@/components/SourceRegistrationModal';
 export default function LandingPage() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Check for query params to auto-open modals
+  useEffect(() => {
+    const register = searchParams.get('register');
+    if (register === 'source') {
+      setShowSourceModal(true);
+      // Clean up URL
+      router.replace('/', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleSourceSelected = () => {
     setShowAccountModal(false);
