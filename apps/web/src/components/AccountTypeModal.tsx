@@ -98,7 +98,7 @@ export function AccountTypeModal({ isOpen, onClose }: AccountTypeModalProps) {
               <div>
                 <h3 className="font-semibold text-white">HUMINT Source</h3>
                 <p className="text-sm text-slate-400 mt-1">
-                  Anonymous passkey authentication. Submit intel and earn crypto without revealing your identity.
+                  Anonymous passkey authentication. Submit intel and earn without revealing your identity.
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">
