@@ -333,15 +333,6 @@ function SourceRegistrationContent() {
               </ol>
             </div>
 
-            {/* Alternative */}
-            <div className="bg-slate-700/30 rounded-lg p-3 mb-6">
-              <p className="text-sm text-slate-400">
-                <strong className="text-slate-300">Alternative:</strong> Create a separate 
-                Bitwarden account with an anonymous email (ProtonMail/Tutanota) and use that 
-                to store this passkey.
-              </p>
-            </div>
-
             <button
               onClick={handleStartRegistration}
               disabled={isLoading}
