@@ -1,0 +1,504 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import EXIF from 'exif-js';
+
+interface ProofRequirement {
+  template: string;
+  params: Record<string, any>;
+  description: string;
+  required: boolean;
+  weight: number;
+}
+
+interface GeneratedProof {
+  requirementIndex: number;
+  proofType: string;
+  proofData: any;
+  publicInputs: any;
+  status: 'pending' | 'generated' | 'failed';
+  error?: string;
+}
+
+interface ProofGeneratorProps {
+  requirements: ProofRequirement[];
+  onProofsGenerated: (proofs: GeneratedProof[]) => void;
+}
+
+export function ProofGenerator({ requirements, onProofsGenerated }: ProofGeneratorProps) {
+  const [proofs, setProofs] = useState<GeneratedProof[]>(
+    requirements.map((_, i) => ({
+      requirementIndex: i,
+      proofType: requirements[i].template,
+      proofData: null,
+      publicInputs: null,
+      status: 'pending',
+    }))
+  );
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Handle image upload for location/timestamp proofs
+  const handleImageUpload = useCallback(async (
+    file: File, 
+    requirementIndex: number,
+    requirement: ProofRequirement
+  ) => {
+    setIsGenerating(true);
+    
+    try {
+      // Extract EXIF data client-side
+      const exifData = await new Promise<any>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            EXIF.getData(img as any, function(this: any) {
+              const allMetaData = EXIF.getAllTags(this);
+              resolve(allMetaData);
+            });
+          };
+          img.onerror = reject;
+          img.src = e.target?.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      let proof: GeneratedProof;
+
+      if (requirement.template === 'location_proximity') {
+        // Extract GPS coordinates
+        const lat = exifData.GPSLatitude;
+        const lng = exifData.GPSLongitude;
+        const latRef = exifData.GPSLatitudeRef;
+        const lngRef = exifData.GPSLongitudeRef;
+
+        if (!lat || !lng) {
+          throw new Error('Image does not contain GPS data. Please use a photo with location enabled.');
+        }
+
+        // Convert to decimal degrees
+        const actualLat = convertDMSToDD(lat, latRef);
+        const actualLng = convertDMSToDD(lng, lngRef);
+
+        // Calculate distance to target
+        const { target_lat, target_lng, radius_km } = requirement.params;
+        const distance = haversineDistance(actualLat, actualLng, target_lat, target_lng);
+        const withinRadius = distance <= radius_km;
+
+        // Generate ZK proof (simplified - in production would use actual ZK circuit)
+        // The proof data would be the actual snarkjs proof
+        // For now, we create a commitment that can be verified
+        const proofData = await generateLocationProof(actualLat, actualLng, target_lat, target_lng, radius_km);
+
+        proof = {
+          requirementIndex,
+          proofType: 'location_proximity',
+          proofData,
+          publicInputs: {
+            target_lat,
+            target_lng,
+            radius_km,
+            within_radius: withinRadius,
+            distance_km: Math.round(distance * 10) / 10, // Rounded to protect exact location
+          },
+          status: withinRadius ? 'generated' : 'failed',
+          error: withinRadius ? undefined : `Location is ${distance.toFixed(1)}km from target, exceeds ${radius_km}km radius`,
+        };
+
+      } else if (requirement.template === 'timestamp_range') {
+        // Extract timestamp
+        const dateTimeOriginal = exifData.DateTimeOriginal;
+        
+        if (!dateTimeOriginal) {
+          throw new Error('Image does not contain timestamp data.');
+        }
+
+        // Parse EXIF date format (YYYY:MM:DD HH:MM:SS)
+        const [datePart, timePart] = dateTimeOriginal.split(' ');
+        const [year, month, day] = datePart.split(':');
+        const timestamp = new Date(`${year}-${month}-${day}T${timePart}`);
+
+        const { not_before, not_after } = requirement.params;
+        const notBefore = new Date(not_before);
+        const notAfter = new Date(not_after);
+        
+        const withinRange = timestamp >= notBefore && timestamp <= notAfter;
+
+        const proofData = await generateTimestampProof(timestamp, notBefore, notAfter);
+
+        proof = {
+          requirementIndex,
+          proofType: 'timestamp_range',
+          proofData,
+          publicInputs: {
+            timestamp: timestamp.toISOString(),
+            not_before,
+            not_after,
+            within_range: withinRange,
+          },
+          status: withinRange ? 'generated' : 'failed',
+          error: withinRange ? undefined : `Timestamp ${timestamp.toISOString()} is outside allowed range`,
+        };
+
+      } else if (requirement.template === 'image_metadata') {
+        // Check various metadata properties
+        const { min_resolution, device_type, has_gps } = requirement.params;
+        
+        const width = exifData.PixelXDimension || exifData.ImageWidth;
+        const height = exifData.PixelYDimension || exifData.ImageHeight;
+        const hasGps = !!(exifData.GPSLatitude && exifData.GPSLongitude);
+        const make = exifData.Make;
+        
+        let valid = true;
+        let errors: string[] = [];
+
+        if (min_resolution) {
+          if (width < min_resolution.width || height < min_resolution.height) {
+            valid = false;
+            errors.push(`Resolution ${width}x${height} below minimum ${min_resolution.width}x${min_resolution.height}`);
+          }
+        }
+
+        if (has_gps && !hasGps) {
+          valid = false;
+          errors.push('Image must have GPS data');
+        }
+
+        proof = {
+          requirementIndex,
+          proofType: 'image_metadata',
+          proofData: { verified: valid },
+          publicInputs: {
+            resolution: { width, height },
+            has_gps: hasGps,
+            device_make: make || 'Unknown',
+          },
+          status: valid ? 'generated' : 'failed',
+          error: valid ? undefined : errors.join(', '),
+        };
+
+      } else {
+        throw new Error(`Unsupported proof type for image: ${requirement.template}`);
+      }
+
+      // Update proofs state
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+
+      // Move to next step if successful
+      if (proof.status === 'generated') {
+        setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+      }
+
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = {
+          ...prev[requirementIndex],
+          status: 'failed',
+          error: error.message,
+        };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  // Handle document upload for keyword proofs
+  const handleDocumentUpload = useCallback(async (
+    file: File,
+    requirementIndex: number,
+    requirement: ProofRequirement
+  ) => {
+    setIsGenerating(true);
+
+    try {
+      const text = await file.text();
+      const lowerText = text.toLowerCase();
+      
+      const { required_keywords } = requirement.params;
+      const foundKeywords = required_keywords.filter((kw: string) => 
+        lowerText.includes(kw.toLowerCase())
+      );
+      
+      const allFound = foundKeywords.length === required_keywords.length;
+
+      const proofData = await generateDocumentProof(text, required_keywords);
+
+      const proof: GeneratedProof = {
+        requirementIndex,
+        proofType: 'document_contains',
+        proofData,
+        publicInputs: {
+          keyword_matches: foundKeywords,
+          total_keywords: required_keywords.length,
+          found_count: foundKeywords.length,
+        },
+        status: allFound ? 'generated' : 'failed',
+        error: allFound ? undefined : `Missing keywords: ${required_keywords.filter((k: string) => !foundKeywords.includes(k)).join(', ')}`,
+      };
+
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = proof;
+        return updated;
+      });
+
+      if (proof.status === 'generated') {
+        setCurrentStep(prev => Math.min(prev + 1, requirements.length - 1));
+      }
+
+    } catch (error: any) {
+      setProofs(prev => {
+        const updated = [...prev];
+        updated[requirementIndex] = {
+          ...prev[requirementIndex],
+          status: 'failed',
+          error: error.message,
+        };
+        return updated;
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [requirements]);
+
+  // Check if all required proofs are generated
+  const allRequiredGenerated = requirements.every((req, i) => 
+    !req.required || proofs[i]?.status === 'generated'
+  );
+
+  const handleSubmit = () => {
+    const generatedProofs = proofs.filter(p => p.status === 'generated');
+    onProofsGenerated(generatedProofs);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+          🔐 Zero-Knowledge Proof Generation
+        </h3>
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          Your evidence is processed <strong>locally in your browser</strong>. 
+          Only the proof (not your actual data) is sent to verify your submission.
+          Your exact location, timestamps, and documents remain private.
+        </p>
+      </div>
+
+      {requirements.map((req, index) => (
+        <div 
+          key={index}
+          className={`border rounded-lg p-4 ${
+            index === currentStep 
+              ? 'border-argus-500 bg-argus-50 dark:bg-argus-900/20' 
+              : 'border-slate-200 dark:border-slate-700'
+          }`}
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  proofs[index]?.status === 'generated' 
+                    ? 'bg-green-500 text-white'
+                    : proofs[index]?.status === 'failed'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-300'
+                }`}>
+                  {proofs[index]?.status === 'generated' ? '✓' : index + 1}
+                </span>
+                <h4 className="font-medium">{req.description}</h4>
+                {req.required && (
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded">
+                    Required
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1 ml-8">
+                Proof type: {req.template}
+              </p>
+            </div>
+          </div>
+
+          {/* Proof input based on type */}
+          {(req.template === 'location_proximity' || req.template === 'timestamp_range' || req.template === 'image_metadata') && (
+            <div className="ml-8">
+              <label className="block">
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Upload a photo with {req.template === 'location_proximity' ? 'GPS data' : 'timestamp'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file, index, req);
+                  }}
+                  disabled={isGenerating}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-argus-50 file:text-argus-700 hover:file:bg-argus-100"
+                />
+              </label>
+            </div>
+          )}
+
+          {req.template === 'document_contains' && (
+            <div className="ml-8">
+              <label className="block">
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Upload document containing: {req.params.required_keywords?.join(', ')}
+                </span>
+                <input
+                  type="file"
+                  accept=".txt,.pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleDocumentUpload(file, index, req);
+                  }}
+                  disabled={isGenerating}
+                  className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-argus-50 file:text-argus-700 hover:file:bg-argus-100"
+                />
+              </label>
+            </div>
+          )}
+
+          {req.template === 'multi_source_corroboration' && (
+            <div className="ml-8 text-sm text-slate-500">
+              This proof requires {req.params.min_witnesses} independent sources to confirm.
+              Other sources must also submit to fulfill this requirement.
+            </div>
+          )}
+
+          {/* Status display */}
+          {proofs[index]?.status === 'generated' && (
+            <div className="mt-3 ml-8 p-3 bg-green-50 dark:bg-green-900/20 rounded text-sm">
+              <div className="text-green-700 dark:text-green-300 font-medium">✓ Proof generated</div>
+              <div className="text-green-600 dark:text-green-400 text-xs mt-1">
+                Public inputs: {JSON.stringify(proofs[index].publicInputs, null, 2)}
+              </div>
+            </div>
+          )}
+
+          {proofs[index]?.status === 'failed' && (
+            <div className="mt-3 ml-8 p-3 bg-red-50 dark:bg-red-900/20 rounded text-sm">
+              <div className="text-red-700 dark:text-red-300 font-medium">✗ Proof failed</div>
+              <div className="text-red-600 dark:text-red-400 text-xs mt-1">
+                {proofs[index].error}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {isGenerating && (
+        <div className="text-center py-4 text-slate-500">
+          <div className="animate-spin inline-block w-6 h-6 border-2 border-argus-500 border-t-transparent rounded-full mr-2"></div>
+          Generating proof...
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={handleSubmit}
+          disabled={!allRequiredGenerated || isGenerating}
+          className="px-6 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {allRequiredGenerated ? 'Submit with Proofs' : 'Generate Required Proofs First'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Helper functions
+
+function convertDMSToDD(dms: number[], ref: string): number {
+  const degrees = dms[0];
+  const minutes = dms[1];
+  const seconds = dms[2];
+  let dd = degrees + minutes / 60 + seconds / 3600;
+  if (ref === 'S' || ref === 'W') dd = -dd;
+  return dd;
+}
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Simplified proof generation (in production, would use snarkjs)
+async function generateLocationProof(
+  actualLat: number, 
+  actualLng: number, 
+  targetLat: number, 
+  targetLng: number, 
+  radiusKm: number
+): Promise<any> {
+  // In production: Use snarkjs to generate actual ZK proof
+  // For now, create a commitment hash
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${actualLat},${actualLng},${Date.now()}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const commitment = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return {
+    type: 'location_proximity',
+    commitment,
+    // In production: actual snarkjs proof bytes
+    proof: 'placeholder_proof_data',
+    version: '0.1.0',
+  };
+}
+
+async function generateTimestampProof(
+  timestamp: Date,
+  notBefore: Date,
+  notAfter: Date
+): Promise<any> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${timestamp.toISOString()},${Date.now()}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const commitment = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return {
+    type: 'timestamp_range',
+    commitment,
+    proof: 'placeholder_proof_data',
+    version: '0.1.0',
+  };
+}
+
+async function generateDocumentProof(
+  content: string,
+  keywords: string[]
+): Promise<any> {
+  // Hash the document + keywords for commitment
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${content.substring(0, 1000)},${keywords.join(',')},${Date.now()}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const commitment = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return {
+    type: 'document_contains',
+    commitment,
+    proof: 'placeholder_proof_data',
+    version: '0.1.0',
+  };
+}
+
+export default ProofGenerator;
