@@ -12,11 +12,20 @@ interface Bounty {
   description: string;
   domains: string[];
   regions: string[];
+  category: string;
   rewardUsdc: number;
   minSourceReputation: number;
   status: string;
+  reviewStatus: string;
   expiresAt: string | null;
   createdAt: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  autoApprove: boolean;
 }
 
 interface BountyStats {
@@ -45,6 +54,7 @@ export default function BountiesPage() {
   // Create form
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -54,12 +64,29 @@ export default function BountiesPage() {
     minSourceReputation: 50,
     expiresInDays: 7,
     anonymous: false,
+    // NEW: Required for legal compliance
+    category: 'general',
+    intendedUse: '',
+    legalAttestation: false,
   });
 
   useEffect(() => {
     fetchBounties();
     fetchStats();
+    fetchCategories();
   }, [statusFilter, regionFilter, domainFilter, sortBy]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/bounties/categories`);
+      const data = await res.json();
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+    }
+  };
 
   const fetchBounties = async () => {
     try {
@@ -102,6 +129,18 @@ export default function BountiesPage() {
       return;
     }
     
+    // Validate legal attestation
+    if (!formData.legalAttestation) {
+      setError('You must agree to the legal attestation to post a bounty');
+      return;
+    }
+    
+    // Validate intended use
+    if (formData.intendedUse.length < 20) {
+      setError('Please provide a more detailed intended use statement (at least 20 characters)');
+      return;
+    }
+    
     setCreating(true);
     setError('');
     
@@ -124,13 +163,19 @@ export default function BountiesPage() {
           minSourceReputation: formData.minSourceReputation,
           expiresAt: expiresAt.toISOString(),
           anonymous: formData.anonymous,
+          // NEW fields
+          category: formData.category,
+          intendedUse: formData.intendedUse,
+          legalAttestation: formData.legalAttestation,
         }),
       });
       
       const data = await res.json();
       
       if (data.success) {
-        setSuccessMessage('Bounty created successfully!');
+        // Show different message based on review status
+        const message = data.message || 'Bounty created successfully!';
+        setSuccessMessage(message);
         setShowCreateForm(false);
         setFormData({
           title: '',
@@ -141,10 +186,13 @@ export default function BountiesPage() {
           minSourceReputation: 50,
           expiresInDays: 7,
           anonymous: false,
+          category: 'general',
+          intendedUse: '',
+          legalAttestation: false,
         });
         fetchBounties();
         fetchStats();
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setTimeout(() => setSuccessMessage(''), 5000);
       } else {
         setError(data.error || 'Failed to create bounty');
       }
@@ -290,7 +338,23 @@ export default function BountiesPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Category *</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  required
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium mb-1">Reward (USDC) *</label>
                 <input
@@ -331,6 +395,20 @@ export default function BountiesPage() {
               </div>
             </div>
             
+            {/* Intended Use - REQUIRED */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Intended Use *</label>
+              <textarea
+                value={formData.intendedUse}
+                onChange={(e) => setFormData({ ...formData, intendedUse: e.target.value })}
+                required
+                rows={3}
+                placeholder="Explain how you plan to use this intelligence. E.g., 'For a research report on regional stability' or 'To inform investment decisions in the energy sector'"
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+              />
+              <p className="text-xs text-slate-500 mt-1">Be specific about your use case. This helps us ensure requests are legitimate.</p>
+            </div>
+            
             <div>
               <label className="flex items-center gap-2">
                 <input
@@ -340,6 +418,35 @@ export default function BountiesPage() {
                   className="rounded"
                 />
                 <span className="text-sm">Post anonymously (your identity won't be linked to this bounty)</span>
+              </label>
+            </div>
+            
+            {/* Legal Attestation - REQUIRED */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={formData.legalAttestation}
+                  onChange={(e) => setFormData({ ...formData, legalAttestation: e.target.checked })}
+                  required
+                  className="rounded mt-1"
+                />
+                <div className="text-sm">
+                  <span className="font-medium text-amber-800 dark:text-amber-200">Legal Attestation (Required)</span>
+                  <p className="text-amber-700 dark:text-amber-300 mt-1">
+                    I attest that this intelligence request will NOT be used for:
+                  </p>
+                  <ul className="list-disc list-inside text-amber-600 dark:text-amber-400 mt-1 space-y-1">
+                    <li>Harassment, stalking, or targeting individuals</li>
+                    <li>Obtaining personal/private information about individuals</li>
+                    <li>Illegal activities or circumventing the law</li>
+                    <li>Market manipulation or insider trading</li>
+                    <li>Any purpose that could cause harm to individuals or groups</li>
+                  </ul>
+                  <p className="text-amber-700 dark:text-amber-300 mt-2">
+                    I understand that violations may result in account termination and potential legal action.
+                  </p>
+                </div>
               </label>
             </div>
             
@@ -449,6 +556,11 @@ export default function BountiesPage() {
               
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-3">
+                {bounty.category && (
+                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-xs font-medium">
+                    {bounty.category.replace(/_/g, ' ')}
+                  </span>
+                )}
                 {bounty.regions.map((region) => (
                   <span key={region} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
                     📍 {region}
@@ -491,11 +603,19 @@ export default function BountiesPage() {
         <h3 className="font-semibold mb-3">💡 How Bounties Work</h3>
         <ul className="space-y-2 text-slate-600 dark:text-slate-400">
           <li>• <strong>Post a request:</strong> Describe what intel you need and offer a reward</li>
-          <li>• <strong>Set requirements:</strong> Minimum source reputation, regions, domains</li>
+          <li>• <strong>Legal attestation:</strong> Confirm your request won't be used for harm</li>
+          <li>• <strong>Review process:</strong> Some categories are auto-approved; others reviewed within 24h</li>
           <li>• <strong>HUMINT sources claim:</strong> Sources with matching expertise claim your bounty</li>
           <li>• <strong>Review & pay:</strong> Approve the submission and release payment</li>
           <li>• <strong>Anonymous option:</strong> Post without linking your identity</li>
         </ul>
+        
+        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
+          <p className="text-amber-700 dark:text-amber-300">
+            <strong>⚠️ Prohibited requests:</strong> Personal information, home addresses, stalking-related intel, 
+            doxxing, or any request that could facilitate harm to individuals. These will be automatically rejected.
+          </p>
+        </div>
       </div>
     </div>
   );

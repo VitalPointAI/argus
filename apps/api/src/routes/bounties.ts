@@ -1,17 +1,41 @@
 // Intel Bounties API Routes
 // Allows users to post requests for specific intelligence with rewards
+// Implements Option 2 safeguards: category allowlist, keyword blocklist, legal attestation, admin review
 
 import { Hono } from 'hono';
 import { db } from '../db';
-import { intelBounties, humintSources, humintSubmissions, users } from '../db/schema';
-import { eq, desc, sql, and, gte, or, ilike } from 'drizzle-orm';
+import { intelBounties, humintSources, humintSubmissions, users, bountyCategories, bountyBlockedKeywords } from '../db/schema';
+import { eq, desc, sql, and, gte, or, ilike, inArray } from 'drizzle-orm';
 
 const bounties = new Hono();
 
 // Helper to get authenticated user from context
-function getUser(c: any): { id: string } | null {
+function getUser(c: any): { id: string; isAdmin?: boolean } | null {
   const user = c.get('user' as never);
-  return user && typeof user === 'object' && 'id' in user ? user as { id: string } : null;
+  return user && typeof user === 'object' && 'id' in user ? user as { id: string; isAdmin?: boolean } : null;
+}
+
+// Check text against blocked keywords
+async function checkBlockedKeywords(text: string): Promise<{ blocked: boolean; keyword?: string; reason?: string }> {
+  const keywords = await db.select().from(bountyBlockedKeywords);
+  const lowerText = text.toLowerCase();
+  
+  for (const kw of keywords) {
+    // Support regex patterns (e.g., "where does .* live")
+    try {
+      const regex = new RegExp(kw.keyword.toLowerCase(), 'i');
+      if (regex.test(lowerText)) {
+        return { blocked: true, keyword: kw.keyword, reason: kw.reason || 'Prohibited content' };
+      }
+    } catch {
+      // Fallback to simple includes for non-regex keywords
+      if (lowerText.includes(kw.keyword.toLowerCase())) {
+        return { blocked: true, keyword: kw.keyword, reason: kw.reason || 'Prohibited content' };
+      }
+    }
+  }
+  
+  return { blocked: false };
 }
 
 // ============================================
@@ -24,12 +48,16 @@ bounties.get('/', async (c) => {
       status = 'open',
       region,
       domain,
+      category,
       minReward,
       maxReward,
       sort = 'recent',
       limit = '20',
-      offset = '0'
+      offset = '0',
+      includeUnreviewed = 'false' // Admin only
     } = c.req.query();
+    
+    const user = getUser(c);
     
     let query = db.select({
       id: intelBounties.id,
@@ -37,9 +65,11 @@ bounties.get('/', async (c) => {
       description: intelBounties.description,
       domains: intelBounties.domains,
       regions: intelBounties.regions,
+      category: intelBounties.category,
       rewardUsdc: intelBounties.rewardUsdc,
       minSourceReputation: intelBounties.minSourceReputation,
       status: intelBounties.status,
+      reviewStatus: intelBounties.reviewStatus,
       expiresAt: intelBounties.expiresAt,
       createdAt: intelBounties.createdAt,
       // Don't expose creator ID for anonymous bounties
@@ -49,9 +79,20 @@ bounties.get('/', async (c) => {
     
     const conditions = [];
     
+    // IMPORTANT: Only show approved bounties to public
+    // Admins can see all with includeUnreviewed=true
+    if (includeUnreviewed !== 'true' || !user?.isAdmin) {
+      conditions.push(inArray(intelBounties.reviewStatus, ['approved', 'auto_approved']));
+    }
+    
     // Status filter
     if (status && status !== 'all') {
       conditions.push(eq(intelBounties.status, status));
+    }
+    
+    // Category filter
+    if (category) {
+      conditions.push(eq(intelBounties.category, category));
     }
     
     // Region filter
@@ -171,12 +212,32 @@ bounties.post('/', async (c) => {
       rewardUsdc,
       minSourceReputation = 50,
       expiresAt,
-      anonymous = false // If true, creator is not stored
+      anonymous = false,
+      // NEW: Required for Option 2 safeguards
+      intendedUse,
+      category = 'general',
+      legalAttestation = false // Must be true to proceed
     } = body;
     
     // Validation
     if (!title || !description || !rewardUsdc) {
       return c.json({ success: false, error: 'Title, description, and reward are required' }, 400);
+    }
+    
+    // NEW: Require intended use statement
+    if (!intendedUse || intendedUse.length < 20) {
+      return c.json({ 
+        success: false, 
+        error: 'Please provide a detailed intended use statement (min 20 characters) explaining how you plan to use this intelligence' 
+      }, 400);
+    }
+    
+    // NEW: Require legal attestation
+    if (!legalAttestation) {
+      return c.json({ 
+        success: false, 
+        error: 'You must agree to the legal attestation that this request will not be used for harassment, stalking, or illegal purposes' 
+      }, 400);
     }
     
     if (rewardUsdc < 1) {
@@ -187,13 +248,41 @@ bounties.post('/', async (c) => {
       return c.json({ success: false, error: 'Reputation must be 0-100' }, 400);
     }
     
-    // TODO: Escrow payment verification
-    // For now, bounties are created without payment escrow
-    // Full implementation requires NEAR contract integration
+    // NEW: Validate category exists and is enabled
+    const [categoryRecord] = await db.select()
+      .from(bountyCategories)
+      .where(and(eq(bountyCategories.name, category), eq(bountyCategories.enabled, true)))
+      .limit(1);
+    
+    if (!categoryRecord) {
+      return c.json({ success: false, error: 'Invalid or disabled category' }, 400);
+    }
+    
+    // NEW: Check for blocked keywords in title, description, and intended use
+    const fullText = `${title} ${description} ${intendedUse}`;
+    const keywordCheck = await checkBlockedKeywords(fullText);
+    
+    if (keywordCheck.blocked) {
+      console.log('Bounty rejected - blocked keyword:', {
+        user: user.id,
+        keyword: keywordCheck.keyword,
+        reason: keywordCheck.reason,
+        title: title.substring(0, 50)
+      });
+      
+      return c.json({ 
+        success: false, 
+        error: `Request contains prohibited content: ${keywordCheck.reason}. Intel bounties cannot request personal information, locations of individuals, or content that could be used for harm.`,
+        code: 'BLOCKED_CONTENT'
+      }, 400);
+    }
+    
+    // Determine review status based on category
+    const reviewStatus = categoryRecord.autoApprove ? 'auto_approved' : 'pending';
     
     const [bounty] = await db.insert(intelBounties)
       .values({
-        creatorId: anonymous ? null : user.id, // Null for anonymous bounties
+        creatorId: anonymous ? null : user.id,
         title,
         description,
         domains: domains?.map((d: string) => d.toLowerCase()) || [],
@@ -202,6 +291,11 @@ bounties.post('/', async (c) => {
         minSourceReputation,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         status: 'open',
+        // NEW fields
+        intendedUse,
+        legalAttestationAt: new Date(),
+        category,
+        reviewStatus,
       })
       .returning();
     
@@ -209,8 +303,19 @@ bounties.post('/', async (c) => {
       id: bounty.id, 
       title: bounty.title, 
       reward: bounty.rewardUsdc,
-      anonymous: anonymous 
+      category,
+      reviewStatus,
+      anonymous
     });
+    
+    // Different response based on review status
+    if (reviewStatus === 'pending') {
+      return c.json({
+        success: true,
+        data: bounty,
+        message: 'Your bounty has been submitted for review. It will be visible to sources once approved (usually within 24 hours).'
+      });
+    }
     
     return c.json({
       success: true,
@@ -307,7 +412,8 @@ bounties.get('/stats/summary', async (c) => {
       open: sql<number>`count(*) filter (where status = 'open')::int`,
       claimed: sql<number>`count(*) filter (where status = 'claimed')::int`,
       paid: sql<number>`count(*) filter (where status = 'paid')::int`,
-      totalRewardOpen: sql<number>`coalesce(sum(reward_usdc) filter (where status = 'open'), 0)::numeric`,
+      pendingReview: sql<number>`count(*) filter (where review_status = 'pending')::int`,
+      totalRewardOpen: sql<number>`coalesce(sum(reward_usdc) filter (where status = 'open' and review_status in ('approved', 'auto_approved')), 0)::numeric`,
       avgReward: sql<number>`coalesce(avg(reward_usdc), 0)::numeric`,
     })
     .from(intelBounties);
@@ -319,6 +425,7 @@ bounties.get('/stats/summary', async (c) => {
         open: stats?.open || 0,
         claimed: stats?.claimed || 0,
         paid: stats?.paid || 0,
+        pendingReview: stats?.pendingReview || 0,
         totalRewardOpen: parseFloat(String(stats?.totalRewardOpen || 0)),
         avgReward: parseFloat(String(stats?.avgReward || 0)).toFixed(2),
       }
@@ -326,6 +433,221 @@ bounties.get('/stats/summary', async (c) => {
   } catch (error) {
     console.error('Stats error:', error);
     return c.json({ success: false, error: 'Failed to get stats' }, 500);
+  }
+});
+
+// ============================================
+// Admin: List Categories
+// ============================================
+
+bounties.get('/categories', async (c) => {
+  try {
+    const categories = await db.select()
+      .from(bountyCategories)
+      .where(eq(bountyCategories.enabled, true))
+      .orderBy(bountyCategories.name);
+    
+    return c.json({ success: true, data: categories });
+  } catch (error) {
+    console.error('List categories error:', error);
+    return c.json({ success: false, error: 'Failed to list categories' }, 500);
+  }
+});
+
+// ============================================
+// Admin: Review Queue
+// ============================================
+
+bounties.get('/admin/review-queue', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const pending = await db.select({
+      id: intelBounties.id,
+      title: intelBounties.title,
+      description: intelBounties.description,
+      intendedUse: intelBounties.intendedUse,
+      category: intelBounties.category,
+      rewardUsdc: intelBounties.rewardUsdc,
+      createdAt: intelBounties.createdAt,
+      creatorId: intelBounties.creatorId,
+    })
+    .from(intelBounties)
+    .where(eq(intelBounties.reviewStatus, 'pending'))
+    .orderBy(intelBounties.createdAt);
+    
+    return c.json({ success: true, data: pending });
+  } catch (error) {
+    console.error('Review queue error:', error);
+    return c.json({ success: false, error: 'Failed to get review queue' }, 500);
+  }
+});
+
+// ============================================
+// Admin: Approve Bounty
+// ============================================
+
+bounties.post('/:id/approve', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const { id } = c.req.param();
+    
+    const [bounty] = await db.select()
+      .from(intelBounties)
+      .where(eq(intelBounties.id, id))
+      .limit(1);
+    
+    if (!bounty) {
+      return c.json({ success: false, error: 'Bounty not found' }, 404);
+    }
+    
+    if (bounty.reviewStatus !== 'pending') {
+      return c.json({ success: false, error: 'Bounty is not pending review' }, 400);
+    }
+    
+    const [updated] = await db.update(intelBounties)
+      .set({
+        reviewStatus: 'approved',
+        reviewedBy: user.id,
+        reviewedAt: new Date(),
+      })
+      .where(eq(intelBounties.id, id))
+      .returning();
+    
+    console.log('Bounty approved:', { id, adminId: user.id });
+    
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Approve bounty error:', error);
+    return c.json({ success: false, error: 'Failed to approve bounty' }, 500);
+  }
+});
+
+// ============================================
+// Admin: Reject Bounty
+// ============================================
+
+bounties.post('/:id/reject', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const { id } = c.req.param();
+    const body = await c.req.json();
+    const { reason } = body;
+    
+    if (!reason) {
+      return c.json({ success: false, error: 'Rejection reason is required' }, 400);
+    }
+    
+    const [bounty] = await db.select()
+      .from(intelBounties)
+      .where(eq(intelBounties.id, id))
+      .limit(1);
+    
+    if (!bounty) {
+      return c.json({ success: false, error: 'Bounty not found' }, 404);
+    }
+    
+    if (bounty.reviewStatus !== 'pending') {
+      return c.json({ success: false, error: 'Bounty is not pending review' }, 400);
+    }
+    
+    const [updated] = await db.update(intelBounties)
+      .set({
+        reviewStatus: 'rejected',
+        rejectionReason: reason,
+        reviewedBy: user.id,
+        reviewedAt: new Date(),
+        status: 'cancelled', // Rejected bounties are effectively cancelled
+      })
+      .where(eq(intelBounties.id, id))
+      .returning();
+    
+    console.log('Bounty rejected:', { id, adminId: user.id, reason });
+    
+    // TODO: Notify creator of rejection (if not anonymous)
+    
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Reject bounty error:', error);
+    return c.json({ success: false, error: 'Failed to reject bounty' }, 500);
+  }
+});
+
+// ============================================
+// Admin: Manage Blocked Keywords
+// ============================================
+
+bounties.get('/admin/blocked-keywords', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const keywords = await db.select().from(bountyBlockedKeywords).orderBy(bountyBlockedKeywords.keyword);
+    return c.json({ success: true, data: keywords });
+  } catch (error) {
+    console.error('List blocked keywords error:', error);
+    return c.json({ success: false, error: 'Failed to list blocked keywords' }, 500);
+  }
+});
+
+bounties.post('/admin/blocked-keywords', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const body = await c.req.json();
+    const { keyword, reason } = body;
+    
+    if (!keyword) {
+      return c.json({ success: false, error: 'Keyword is required' }, 400);
+    }
+    
+    const [added] = await db.insert(bountyBlockedKeywords)
+      .values({ keyword: keyword.toLowerCase(), reason })
+      .onConflictDoNothing()
+      .returning();
+    
+    if (!added) {
+      return c.json({ success: false, error: 'Keyword already exists' }, 400);
+    }
+    
+    return c.json({ success: true, data: added });
+  } catch (error) {
+    console.error('Add blocked keyword error:', error);
+    return c.json({ success: false, error: 'Failed to add blocked keyword' }, 500);
+  }
+});
+
+bounties.delete('/admin/blocked-keywords/:id', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user?.isAdmin) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    
+    const { id } = c.req.param();
+    
+    await db.delete(bountyBlockedKeywords).where(eq(bountyBlockedKeywords.id, id));
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Delete blocked keyword error:', error);
+    return c.json({ success: false, error: 'Failed to delete blocked keyword' }, 500);
   }
 });
 

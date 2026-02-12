@@ -402,6 +402,15 @@ export const intelBounties = pgTable('intel_bounties', {
   rewardUsdc: real('reward_usdc').notNull(),
   minSourceReputation: integer('min_source_reputation').notNull().default(50),
   
+  // Moderation & Legal (Option 2 safeguards)
+  intendedUse: text('intended_use'), // Required: How they plan to use the intel
+  legalAttestationAt: timestamp('legal_attestation_at'), // When they agreed to terms
+  category: text('category').notNull().default('general'),
+  reviewStatus: text('review_status').notNull().default('pending'), // pending, approved, rejected, auto_approved
+  reviewedBy: uuid('reviewed_by').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at'),
+  rejectionReason: text('rejection_reason'),
+  
   status: text('status').notNull().default('open'), // open, claimed, paid, expired, cancelled
   expiresAt: timestamp('expires_at'),
   
@@ -409,6 +418,25 @@ export const intelBounties = pgTable('intel_bounties', {
   fulfillmentSubmissionId: uuid('fulfillment_submission_id').references(() => humintSubmissions.id),
   paymentTxHash: text('payment_tx_hash'),
   
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Bounty category allowlist
+export const bountyCategories = pgTable('bounty_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description'),
+  autoApprove: boolean('auto_approve').notNull().default(false),
+  requiresKyc: boolean('requires_kyc').notNull().default(false),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Blocked keywords for auto-rejection
+export const bountyBlockedKeywords = pgTable('bounty_blocked_keywords', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  keyword: text('keyword').notNull().unique(),
+  reason: text('reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
