@@ -105,7 +105,7 @@ export function AccountTypeModal({ isOpen, onClose }: AccountTypeModalProps) {
                     🔒 Anonymous
                   </span>
                   <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
-                    💰 Earn Crypto
+                    💰 Earn Bounties
                   </span>
                 </div>
               </div>
