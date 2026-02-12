@@ -1,0 +1,23 @@
+{
+  "name": "@argus/zk-circuits",
+  "version": "0.1.0",
+  "description": "Zero-knowledge proof circuits for Argus intel verification",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npm run compile:circuits && npm run build:ts",
+    "build:ts": "tsc",
+    "compile:circuits": "node scripts/compile-circuits.js",
+    "setup": "node scripts/trusted-setup.js",
+    "test": "node scripts/test-proofs.js"
+  },
+  "dependencies": {
+    "snarkjs": "^0.7.0",
+    "circomlibjs": "^0.1.7",
+    "ffjavascript": "^0.2.60"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

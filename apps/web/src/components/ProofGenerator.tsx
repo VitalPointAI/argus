@@ -1,7 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import EXIF from 'exif-js';
+import {
+  generateLocationProof as generateZKLocationProof,
+  generateTimestampProof as generateZKTimestampProof,
+  generateDocumentProof as generateZKDocumentProof,
+  checkCircuitsAvailable,
+  haversineDistance,
+} from '@/lib/zk-proofs';
 
 interface ProofRequirement {
   template: string;
@@ -37,6 +44,12 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
   );
   const [currentStep, setCurrentStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [zkAvailable, setZkAvailable] = useState<boolean | null>(null);
+
+  // Check if full ZK circuits are available
+  useEffect(() => {
+    checkCircuitsAvailable().then(setZkAvailable);
+  }, []);
 
   // Handle image upload for location/timestamp proofs
   const handleImageUpload = useCallback(async (
@@ -84,25 +97,50 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
 
         // Calculate distance to target
         const { target_lat, target_lng, radius_km } = requirement.params;
-        const distance = haversineDistance(actualLat, actualLng, target_lat, target_lng);
+        const radiusMeters = radius_km * 1000;
+        const distance = haversineDistance(actualLat, actualLng, target_lat, target_lng) / 1000; // km
         const withinRadius = distance <= radius_km;
 
-        // Generate ZK proof (simplified - in production would use actual ZK circuit)
-        // The proof data would be the actual snarkjs proof
-        // For now, we create a commitment that can be verified
-        const proofData = await generateLocationProof(actualLat, actualLng, target_lat, target_lng, radius_km);
+        let proofData;
+        let publicInputs;
+
+        if (zkAvailable) {
+          // Use full ZK proof generation
+          console.log('🔐 Generating full ZK location proof...');
+          const zkResult = await generateZKLocationProof({
+            actualLat,
+            actualLng,
+            targetLat: target_lat,
+            targetLng: target_lng,
+            radiusMeters,
+          });
+          proofData = zkResult.proof;
+          publicInputs = {
+            target_lat,
+            target_lng,
+            radius_km,
+            within_radius: zkResult.publicInputs.withinRadius,
+            proof_type: 'groth16',
+          };
+        } else {
+          // Fallback to commitment-based proof
+          console.log('⚠️ ZK circuits not available, using commitment proof...');
+          proofData = await generateLocationProofFallback(actualLat, actualLng, target_lat, target_lng, radius_km);
+          publicInputs = {
+            target_lat,
+            target_lng,
+            radius_km,
+            within_radius: withinRadius,
+            distance_km: Math.round(distance * 10) / 10,
+            proof_type: 'commitment',
+          };
+        }
 
         proof = {
           requirementIndex,
           proofType: 'location_proximity',
           proofData,
-          publicInputs: {
-            target_lat,
-            target_lng,
-            radius_km,
-            within_radius: withinRadius,
-            distance_km: Math.round(distance * 10) / 10, // Rounded to protect exact location
-          },
+          publicInputs,
           status: withinRadius ? 'generated' : 'failed',
           error: withinRadius ? undefined : `Location is ${distance.toFixed(1)}km from target, exceeds ${radius_km}km radius`,
         };
@@ -126,18 +164,42 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
         
         const withinRange = timestamp >= notBefore && timestamp <= notAfter;
 
-        const proofData = await generateTimestampProof(timestamp, notBefore, notAfter);
+        let proofData;
+        let publicInputs;
+
+        if (zkAvailable) {
+          // Use full ZK proof generation
+          console.log('🔐 Generating full ZK timestamp proof...');
+          const zkResult = await generateZKTimestampProof({
+            timestamp,
+            notBefore,
+            notAfter,
+          });
+          proofData = zkResult.proof;
+          publicInputs = {
+            not_before: zkResult.publicInputs.notBefore,
+            not_after: zkResult.publicInputs.notAfter,
+            within_range: zkResult.publicInputs.withinRange,
+            proof_type: 'groth16',
+          };
+        } else {
+          // Fallback to commitment-based proof
+          console.log('⚠️ ZK circuits not available, using commitment proof...');
+          proofData = await generateTimestampProofFallback(timestamp, notBefore, notAfter);
+          publicInputs = {
+            timestamp: timestamp.toISOString(),
+            not_before,
+            not_after,
+            within_range: withinRange,
+            proof_type: 'commitment',
+          };
+        }
 
         proof = {
           requirementIndex,
           proofType: 'timestamp_range',
           proofData,
-          publicInputs: {
-            timestamp: timestamp.toISOString(),
-            not_before,
-            not_after,
-            within_range: withinRange,
-          },
+          publicInputs,
           status: withinRange ? 'generated' : 'failed',
           error: withinRange ? undefined : `Timestamp ${timestamp.toISOString()} is outside allowed range`,
         };
@@ -282,13 +344,26 @@ export function ProofGenerator({ requirements, onProofsGenerated }: ProofGenerat
   return (
     <div className="space-y-6">
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
-          🔐 Zero-Knowledge Proof Generation
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-blue-800 dark:text-blue-200">
+            🔐 Zero-Knowledge Proof Generation
+          </h3>
+          {zkAvailable !== null && (
+            <span className={`text-xs px-2 py-1 rounded ${
+              zkAvailable 
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+            }`}>
+              {zkAvailable ? '✓ Full ZK (Groth16)' : '⚠️ Commitment Mode'}
+            </span>
+          )}
+        </div>
         <p className="text-sm text-blue-700 dark:text-blue-300">
           Your evidence is processed <strong>locally in your browser</strong>. 
-          Only the proof (not your actual data) is sent to verify your submission.
-          Your exact location, timestamps, and documents remain private.
+          {zkAvailable 
+            ? ' Full zero-knowledge proofs are generated using Groth16 - mathematically impossible to reverse.'
+            : ' Commitment-based proofs are generated - your data remains private but proofs are simpler.'
+          }
         </p>
       </div>
 
@@ -426,20 +501,8 @@ function convertDMSToDD(dms: number[], ref: string): number {
   return dd;
 }
 
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-// Simplified proof generation (in production, would use snarkjs)
-async function generateLocationProof(
+// Fallback proof generation (when ZK circuits not available)
+async function generateLocationProofFallback(
   actualLat: number, 
   actualLng: number, 
   targetLat: number, 
@@ -463,7 +526,7 @@ async function generateLocationProof(
   };
 }
 
-async function generateTimestampProof(
+async function generateTimestampProofFallback(
   timestamp: Date,
   notBefore: Date,
   notAfter: Date
@@ -477,7 +540,7 @@ async function generateTimestampProof(
   return {
     type: 'timestamp_range',
     commitment,
-    proof: 'placeholder_proof_data',
+    proof: 'commitment_only',
     version: '0.1.0',
   };
 }
