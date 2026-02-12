@@ -419,3 +419,63 @@ export const sourceListHumintItems = pgTable('source_list_humint_items', {
   humintSourceId: uuid('humint_source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
   addedAt: timestamp('added_at').notNull().defaultNow(),
 });
+
+// ============ ZEC Escrow System ============
+
+// Escrow balances (internal tracking before withdrawal)
+export const humintEscrowBalances = pgTable('humint_escrow_balances', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }).unique(),
+  balanceZec: real('balance_zec').notNull().default(0),
+  totalEarnedZec: real('total_earned_zec').notNull().default(0),
+  totalWithdrawnZec: real('total_withdrawn_zec').notNull().default(0),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Withdrawal queue with time-delayed processing
+export const humintWithdrawalQueue = pgTable('humint_withdrawal_queue', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  
+  // Amount in fixed denominations
+  amountZec: real('amount_zec').notNull(),
+  denominations: jsonb('denominations').notNull().default([]), // e.g., [2.5, 2.5] for 5 ZEC
+  
+  // Recipient address (shielded z-address)
+  recipientZAddress: text('recipient_z_address').notNull(),
+  
+  // Time-delayed processing
+  queuedAt: timestamp('queued_at').notNull().defaultNow(),
+  scheduledFor: timestamp('scheduled_for').notNull(), // Random time 1-48h from queuedAt
+  
+  // Status tracking
+  status: text('status').notNull().default('pending'), // pending, processing, completed, failed
+  
+  // Transaction details (after processing)
+  txIds: jsonb('tx_ids').default([]), // Array of tx IDs (one per denomination)
+  errorMessage: text('error_message'),
+  
+  // Completion
+  processedAt: timestamp('processed_at'),
+  completedAt: timestamp('completed_at'),
+});
+
+// Escrow transactions (credits and debits)
+export const humintEscrowTransactions = pgTable('humint_escrow_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  
+  // Transaction type
+  type: text('type').notNull(), // 'credit' (bounty accepted) or 'debit' (withdrawal)
+  amountZec: real('amount_zec').notNull(),
+  
+  // Reference
+  referenceType: text('reference_type'), // 'bounty', 'tip', 'subscription', 'withdrawal'
+  referenceId: uuid('reference_id'),
+  
+  // Balance after transaction
+  balanceAfter: real('balance_after').notNull(),
+  
+  note: text('note'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});

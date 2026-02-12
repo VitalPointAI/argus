@@ -28,6 +28,7 @@ import opsecRoutes from './routes/opsec';
 import zkRoutes from './routes/zk';
 import nftRoutes from './routes/nft';
 import phantomAuthRoutes from './routes/phantom-auth';
+import escrowRoutes from './routes/escrow';
 import { initPhantomAuth } from './services/auth/phantom-auth';
 
 const app = new Hono();
@@ -71,6 +72,7 @@ app.route('/api/zk', zkRoutes);
 app.route('/api/nft', nftRoutes);
 app.route('/api/phantom', phantomAuthRoutes); // Anonymous passkey auth for HUMINT
 app.route('/api/auth/passkey', phantomAuthRoutes); // Also mount at standard path
+app.route('/api/escrow', escrowRoutes); // ZEC escrow and withdrawal system
 
 // Root
 app.get('/', (c) => {
