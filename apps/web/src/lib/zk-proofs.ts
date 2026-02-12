@@ -252,14 +252,14 @@ export async function generateDocumentProof(params: DocumentProofParams): Promis
     const keywordHashes = await Promise.all(
       params.requiredKeywords.map(kw => hashString(kw))
     );
-    while (keywordHashes.length < 10) keywordHashes.push(0n);
+    while (keywordHashes.length < 10) keywordHashes.push(BigInt(0));
 
     // Create preimage (simplified)
     const preimage: [bigint, bigint, bigint, bigint] = [
       docHash, 
       BigInt(params.documentText.length), 
-      0n, 
-      0n
+      BigInt(0), 
+      BigInt(0)
     ];
 
     const input = {
@@ -315,9 +315,9 @@ async function hashString(str: string): Promise<bigint> {
   const hashArray = new Uint8Array(hashBuffer);
   
   // Convert to bigint (truncate to fit field)
-  let hash = 0n;
+  let hash = BigInt(0);
   for (let i = 0; i < 31; i++) { // 31 bytes to stay within field
-    hash = (hash << 8n) + BigInt(hashArray[i]);
+    hash = (hash << BigInt(8)) + BigInt(hashArray[i]);
   }
   return hash;
 }

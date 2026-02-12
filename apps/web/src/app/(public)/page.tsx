@@ -1,26 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AccountTypeModal } from '@/components/AccountTypeModal';
 import { SourceRegistrationModal } from '@/components/SourceRegistrationModal';
 
-export default function LandingPage() {
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showSourceModal, setShowSourceModal] = useState(false);
+// Component that uses useSearchParams - must be wrapped in Suspense
+function SearchParamsHandler({ 
+  onSourceRegister 
+}: { 
+  onSourceRegister: () => void 
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Check for query params to auto-open modals
   useEffect(() => {
     const register = searchParams.get('register');
     if (register === 'source') {
-      setShowSourceModal(true);
+      onSourceRegister();
       // Clean up URL
       router.replace('/', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, onSourceRegister]);
+
+  return null;
+}
+
+export default function LandingPage() {
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showSourceModal, setShowSourceModal] = useState(false);
 
   const handleSourceSelected = () => {
     setShowAccountModal(false);
@@ -29,6 +38,11 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+      {/* Suspense wrapper for useSearchParams */}
+      <Suspense fallback={null}>
+        <SearchParamsHandler onSourceRegister={() => setShowSourceModal(true)} />
+      </Suspense>
+
       {/* Hero Section */}
       <section className="relative pt-20 pb-32 overflow-hidden">
         {/* Background decoration */}
