@@ -185,20 +185,22 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Tabs - scrollable on mobile */}
       <div className="max-w-7xl mx-auto px-4 mt-6">
-        <div className="flex gap-2 border-b border-slate-700">
+        <div className="flex gap-2 border-b border-slate-700 overflow-x-auto pb-px scrollbar-hide">
           {(['overview', 'users', 'sources', 'settings'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 font-medium capitalize ${
+              className={`px-4 py-2 font-medium capitalize whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab
                   ? 'text-blue-400 border-b-2 border-blue-400'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {tab}
+              {tab === 'overview' ? '📊 Overview' : 
+               tab === 'users' ? '👥 Users' :
+               tab === 'sources' ? '🔗 Sources' : '⚙️ Settings'}
             </button>
           ))}
         </div>
@@ -208,8 +210,8 @@ export default function AdminPage() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === 'overview' && stats && (
           <div className="space-y-6">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Stats Grid - responsive */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <StatCard label="Users" value={stats.totals.users} />
               <StatCard label="Sources" value={stats.totals.sources} />
               <StatCard label="Articles" value={stats.totals.articles.toLocaleString()} />
@@ -218,9 +220,9 @@ export default function AdminPage() {
             </div>
 
             {/* Activity */}
-            <div className="bg-slate-800 rounded-lg p-6">
+            <div className="bg-slate-800 rounded-lg p-4 sm:p-6">
               <h2 className="text-lg font-semibold mb-4">Activity</h2>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <div className="text-2xl font-bold text-blue-400">
                     {stats.activity.articlesLast24h}
@@ -350,11 +352,11 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <h2 className="text-lg font-semibold">Platform Settings</h2>
             
             {/* Marketplace Settings */}
-            <div className="bg-slate-800 rounded-lg p-6">
+            <div className="bg-slate-800 rounded-lg p-4 sm:p-6">
               <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
                 🛒 Marketplace Settings
               </h3>
@@ -365,7 +367,7 @@ export default function AdminPage() {
                   <label className="block text-sm font-medium text-slate-300 mb-1">
                     Platform Fee (%)
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                     <input
                       type="number"
                       min="0"
@@ -376,10 +378,10 @@ export default function AdminPage() {
                         ...prev,
                         marketplace_fee_percent: parseFloat(e.target.value)
                       }))}
-                      className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                      className="w-full sm:w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
                     />
                     <span className="text-slate-400 text-sm">
-                      Fee taken from each marketplace transaction
+                      Fee taken from each transaction
                     </span>
                   </div>
                 </div>
@@ -389,7 +391,7 @@ export default function AdminPage() {
                   <label className="block text-sm font-medium text-slate-300 mb-1">
                     Minimum Withdrawal (USDC)
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                     <input
                       type="number"
                       min="0"
@@ -399,10 +401,10 @@ export default function AdminPage() {
                         ...prev,
                         min_withdrawal_usdc: parseFloat(e.target.value)
                       }))}
-                      className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                      className="w-full sm:w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
                     />
                     <span className="text-slate-400 text-sm">
-                      Minimum amount creators can withdraw
+                      Min amount creators can withdraw
                     </span>
                   </div>
                 </div>

@@ -383,11 +383,18 @@ adminRoutes.get('/settings', async (c) => {
   try {
     const settings = await db.select().from(platformSettings);
     
-    // Convert to key-value object
+    // Convert to key-value object, parsing JSON values
     const settingsObj: Record<string, any> = {};
     for (const s of settings) {
+      let parsedValue = s.value;
+      // Try to parse as JSON (for backwards compat with stringified values)
+      try {
+        parsedValue = JSON.parse(s.value);
+      } catch {
+        // Keep as-is if not valid JSON
+      }
       settingsObj[s.key] = {
-        value: s.value,
+        value: parsedValue,
         description: s.description,
         updatedAt: s.updatedAt,
       };
@@ -462,15 +469,20 @@ adminRoutes.post('/settings', async (c) => {
     const adminUser = c.get('adminUser');
     const body = await c.req.json();
     
+    console.log('[Admin] Saving settings:', body);
+    
     const results = [];
     for (const [key, value] of Object.entries(body)) {
+      // Store as string - stringify only objects/arrays, not primitives
+      const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      
       const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
       
       if (existing.length > 0) {
         const [result] = await db
           .update(platformSettings)
           .set({ 
-            value: JSON.stringify(value),
+            value: valueStr,
             updatedBy: adminUser.id,
             updatedAt: new Date(),
           })
@@ -482,7 +494,7 @@ adminRoutes.post('/settings', async (c) => {
           .insert(platformSettings)
           .values({
             key,
-            value: JSON.stringify(value),
+            value: valueStr,
             updatedBy: adminUser.id,
           })
           .returning();
@@ -490,6 +502,7 @@ adminRoutes.post('/settings', async (c) => {
       }
     }
     
+    console.log('[Admin] Settings saved:', results.length, 'keys');
     return c.json({ success: true, data: results });
   } catch (error) {
     console.error('Admin batch update settings error:', error);
