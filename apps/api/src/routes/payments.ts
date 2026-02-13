@@ -4,12 +4,12 @@ import { sourceListPackages, sourceListSubscriptions, users } from '../db/schema
 import { eq, and } from 'drizzle-orm';
 import { getPaymentQuote, getPaymentStatus, submitDeposit, USDC_TOKEN_IDS } from '../services/payments/one-click';
 import { mintAccessPass } from '../services/near/source-list-nft';
+import { getMarketplaceFeePercent } from '../services/platform/settings';
 
 const payments = new Hono();
 
 // Platform treasury address for receiving payments
 const PLATFORM_TREASURY = process.env.PLATFORM_TREASURY_ADDRESS || 'argus-intel.near';
-const PLATFORM_FEE_BPS = 500; // 5%
 
 interface PendingPayment {
   depositAddress: string;
@@ -77,9 +77,10 @@ payments.post('/quote', async (c) => {
       });
     }
 
-    // Calculate split (95% creator, 5% platform)
-    const creatorShare = (pkg.priceUsdc * (10000 - PLATFORM_FEE_BPS)) / 10000;
-    const platformShare = pkg.priceUsdc - creatorShare;
+    // Get dynamic platform fee from settings
+    const feePercent = await getMarketplaceFeePercent();
+    const platformShare = pkg.priceUsdc * (feePercent / 100);
+    const creatorShare = pkg.priceUsdc - platformShare;
 
     // Get user's NEAR address for refunds
     const [user] = await db

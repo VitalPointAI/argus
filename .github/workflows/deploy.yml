@@ -38,5 +38,16 @@ jobs:
             # Clean up old images
             docker image prune -f
             
+            # Build and deploy docs
+            echo "Building docs..."
+            cd /opt/argus/docs
+            npm ci --omit=dev
+            npm run build
+            
+            # Copy to web directory (deploy user has write access via group)
+            rm -rf /var/www/argus-docs/* 2>/dev/null || true
+            cp -r build/* /var/www/argus-docs/ 2>/dev/null || echo "Docs copy failed - check permissions"
+            
             echo "Deploy complete: $(date)"
+            cd /opt/argus
             docker compose ps
