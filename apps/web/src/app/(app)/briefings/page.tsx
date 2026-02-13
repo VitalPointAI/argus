@@ -35,6 +35,8 @@ interface BriefingData {
   id: string;
   type: string;
   summary: string;
+  content?: string; // Full markdown content (executive briefings)
+  title?: string;
   changes: Change[];
   forecasts: Forecast[];
   contentIds: (string | { sources: SourceInfo[] })[];
@@ -308,12 +310,15 @@ function BriefingContent({ briefing }: { briefing: BriefingData }) {
     }
   });
 
-  // Parse executive summary from the summary field
-  const summaryLines = briefing.summary.split('\n');
+  // Use full content if available, otherwise fall back to summary
+  const fullContent = briefing.content || briefing.summary;
+  
+  // Parse executive summary from the content
+  const summaryLines = fullContent.split('\n');
   const execSummaryStart = summaryLines.findIndex(l => l.includes('Executive Briefing') || l.includes('Key Developments'));
   const execSummary = execSummaryStart >= 0 
     ? summaryLines.slice(execSummaryStart).join('\n').replace(/^#+\s*Executive Briefing\s*\n?/, '').replace(/^\*\*Key Developments:\*\*\s*\n?/, '')
-    : briefing.summary;
+    : fullContent;
 
   // Count by significance
   const highCount = briefing.changes?.filter(c => c.significance === 'high').length || 0;

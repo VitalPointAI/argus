@@ -68,6 +68,36 @@ briefingsRoutes.get('/debug/articles', async (c) => {
   }
 });
 
+// Debug endpoint to check briefing content lengths
+briefingsRoutes.get('/debug/briefings', async (c) => {
+  try {
+    const result = await db.select({
+      id: briefings.id,
+      title: briefings.title,
+      type: briefings.type,
+      contentLength: sql<number>`length(content)`,
+      createdAt: briefings.createdAt,
+    })
+      .from(briefings)
+      .orderBy(desc(briefings.createdAt))
+      .limit(10);
+
+    return c.json({
+      success: true,
+      data: result.map(b => ({
+        id: b.id,
+        title: b.title?.substring(0, 50),
+        type: b.type,
+        contentLength: b.contentLength,
+        createdAt: b.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Debug briefings error:', error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
 // Get latest executive briefing for current user
 briefingsRoutes.get('/executive/current', async (c) => {
   const user = c.get('user' as never) as { id: string } | null;
