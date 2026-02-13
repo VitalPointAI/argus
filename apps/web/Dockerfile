@@ -10,6 +10,9 @@ COPY apps/web/package*.json ./apps/web/
 # Install deps
 RUN npm install --include=dev
 
+# Install snarkjs for ZK proof support
+RUN npm install snarkjs
+
 # Copy source and build
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
