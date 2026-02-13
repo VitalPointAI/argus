@@ -250,94 +250,37 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">🏆 Source List Leaderboard</h2>
-              <p className="text-sm text-slate-500">Top performing source lists by {leaderboardSort}</p>
-            </div>
-            <div className="flex gap-2">
-              {(['subscribers', 'revenue', 'rating'] as const).map((sort) => (
-                <button
-                  key={sort}
-                  onClick={() => setLeaderboardSort(sort)}
-                  className={`px-3 py-1 text-sm rounded-full transition ${
-                    leaderboardSort === sort
-                      ? 'bg-argus-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  {sort === 'subscribers' ? '👥 Subscribers' : sort === 'revenue' ? '💰 Revenue' : '⭐ Rating'}
-                </button>
-              ))}
-            </div>
+      {/* Leaderboard Link Card */}
+      <Link 
+        href="/leaderboard"
+        className="block bg-gradient-to-r from-argus-600 to-argus-700 rounded-xl shadow-lg p-6 text-white hover:from-argus-700 hover:to-argus-800 transition-all group"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              🏆 Source List Leaderboard
+            </h2>
+            <p className="text-argus-100 mt-1">
+              See top performing source lists ranked by subscribers, revenue & rating
+            </p>
           </div>
+          <span className="text-2xl group-hover:translate-x-1 transition-transform">→</span>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-700/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Source List</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Creator</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Subscribers</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Revenue</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Rating</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {leaderboard.length > 0 ? (
-                leaderboard.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-2xl ${
-                        item.rank === 1 ? '' : item.rank === 2 ? '' : item.rank === 3 ? '' : 'text-slate-400'
-                      }`}>
-                        {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link 
-                        href={`/marketplace/source-lists/${item.id}`}
-                        className="font-medium text-argus-600 hover:text-argus-700"
-                      >
-                        {item.name}
-                      </Link>
-                      {item.isMarketplaceListed && (
-                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                          Listed
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                      {item.creatorName || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 text-right font-semibold">
-                      {formatNumber(item.totalSubscribers || 0)}
-                    </td>
-                    <td className="px-6 py-4 text-right text-green-600 font-semibold">
-                      ${(item.totalRevenueUsdc || 0).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-amber-500">★</span> {(item.avgRating || 0).toFixed(1)}
-                      <span className="text-slate-400 text-sm ml-1">({item.ratingCount || 0})</span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    No source lists yet. <Link href="/sources/manage" className="text-argus-600 hover:underline">Create one!</Link>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        {/* Quick preview of top 3 */}
+        {leaderboard.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {leaderboard.slice(0, 3).map((item, i) => (
+              <span 
+                key={item.id}
+                className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 rounded-full text-sm"
+              >
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} {item.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </Link>
     </div>
   );
 }

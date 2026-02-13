@@ -52,6 +52,7 @@ export default function NavBar() {
   // Secondary navigation - in "More" dropdown
   const moreLinks = [
     { href: '/marketplace', label: '🛒 Marketplace' },
+    { href: '/leaderboard', label: '🏆 Leaderboard' },
     { href: '/analytics', label: '📊 Analytics' },
     { href: '/domains', label: 'Domains' },
     { href: '/bounties', label: '📋 Intel Bounties' },
