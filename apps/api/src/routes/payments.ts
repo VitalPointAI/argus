@@ -3,7 +3,8 @@ import { db } from '../db';
 import { sourceListPackages, sourceListSubscriptions, users } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getPaymentQuote, getPaymentStatus, submitDeposit, USDC_TOKEN_IDS } from '../services/payments/one-click';
-import { mintAccessPass } from '../services/near/source-list-nft';
+// TODO: Re-enable when near-api-js ESM issue is fixed
+// import { mintAccessPass } from '../services/near/source-list-nft';
 import { getMarketplaceFeePercent } from '../services/platform/settings';
 
 const payments = new Hono();
@@ -253,20 +254,19 @@ async function completeSubscription(pending: PendingPayment, txHash: string): Pr
     .set({ mintedCount: pkg.mintedCount + 1 })
     .where(eq(sourceListPackages.id, pending.packageId));
 
-  // Mint NFT access pass if user has NEAR account
-  if (user?.nearAccountId) {
-    try {
-      await mintAccessPass({
-        listId: pkg.listId,
-        subscriberAccount: user.nearAccountId,
-        packageId: pending.packageId,
-      });
-      console.log(`Minted access pass for ${user.nearAccountId} on list ${pkg.listId}`);
-    } catch (e) {
-      console.error('NFT mint failed (subscription still active):', e);
-      // Subscription is still valid even if NFT mint fails
-    }
-  }
+  // TODO: Mint NFT access pass when near-api-js ESM issue is fixed
+  // if (user?.nearAccountId) {
+  //   try {
+  //     await mintAccessPass({
+  //       listId: pkg.listId,
+  //       subscriberAccount: user.nearAccountId,
+  //       packageId: pending.packageId,
+  //     });
+  //     console.log(`Minted access pass for ${user.nearAccountId} on list ${pkg.listId}`);
+  //   } catch (e) {
+  //     console.error('NFT mint failed (subscription still active):', e);
+  //   }
+  // }
 
   return subscription.id;
 }
