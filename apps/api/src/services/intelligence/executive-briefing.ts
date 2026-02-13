@@ -271,9 +271,20 @@ RULES:
     const stories = JSON.parse(jsonMatch[0]);
     
     return stories.map((s: any, i: number) => {
-      const storyArticles = (s.articleIds || []).map((idx: number) => articles[idx - 1]).filter(Boolean);
-      const avgConf = storyArticles.length > 0 
-        ? Math.round(storyArticles.reduce((sum: number, a: Article) => sum + a.confidenceScore, 0) / storyArticles.length)
+      // Deduplicate article IDs (LLM sometimes returns duplicates)
+      const uniqueIds = [...new Set(s.articleIds || [])] as number[];
+      const storyArticles = uniqueIds.map((idx: number) => articles[idx - 1]).filter(Boolean);
+      
+      // Also deduplicate by URL in case of any edge cases
+      const seenUrls = new Set<string>();
+      const dedupedArticles = storyArticles.filter((a: Article) => {
+        if (seenUrls.has(a.url)) return false;
+        seenUrls.add(a.url);
+        return true;
+      });
+      
+      const avgConf = dedupedArticles.length > 0 
+        ? Math.round(dedupedArticles.reduce((sum: number, a: Article) => sum + a.confidenceScore, 0) / dedupedArticles.length)
         : 50;
       
       return {
@@ -282,7 +293,7 @@ RULES:
         context: s.context,
         latestUpdate: s.latestUpdate,
         significance: s.significance || 'medium',
-        articles: storyArticles.map((a: Article) => ({
+        articles: dedupedArticles.map((a: Article) => ({
           id: a.id,
           title: a.title,
           source: a.sourceName,
