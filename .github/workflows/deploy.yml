@@ -26,13 +26,23 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             
-            # Build and deploy with Docker Compose
-            docker compose down || true
-            docker compose build --no-cache
-            docker compose up -d
+            # Install dependencies if needed
+            npm install --legacy-peer-deps 2>/dev/null || true
             
-            # Clean up old images
-            docker image prune -f
+            # Build API
+            cd apps/api
+            npm run build
+            cd ../..
             
+            # Build Web (clean .next first)
+            cd apps/web
+            rm -rf .next
+            npm run build
+            cd ../..
+            
+            # Restart PM2 services
+            pm2 restart argus-api argus-web
+            
+            # Show status
             echo "Deploy complete: $(date)"
-            docker compose ps
+            pm2 list
