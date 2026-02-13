@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import OneClickPayment from '@/components/OneClickPayment';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -392,51 +393,57 @@ export default function SourceListDetailPage() {
       {/* Subscribe Modal */}
       {showSubscribeModal && selectedPackage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Confirm Subscription</h3>
-            
-            <div className={`rounded-lg p-4 mb-4 ${selectedPackage.priceUsdc === 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-slate-50 dark:bg-slate-700'}`}>
-              <div className="font-semibold">{selectedPackage.name}</div>
-              <div className={`text-2xl font-bold mt-1 ${selectedPackage.priceUsdc === 0 ? 'text-green-600' : 'text-argus-600'}`}>
-                {selectedPackage.priceUsdc === 0 ? '🎁 Free' : `$${selectedPackage.priceUsdc.toFixed(2)}`}
+          {selectedPackage.priceUsdc === 0 ? (
+            // Free package - simple confirmation
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-xl font-bold mb-4">Get Free Access Pass</h3>
+              
+              <div className="rounded-lg p-4 mb-4 bg-green-50 dark:bg-green-900/20">
+                <div className="font-semibold">{selectedPackage.name}</div>
+                <div className="text-2xl font-bold mt-1 text-green-600">🎁 Free</div>
+                <div className="text-sm text-slate-500">
+                  {formatDuration(selectedPackage.durationDays)} access
+                </div>
               </div>
-              <div className="text-sm text-slate-500">
-                {formatDuration(selectedPackage.durationDays)} access
+
+              <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Get your free Access Pass for <strong>{listing.name}</strong> and all future updates.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSubscribeModal(false)}
+                  className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSubscription}
+                  disabled={subscribing}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+                >
+                  {subscribing ? 'Activating...' : 'Get Access Pass'}
+                </button>
               </div>
             </div>
-
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              {selectedPackage.priceUsdc === 0 
-                ? <>Get your free Access Pass for <strong>{listing.name}</strong> and all future updates.</>
-                : <>You'll get immediate access to <strong>{listing.name}</strong> and all future updates.</>
-              }
-            </p>
-
-            {/* TODO: 1Click Payment Widget goes here */}
-            {selectedPackage.priceUsdc > 0 && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                  ⚠️ 1Click payment integration coming soon. For demo, clicking subscribe will grant access.
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSubscribeModal(false)}
-                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSubscription}
-                disabled={subscribing}
-                className="flex-1 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
-              >
-                {subscribing ? 'Processing...' : 'Subscribe'}
-              </button>
+          ) : (
+            // Paid package - 1Click payment flow
+            <div className="max-w-md w-full">
+              <OneClickPayment
+                amountUsdc={selectedPackage.priceUsdc}
+                packageId={selectedPackage.id}
+                listId={listing.id}
+                listName={listing.name}
+                onSuccess={(subscriptionId) => {
+                  setShowSubscribeModal(false);
+                  checkAccess();
+                  // Show success message
+                  alert('🎉 Payment successful! Your access pass has been activated.');
+                }}
+                onCancel={() => setShowSubscribeModal(false)}
+              />
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
