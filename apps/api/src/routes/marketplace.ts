@@ -11,8 +11,31 @@ import {
   domains
 } from '../db/schema';
 import { eq, and, desc, asc, gte, lte, sql, or, ilike } from 'drizzle-orm';
+import { getMarketplaceFeePercent, isMarketplaceEnabled, getPlatformSettings } from '../services/platform/settings';
 
 const app = new Hono();
+
+// ============ Platform Info ============
+
+// Get marketplace settings (public)
+app.get('/settings', async (c) => {
+  try {
+    const settings = await getPlatformSettings();
+    const enabled = await isMarketplaceEnabled();
+    
+    return c.json({
+      success: true,
+      data: {
+        feePercent: settings.marketplace_fee_percent || 5,
+        minWithdrawalUsdc: settings.min_withdrawal_usdc || 10,
+        enabled,
+      }
+    });
+  } catch (error) {
+    console.error('Marketplace settings error:', error);
+    return c.json({ success: false, error: 'Failed to fetch settings' }, 500);
+  }
+});
 
 // ============ Public Marketplace ============
 
@@ -474,8 +497,9 @@ app.post('/subscribe', async (c) => {
       })
       .where(eq(sourceLists.id, pkg.sourceListId));
 
-    // Record earnings
-    const platformFee = pkg.priceUsdc * 0.05;
+    // Record earnings with dynamic platform fee
+    const feePercent = await getMarketplaceFeePercent();
+    const platformFee = pkg.priceUsdc * (feePercent / 100);
     const netAmount = pkg.priceUsdc - platformFee;
 
     await db.insert(creatorEarnings).values({

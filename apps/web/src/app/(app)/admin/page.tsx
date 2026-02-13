@@ -38,8 +38,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sources'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sources' | 'settings'>('overview');
   const [actionMessage, setActionMessage] = useState('');
+  const [platformSettings, setPlatformSettings] = useState<Record<string, any>>({});
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -61,9 +63,10 @@ export default function AdminPage() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, settingsRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/stats`, { headers }),
         fetch(`${API_URL}/api/admin/users`, { headers }),
+        fetch(`${API_URL}/api/admin/settings`, { headers }),
       ]);
 
       if (!statsRes.ok || !usersRes.ok) {
@@ -72,9 +75,18 @@ export default function AdminPage() {
 
       const statsData = await statsRes.json();
       const usersData = await usersRes.json();
+      const settingsData = await settingsRes.json();
 
       setStats(statsData.data);
       setUsers(usersData.data);
+      if (settingsData.success) {
+        // Convert to simpler format
+        const settings: Record<string, any> = {};
+        for (const [key, val] of Object.entries(settingsData.data || {})) {
+          settings[key] = (val as any).value;
+        }
+        setPlatformSettings(settings);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load admin data');
     } finally {
@@ -178,7 +190,7 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 mt-6">
         <div className="flex gap-2 border-b border-slate-700">
-          {(['overview', 'users', 'sources'] as const).map((tab) => (
+          {(['overview', 'users', 'sources', 'settings'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -336,6 +348,174 @@ export default function AdminPage() {
               </Link>
               . Admin features include bulk operations, global source promotion, and user source oversight.
             </p>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold">Platform Settings</h2>
+            
+            {/* Marketplace Settings */}
+            <div className="bg-slate-800 rounded-lg p-6">
+              <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
+                🛒 Marketplace Settings
+              </h3>
+              
+              <div className="space-y-4">
+                {/* Platform Fee */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Platform Fee (%)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={platformSettings.marketplace_fee_percent || 5}
+                      onChange={(e) => setPlatformSettings(prev => ({
+                        ...prev,
+                        marketplace_fee_percent: parseFloat(e.target.value)
+                      }))}
+                      className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                    />
+                    <span className="text-slate-400 text-sm">
+                      Fee taken from each marketplace transaction
+                    </span>
+                  </div>
+                </div>
+
+                {/* Min Withdrawal */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Minimum Withdrawal (USDC)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={platformSettings.min_withdrawal_usdc || 10}
+                      onChange={(e) => setPlatformSettings(prev => ({
+                        ...prev,
+                        min_withdrawal_usdc: parseFloat(e.target.value)
+                      }))}
+                      className="w-32 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                    />
+                    <span className="text-slate-400 text-sm">
+                      Minimum amount creators can withdraw
+                    </span>
+                  </div>
+                </div>
+
+                {/* Platform Wallet */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Platform Wallet
+                  </label>
+                  <input
+                    type="text"
+                    value={platformSettings.platform_wallet || 'argus-intel.near'}
+                    onChange={(e) => setPlatformSettings(prev => ({
+                      ...prev,
+                      platform_wallet: e.target.value
+                    }))}
+                    placeholder="account.near"
+                    className="w-full max-w-md px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                  />
+                  <p className="text-slate-400 text-sm mt-1">
+                    NEAR wallet that receives platform fees
+                  </p>
+                </div>
+
+                {/* Marketplace Enabled */}
+                <div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={platformSettings.marketplace_enabled !== false}
+                      onChange={(e) => setPlatformSettings(prev => ({
+                        ...prev,
+                        marketplace_enabled: e.target.checked
+                      }))}
+                      className="w-5 h-5 rounded"
+                    />
+                    <span className="text-sm font-medium text-slate-300">
+                      Marketplace Enabled
+                    </span>
+                  </label>
+                  <p className="text-slate-400 text-sm mt-1 ml-8">
+                    When disabled, new subscriptions are paused
+                  </p>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="mt-6 pt-4 border-t border-slate-700">
+                <button
+                  onClick={async () => {
+                    setSavingSettings(true);
+                    try {
+                      const res = await fetch(`${API_URL}/api/admin/settings`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify(platformSettings),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setActionMessage('Settings saved successfully');
+                        setTimeout(() => setActionMessage(''), 3000);
+                      } else {
+                        setActionMessage(`Error: ${data.error}`);
+                      }
+                    } catch {
+                      setActionMessage('Failed to save settings');
+                    } finally {
+                      setSavingSettings(false);
+                    }
+                  }}
+                  disabled={savingSettings}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50"
+                >
+                  {savingSettings ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+            </div>
+
+            {/* Current Settings Summary */}
+            <div className="bg-slate-800 rounded-lg p-6">
+              <h3 className="text-md font-semibold mb-4">Current Configuration</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-blue-400">
+                    {platformSettings.marketplace_fee_percent || 5}%
+                  </div>
+                  <div className="text-sm text-slate-400">Platform Fee</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-400">
+                    ${platformSettings.min_withdrawal_usdc || 10}
+                  </div>
+                  <div className="text-sm text-slate-400">Min Withdrawal</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {(100 - (platformSettings.marketplace_fee_percent || 5))}%
+                  </div>
+                  <div className="text-sm text-slate-400">Creator Payout</div>
+                </div>
+                <div>
+                  <div className={`text-2xl font-bold ${platformSettings.marketplace_enabled !== false ? 'text-green-400' : 'text-red-400'}`}>
+                    {platformSettings.marketplace_enabled !== false ? 'ON' : 'OFF'}
+                  </div>
+                  <div className="text-sm text-slate-400">Marketplace</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

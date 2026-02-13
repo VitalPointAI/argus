@@ -1,5 +1,5 @@
 import { Hono, Context } from 'hono';
-import { db, users, sources, content, briefings, domains, apiKeys } from '../db';
+import { db, users, sources, content, briefings, domains, apiKeys, platformSettings } from '../db';
 import { eq, desc, count, and, gte, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
@@ -378,5 +378,128 @@ adminRoutes.delete('/api-keys/:id', async (c) => {
   } catch (error) {
     console.error('Admin delete API key error:', error);
     return c.json({ success: false, error: 'Failed to delete API key' }, 500);
+  }
+});
+
+// ============ Platform Settings ============
+
+/**
+ * GET /admin/settings - Get all platform settings
+ */
+adminRoutes.get('/settings', async (c) => {
+  try {
+    const settings = await db.select().from(platformSettings);
+    
+    // Convert to key-value object
+    const settingsObj: Record<string, any> = {};
+    for (const s of settings) {
+      settingsObj[s.key] = {
+        value: s.value,
+        description: s.description,
+        updatedAt: s.updatedAt,
+      };
+    }
+    
+    return c.json({ success: true, data: settingsObj });
+  } catch (error) {
+    console.error('Admin get settings error:', error);
+    return c.json({ success: false, error: 'Failed to fetch settings' }, 500);
+  }
+});
+
+/**
+ * PUT /admin/settings/:key - Update a platform setting
+ */
+adminRoutes.put('/settings/:key', async (c) => {
+  try {
+    const adminUser = c.get('adminUser');
+    const key = c.req.param('key');
+    const body = await c.req.json();
+    const { value } = body;
+    
+    if (value === undefined) {
+      return c.json({ success: false, error: 'Value required' }, 400);
+    }
+    
+    // Validate specific settings
+    if (key === 'marketplace_fee_percent') {
+      const fee = parseFloat(value);
+      if (isNaN(fee) || fee < 0 || fee > 100) {
+        return c.json({ success: false, error: 'Fee must be 0-100' }, 400);
+      }
+    }
+    
+    // Upsert setting
+    const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+    
+    let result;
+    if (existing.length > 0) {
+      [result] = await db
+        .update(platformSettings)
+        .set({ 
+          value: JSON.stringify(value),
+          updatedBy: adminUser.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(platformSettings.key, key))
+        .returning();
+    } else {
+      [result] = await db
+        .insert(platformSettings)
+        .values({
+          key,
+          value: JSON.stringify(value),
+          updatedBy: adminUser.id,
+        })
+        .returning();
+    }
+    
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Admin update setting error:', error);
+    return c.json({ success: false, error: 'Failed to update setting' }, 500);
+  }
+});
+
+/**
+ * POST /admin/settings - Batch update settings
+ */
+adminRoutes.post('/settings', async (c) => {
+  try {
+    const adminUser = c.get('adminUser');
+    const body = await c.req.json();
+    
+    const results = [];
+    for (const [key, value] of Object.entries(body)) {
+      const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+      
+      if (existing.length > 0) {
+        const [result] = await db
+          .update(platformSettings)
+          .set({ 
+            value: JSON.stringify(value),
+            updatedBy: adminUser.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(platformSettings.key, key))
+          .returning();
+        results.push(result);
+      } else {
+        const [result] = await db
+          .insert(platformSettings)
+          .values({
+            key,
+            value: JSON.stringify(value),
+            updatedBy: adminUser.id,
+          })
+          .returning();
+        results.push(result);
+      }
+    }
+    
+    return c.json({ success: true, data: results });
+  } catch (error) {
+    console.error('Admin batch update settings error:', error);
+    return c.json({ success: false, error: 'Failed to update settings' }, 500);
   }
 });

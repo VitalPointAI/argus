@@ -831,6 +831,15 @@ export const creatorEarnings = pgTable('creator_earnings', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Platform settings (admin configurable)
+export const platformSettings = pgTable('platform_settings', {
+  key: varchar('key', { length: 100 }).primaryKey(),
+  value: jsonb('value').notNull(),
+  description: text('description'),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Source list reviews
 export const sourceListReviews = pgTable('source_list_reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
