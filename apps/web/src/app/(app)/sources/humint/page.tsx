@@ -22,10 +22,12 @@ interface HumintSource {
 }
 
 export default function HumintSourcesPage() {
-  const { user, token } = useAuth();
+  const { user, isHumint } = useAuth();
   const [sources, setSources] = useState<HumintSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mySourceProfile, setMySourceProfile] = useState<HumintSource | null>(null);
+  const [checkingProfile, setCheckingProfile] = useState(false);
   
   // Filters
   const [regionFilter, setRegionFilter] = useState('');
@@ -37,6 +39,32 @@ export default function HumintSourcesPage() {
     fetchSources();
   }, [regionFilter, domainFilter, minReputation, sortBy]);
 
+  // Check if current HUMINT user has a source profile
+  useEffect(() => {
+    if (isHumint && user?.type === 'humint') {
+      checkMySourceProfile();
+    }
+  }, [isHumint, user]);
+
+  const checkMySourceProfile = async () => {
+    if (!user || user.type !== 'humint') return;
+    
+    setCheckingProfile(true);
+    try {
+      const res = await fetch(`${API_URL}/api/humint/sources/${user.codename}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setMySourceProfile(data.data);
+      }
+    } catch (err) {
+      // Not registered yet - that's fine
+    } finally {
+      setCheckingProfile(false);
+    }
+  };
+
   const fetchSources = async () => {
     try {
       setLoading(true);
@@ -47,7 +75,7 @@ export default function HumintSourcesPage() {
       params.set('sort', sortBy);
       
       const res = await fetch(`${API_URL}/api/humint/sources?${params}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        credentials: 'include',
       });
       const data = await res.json();
       
@@ -98,6 +126,54 @@ export default function HumintSourcesPage() {
             ← All Sources
           </Link>
         </div>
+      </div>
+
+      {/* HUMINT User - Register as Source CTA */}
+      {isHumint && user?.type === 'humint' && !checkingProfile && !mySourceProfile && (
+        <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg shadow-lg p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                🎭 Welcome, {user.codename}!
+              </h2>
+              <p className="text-purple-100 mt-1">
+                You have an anonymous identity. Complete your source profile to start sharing intel and earning rewards.
+              </p>
+            </div>
+            <Link
+              href="/sources/humint/register"
+              className="px-6 py-3 bg-white text-purple-700 font-semibold rounded-lg hover:bg-purple-50 transition text-center shrink-0"
+            >
+              Complete Source Registration →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* HUMINT User - Already Registered */}
+      {isHumint && mySourceProfile && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">✅</span>
+              <div>
+                <p className="font-medium text-green-800 dark:text-green-200">
+                  You're registered as <strong>{mySourceProfile.codename}</strong>
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {mySourceProfile.totalSubmissions} submissions • {mySourceProfile.subscriberCount} subscribers
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/sources/humint/${mySourceProfile.codename}`}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition"
+            >
+              View Profile
+            </Link>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Filters */}
