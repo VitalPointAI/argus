@@ -108,7 +108,7 @@ export default function MarketplacePage() {
           </h1>
           <p className="text-xl text-white/90 mb-6">
             Subscribe to curated source lists from expert analysts. 
-            NFT-powered access passes with instant delivery.
+            Get Access Passes with instant delivery.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -138,9 +138,9 @@ export default function MarketplacePage() {
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg p-6 text-center">
           <div className="text-4xl mb-3">🎫</div>
-          <h3 className="font-semibold text-lg mb-2">NFT Access Passes</h3>
+          <h3 className="font-semibold text-lg mb-2">Access Passes</h3>
           <p className="text-slate-500 text-sm">
-            Subscribe with any token - get an NFT that grants access to latest content
+            Subscribe with any token - get a pass that grants access to latest content
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg p-6 text-center">

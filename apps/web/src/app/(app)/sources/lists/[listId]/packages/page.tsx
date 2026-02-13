@@ -282,6 +282,27 @@ export default function PackageBuilderPage() {
               />
             </div>
 
+            {/* Free Tier Toggle */}
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+              <input
+                type="checkbox"
+                id="freeTier"
+                checked={formData.priceUsdc === '0'}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  priceUsdc: e.target.checked ? '0' : '' 
+                }))}
+                className="w-5 h-5 rounded text-argus-600"
+              />
+              <label htmlFor="freeTier" className="flex-1">
+                <span className="font-medium">Free Tier</span>
+                <p className="text-sm text-slate-500">
+                  Users get a free Access Pass for analytics tracking. Great for building audience!
+                </p>
+              </label>
+              <span className="text-2xl">🎁</span>
+            </div>
+
             {/* Price & Duration */}
             <div className="grid md:grid-cols-2 gap-4">
               <div>
@@ -294,8 +315,12 @@ export default function PackageBuilderPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, priceUsdc: e.target.value }))}
                   placeholder="9.99"
                   required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+                  disabled={formData.priceUsdc === '0'}
+                  className={`w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 ${formData.priceUsdc === '0' ? 'opacity-50' : ''}`}
                 />
+                {formData.priceUsdc === '0' && (
+                  <p className="text-sm text-green-600 mt-1">✓ Free - users only pay gas fees</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Duration</label>
@@ -373,7 +398,7 @@ export default function PackageBuilderPage() {
             {/* Image CID */}
             <div>
               <label className="block text-sm font-medium mb-1">
-                NFT Image (IPFS CID) <span className="text-slate-400 font-normal">(optional)</span>
+                Access Pass Image (IPFS CID) <span className="text-slate-400 font-normal">(optional)</span>
               </label>
               <input
                 type="text"
@@ -383,7 +408,7 @@ export default function PackageBuilderPage() {
                 className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Upload your image to IPFS and paste the CID here
+                Upload your image to IPFS and paste the CID here. This appears on the subscriber's Access Pass.
               </p>
             </div>
 

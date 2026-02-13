@@ -295,10 +295,14 @@ export default function SourceListDetailPage() {
                 }`}
               >
                 {/* Package Image or Header */}
-                <div className="bg-gradient-to-r from-slate-700 to-slate-800 p-4 text-white">
+                <div className={`p-4 text-white ${pkg.priceUsdc === 0 ? 'bg-gradient-to-r from-green-600 to-green-700' : 'bg-gradient-to-r from-slate-700 to-slate-800'}`}>
                   <h3 className="text-xl font-bold">{pkg.name}</h3>
                   <div className="text-3xl font-bold mt-2">
-                    ${pkg.priceUsdc.toFixed(2)}
+                    {pkg.priceUsdc === 0 ? (
+                      <>🎁 Free</>
+                    ) : (
+                      <>${pkg.priceUsdc.toFixed(2)}</>
+                    )}
                     <span className="text-sm font-normal opacity-75">
                       {' '}/ {formatDuration(pkg.durationDays)}
                     </span>
@@ -391,10 +395,10 @@ export default function SourceListDetailPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
             <h3 className="text-xl font-bold mb-4">Confirm Subscription</h3>
             
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4 mb-4">
+            <div className={`rounded-lg p-4 mb-4 ${selectedPackage.priceUsdc === 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-slate-50 dark:bg-slate-700'}`}>
               <div className="font-semibold">{selectedPackage.name}</div>
-              <div className="text-2xl font-bold text-argus-600 mt-1">
-                ${selectedPackage.priceUsdc.toFixed(2)}
+              <div className={`text-2xl font-bold mt-1 ${selectedPackage.priceUsdc === 0 ? 'text-green-600' : 'text-argus-600'}`}>
+                {selectedPackage.priceUsdc === 0 ? '🎁 Free' : `$${selectedPackage.priceUsdc.toFixed(2)}`}
               </div>
               <div className="text-sm text-slate-500">
                 {formatDuration(selectedPackage.durationDays)} access
@@ -402,15 +406,20 @@ export default function SourceListDetailPage() {
             </div>
 
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              You'll get immediate access to <strong>{listing.name}</strong> and all future updates.
+              {selectedPackage.priceUsdc === 0 
+                ? <>Get your free Access Pass for <strong>{listing.name}</strong> and all future updates.</>
+                : <>You'll get immediate access to <strong>{listing.name}</strong> and all future updates.</>
+              }
             </p>
 
             {/* TODO: 1Click Payment Widget goes here */}
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                ⚠️ 1Click payment integration coming soon. For demo, clicking subscribe will grant access.
-              </p>
-            </div>
+            {selectedPackage.priceUsdc > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  ⚠️ 1Click payment integration coming soon. For demo, clicking subscribe will grant access.
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button

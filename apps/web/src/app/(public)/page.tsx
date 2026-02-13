@@ -161,10 +161,10 @@ export default function LandingPage() {
                 🎨
               </div>
               <h3 className="text-xl font-semibold text-white mb-3">
-                NFT Source Lists
+                Source List Marketplace
               </h3>
               <p className="text-slate-400">
-                Curate and monetize source collections as NFTs. Subscribe to expert-curated intelligence feeds.
+                Curate and monetize source collections. Subscribe to expert-curated intelligence feeds with Access Passes.
               </p>
             </div>
 

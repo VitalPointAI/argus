@@ -242,10 +242,10 @@ export default function SourceListMarketplacePage() {
                   <div className="text-sm text-slate-500">
                     by {listing.creatorName}
                   </div>
-                  <div className="font-semibold text-argus-600">
-                    {listing.minPackagePrice !== null 
-                      ? `From $${listing.minPackagePrice.toFixed(2)}`
-                      : 'Free'}
+                  <div className={`font-semibold ${listing.minPackagePrice === 0 || listing.minPackagePrice === null ? 'text-green-600' : 'text-argus-600'}`}>
+                    {listing.minPackagePrice === null || listing.minPackagePrice === 0
+                      ? '🎁 Free'
+                      : `From $${listing.minPackagePrice.toFixed(2)}`}
                   </div>
                 </div>
               </div>
