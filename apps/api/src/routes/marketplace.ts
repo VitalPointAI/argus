@@ -92,11 +92,16 @@ app.get('/listings', async (c) => {
         AND EXISTS (SELECT 1 FROM source_list_packages WHERE source_list_id = source_lists.id AND is_active = true)
     `);
 
+    // Handle different response formats from db.execute
+    const listingData = Array.isArray(listings) ? listings : (listings.rows || []);
+    const countData = Array.isArray(countResult) ? countResult : (countResult.rows || []);
+    const totalCount = countData[0]?.count ? parseInt(String(countData[0].count)) : 0;
+
     return c.json({
       success: true,
-      data: listings.rows,
+      data: listingData,
       pagination: {
-        total: parseInt(countResult.rows[0]?.count as string || '0'),
+        total: totalCount,
         limit: parseInt(limit),
         offset: parseInt(offset),
       }
