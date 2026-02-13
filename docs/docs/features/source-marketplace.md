@@ -111,4 +111,4 @@ View your subscriptions at `/marketplace/my-subscriptions`:
 
 ## API Reference
 
-See [Access Passes](/docs/features/access-passes) for API endpoints.
+See [Access Passes](./access-passes) for API endpoints.
