@@ -1001,8 +1001,8 @@ export default function SettingsPage() {
                   emailPrefs.enabled ? 'bg-argus-600' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               >
-                <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                  emailPrefs.enabled ? 'translate-x-8' : 'translate-x-1'
+                <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  emailPrefs.enabled ? 'translate-x-[34px]' : 'translate-x-1'
                 }`} />
               </button>
             </div>
@@ -1038,8 +1038,8 @@ export default function SettingsPage() {
                         emailPrefs.briefings.enabled ? 'bg-argus-600' : 'bg-slate-300 dark:bg-slate-600'
                       }`}
                     >
-                      <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                        emailPrefs.briefings.enabled ? 'translate-x-8' : 'translate-x-1'
+                      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                        emailPrefs.briefings.enabled ? 'translate-x-[34px]' : 'translate-x-1'
                       }`} />
                     </button>
                   </div>
@@ -1163,8 +1163,8 @@ export default function SettingsPage() {
                         emailPrefs.alerts.enabled ? 'bg-argus-600' : 'bg-slate-300 dark:bg-slate-600'
                       }`}
                     >
-                      <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                        emailPrefs.alerts.enabled ? 'translate-x-8' : 'translate-x-1'
+                      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                        emailPrefs.alerts.enabled ? 'translate-x-[34px]' : 'translate-x-1'
                       }`} />
                     </button>
                   </div>
@@ -1205,8 +1205,8 @@ export default function SettingsPage() {
                         emailPrefs.digest.enabled ? 'bg-argus-600' : 'bg-slate-300 dark:bg-slate-600'
                       }`}
                     >
-                      <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                        emailPrefs.digest.enabled ? 'translate-x-8' : 'translate-x-1'
+                      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                        emailPrefs.digest.enabled ? 'translate-x-[34px]' : 'translate-x-1'
                       }`} />
                     </button>
                   </div>
