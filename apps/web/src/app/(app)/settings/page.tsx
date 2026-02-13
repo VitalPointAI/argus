@@ -27,7 +27,7 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
     setLoadingBalance(true);
     try {
       // Query NEAR RPC for account balance
-      const res = await fetch('https://rpc.mainnet.near.org', {
+      const res = await fetch('https://rpc.mainnet.fastnear.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -131,8 +131,8 @@ export class IntelRegistryClient {
       networkId: this.networkId,
       keyStore,
       nodeUrl: this.networkId === 'mainnet' 
-        ? 'https://rpc.mainnet.near.org'
-        : 'https://rpc.testnet.near.org',
+        ? 'https://rpc.mainnet.fastnear.com'
+        : 'https://rpc.testnet.fastnear.com',
       walletUrl: this.networkId === 'mainnet'
         ? 'https://wallet.near.org'
         : 'https://wallet.testnet.near.org',
