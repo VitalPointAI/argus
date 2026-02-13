@@ -33,6 +33,7 @@ import phantomAuthRoutes from './routes/phantom-auth';
 import escrowRoutes from './routes/escrow';
 import marketplaceRoutes from './routes/marketplace';
 import accessRoutes from './routes/access';
+import analyticsRoutes from './routes/analytics';
 // TODO: Fix near-api-js ESM/CJS compatibility with Node 22
 // import nearRegistryRoutes from './routes/near-registry';
 import { initPhantomAuth } from './services/auth/phantom-auth';
@@ -83,6 +84,7 @@ app.route('/api/subscriptions', subscriptionsRoutes); // Subscriber approval wor
 app.route('/api/feed', feedRoutes); // Source feed items (intel published here)
 app.route('/api/marketplace', marketplaceRoutes); // Source list NFT marketplace
 app.route('/api/access', accessRoutes); // On-chain Access Pass verification
+app.route('/api/analytics', analyticsRoutes); // Platform analytics and leaderboards
 // app.route('/api/near', nearRegistryRoutes); // On-chain proof verification via NEAR (disabled: near-api-js ESM issue)
 
 // Root
