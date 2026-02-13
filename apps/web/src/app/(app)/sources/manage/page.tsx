@@ -60,7 +60,7 @@ export default function SourceManagePageWrapper() {
 }
 
 function SourceManagePage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -107,15 +107,10 @@ function SourceManagePage() {
   
   const fetchData = async () => {
     try {
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
       const [sourcesRes, domainsRes, userInfoRes] = await Promise.all([
-        fetch(`${API_URL}/api/sources`, { headers, cache: 'no-store' }),
+        fetch(`${API_URL}/api/sources`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${API_URL}/api/v1/domains`, { cache: 'no-store' }),
-        fetch(`${API_URL}/api/sources/user/info`, { headers }),
+        fetch(`${API_URL}/api/sources/user/info`, { credentials: 'include' }),
       ]);
       
       const sourcesData = await sourcesRes.json();
@@ -127,8 +122,8 @@ function SourceManagePage() {
       setIsAdmin(userInfo.data?.isAdmin || false);
       
       // Fetch source lists if authenticated
-      if (token) {
-        const listsRes = await fetch(`${API_URL}/api/sources/lists/my`, { headers });
+      if (user) {
+        const listsRes = await fetch(`${API_URL}/api/sources/lists/my`, { credentials: 'include' });
         const listsData = await listsRes.json();
         if (listsData.success) {
           setSourceLists(listsData.data || []);
@@ -136,7 +131,7 @@ function SourceManagePage() {
       }
       
       // Fetch HUMINT sources
-      const humintRes = await fetch(`${API_URL}/api/humint/sources?limit=50`, { headers });
+      const humintRes = await fetch(`${API_URL}/api/humint/sources?limit=50`, { credentials: 'include' });
       const humintData = await humintRes.json();
       if (humintData.success) {
         setHumintSources(humintData.data || []);
@@ -161,7 +156,7 @@ function SourceManagePage() {
   // Create source
   const handleSubmitSource = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) {
+    if (!user) {
       setError('Please log in to add sources');
       return;
     }
@@ -172,10 +167,8 @@ function SourceManagePage() {
     try {
       const res = await fetch(`${API_URL}/api/sources`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...sourceFormData,
           domainId: sourceFormData.domainId || null,
@@ -202,7 +195,7 @@ function SourceManagePage() {
   // Create source list
   const handleSubmitList = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) {
+    if (!user) {
       setError('Please log in to create lists');
       return;
     }
@@ -213,10 +206,8 @@ function SourceManagePage() {
     try {
       const res = await fetch(`${API_URL}/api/sources/lists`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(listFormData),
       });
       
@@ -239,15 +230,13 @@ function SourceManagePage() {
   
   // Toggle active status
   const toggleActive = async (source: Source) => {
-    if (!token) return;
+    if (!user) return;
     
     try {
       const res = await fetch(`${API_URL}/api/sources/${source.id}`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ isActive: !source.isActive }),
       });
       
@@ -266,15 +255,13 @@ function SourceManagePage() {
   
   // Update reliability score
   const updateReliability = async (source: Source, score: number) => {
-    if (!token) return;
+    if (!user) return;
     
     try {
       const res = await fetch(`${API_URL}/api/sources/${source.id}`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ reliabilityScore: score }),
       });
       
@@ -290,12 +277,12 @@ function SourceManagePage() {
   
   // Delete source
   const confirmDeleteSource = async () => {
-    if (!deleteId || !token) return;
+    if (!deleteId || !user) return;
     
     try {
       const res = await fetch(`${API_URL}/api/sources/${deleteId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       
       const data = await res.json();
@@ -315,12 +302,12 @@ function SourceManagePage() {
   
   // Delete list
   const confirmDeleteList = async () => {
-    if (!deleteListId || !token) return;
+    if (!deleteListId || !user) return;
     
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/${deleteListId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       
       const data = await res.json();
@@ -464,7 +451,6 @@ function SourceManagePage() {
           {/* AI Source Assistant */}
           {showSourceForm && (
             <SourceAssistant 
-              token={token} 
               onSourceAdded={() => {
                 fetchData();
                 showSuccess('Source added successfully!');

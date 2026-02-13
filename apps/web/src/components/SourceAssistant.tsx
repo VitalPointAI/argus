@@ -23,7 +23,6 @@ interface Domain {
 }
 
 interface Props {
-  token: string | null;
   onSourceAdded?: () => void;
 }
 
@@ -47,7 +46,7 @@ const sourceTypeLabels: Record<string, string> = {
   unknown: 'Unknown',
 };
 
-export default function SourceAssistant({ token, onSourceAdded }: Props) {
+export default function SourceAssistant({ onSourceAdded }: Props) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<SourceAnalysis | null>(null);
@@ -69,10 +68,8 @@ export default function SourceAssistant({ token, onSourceAdded }: Props) {
     try {
       const res = await fetch(`${API_URL}/api/sources/analyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ input: input.trim() }),
       });
 
@@ -103,10 +100,8 @@ export default function SourceAssistant({ token, onSourceAdded }: Props) {
     try {
       const res = await fetch(`${API_URL}/api/sources/from-analysis`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           analysis,
           domainId: selectedDomain,
