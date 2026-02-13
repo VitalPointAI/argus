@@ -1,0 +1,83 @@
+# Argus Content Gate - Shade Agent Deployment
+# Deploy to Phala Cloud TEE for trustless content gating
+
+# environment: local | TEE
+environment: TEE
+
+# network: testnet | mainnet
+network: mainnet
+
+# Path to docker-compose file
+docker_compose_path: ./docker-compose.yaml
+
+agent_contract:
+  # NEAR Account Id for the shade agent contract
+  # This will be created as a subaccount of the master account
+  contract_id: shade-gate.argus-intel.near
+
+  deploy_custom:
+    enabled: true
+    # Amount to fund the agent contract with in NEAR
+    funding_amount: 5
+    # Lock the contract after deployment
+    delete_key: true
+
+    # Build contract from shade template
+    deploy_from_source:
+      enabled: false
+    deploy_from_wasm:
+      enabled: false
+    # Use the standard shade agent contract
+    use_global_by_hash:
+      enabled: true
+      global_hash: 8eHvv9q4eovoUgDXYEduwv3dbcfXkCyPP9TSmhUSxkcm
+
+    init:
+      enabled: true
+      method_name: new
+      args: |
+        {
+          "requires_tee": <REQUIRES_TEE>,
+          "attestation_expiration_time_ms": <7_DAYS>,
+          "owner_id": <MASTER_ACCOUNT_ID>,
+          "mpc_contract_id": <DEFAULT_MPC_CONTRACT_ID>
+        }
+
+# Approve measurements for the TEE
+approve_measurements:
+  enabled: true
+  method_name: approve_measurements
+  args: |
+    {
+      "measurements": <MEASUREMENTS>
+    }
+
+# Approve PPIDs for Phala Cloud
+approve_ppids:
+  enabled: true
+  method_name: approve_ppids
+  args: |
+    {
+      "ppids": <PPIDS>
+    }
+
+# Build Docker image for Phala Cloud
+build_docker_image:
+  enabled: true
+  tag: vitalpoint/argus-content-gate
+  cache: true
+  dockerfile_path: ./Dockerfile
+
+# Deploy to Phala Cloud TEE
+deploy_to_phala:
+  enabled: true
+  app_name: argus-content-gate
+  env_file_path: ./.env
+
+# Local whitelist (for testing)
+whitelist_agent_for_local:
+  method_name: whitelist_agent_for_local
+  args: |
+    {
+      "account_id": <AGENT_ACCOUNT_ID>
+    }

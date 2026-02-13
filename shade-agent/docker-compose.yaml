@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  argus-content-gate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3140:3140"
+    environment:
+      - API_PORT=3140
+      - NFT_CONTRACT=source-lists.argus-intel.near
+      - NEAR_RPC=https://rpc.mainnet.fastnear.com
+      - ADMIN_ACCOUNT=argus-intel.near
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3140/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

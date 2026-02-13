@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
         'features/intel-bounties',
         'features/zk-proofs',
         'features/near-verification',
+        'features/shade-agent',
       ],
     },
     {
