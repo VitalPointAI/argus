@@ -6,265 +6,307 @@ import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
-interface NftListing {
-  tokenId: string;
+interface SourceListListing {
+  id: string;
   name: string;
   description: string;
-  sourceCount: number;
-  domain: string;
-  creator: string;
-  owner: string;
-  price?: string;
-  royaltyPercent: number;
-  isActive: boolean;
+  marketplaceDescription: string;
+  marketplaceImageCid: string | null;
+  domainName: string | null;
+  creatorName: string;
+  totalSubscribers: number;
+  avgRating: number;
+  ratingCount: number;
+  minPackagePrice: number | null;
 }
 
-interface ContractInfo {
-  network: string;
-  nftContract: string;
-  dataRegistryContract: string;
-  rpcEndpoint: string;
+interface Subscription {
+  id: string;
+  sourceListId: string;
+  listName: string;
+  packageName: string;
+  expiresAt: string | null;
+  status: string;
+}
+
+interface MarketplaceSettings {
+  feePercent: number;
+  enabled: boolean;
 }
 
 export default function MarketplacePage() {
-  const { user, token } = useAuth();
-  const [listings, setListings] = useState<NftListing[]>([]);
-  const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
+  const { user } = useAuth();
+  const [featuredListings, setFeaturedListings] = useState<SourceListListing[]>([]);
+  const [mySubscriptions, setMySubscriptions] = useState<Subscription[]>([]);
+  const [settings, setSettings] = useState<MarketplaceSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchContractInfo();
-    fetchListings();
-  }, []);
+    fetchData();
+  }, [user]);
 
-  const fetchContractInfo = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/nft/contract-info`);
-      const data = await res.json();
-      if (data.success) {
-        setContractInfo(data.data);
+      // Fetch marketplace settings
+      const settingsRes = await fetch(`${API_URL}/api/marketplace/settings`);
+      const settingsData = await settingsRes.json();
+      if (settingsData.success) {
+        setSettings(settingsData.data);
+      }
+
+      // Fetch featured/popular listings
+      const listingsRes = await fetch(`${API_URL}/api/marketplace/listings?sort=popular&limit=6`);
+      const listingsData = await listingsRes.json();
+      if (listingsData.success) {
+        setFeaturedListings(listingsData.data);
+      }
+
+      // Fetch user's subscriptions
+      if (user) {
+        const subsRes = await fetch(`${API_URL}/api/marketplace/my-subscriptions`, {
+          credentials: 'include',
+        });
+        const subsData = await subsRes.json();
+        if (subsData.success) {
+          setMySubscriptions(subsData.data);
+        }
       }
     } catch (err) {
-      console.error('Failed to fetch contract info:', err);
-    }
-  };
-
-  const fetchListings = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_URL}/api/nft/marketplace`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        setListings(data.data);
-      } else {
-        setError(data.error || 'Failed to load marketplace');
-      }
-    } catch (err) {
-      setError('Failed to load marketplace');
+      console.error('Failed to fetch marketplace data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <span className="text-4xl">🎨</span>
-            Source List Marketplace
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Trade curated intelligence source lists as NFTs
-          </p>
-        </div>
-        <div className="flex gap-3 flex-wrap">
-          <Link
-            href="/sources/manage"
-            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-          >
-            My Source Lists
-          </Link>
-        </div>
-      </div>
+  const renderStars = (rating: number) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span key={i} className={i <= rating ? 'text-yellow-400' : 'text-slate-300'}>
+          ★
+        </span>
+      );
+    }
+    return stars;
+  };
 
-      {/* Contract Info Banner */}
-      {contractInfo && (
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-4 flex-wrap text-sm">
-            <span className="font-semibold text-purple-700 dark:text-purple-300">
-              ⛓️ NEAR {contractInfo.network.toUpperCase()}
-            </span>
-            <span className="text-slate-600 dark:text-slate-400">
-              Contract: <code className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded">{contractInfo.nftContract}</code>
-            </span>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-slate-500">Loading marketplace...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-argus-600 via-purple-600 to-indigo-700 rounded-2xl p-8 text-white">
+        <div className="max-w-2xl">
+          <h1 className="text-4xl font-bold mb-4">
+            🛒 Intelligence Marketplace
+          </h1>
+          <p className="text-xl text-white/90 mb-6">
+            Subscribe to curated source lists from expert analysts. 
+            NFT-powered access passes with instant delivery.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/marketplace/source-lists"
+              className="px-6 py-3 bg-white text-argus-700 font-semibold rounded-lg hover:bg-white/90 transition"
+            >
+              Browse All Lists →
+            </Link>
+            <Link
+              href="/sources/manage"
+              className="px-6 py-3 bg-white/20 text-white font-semibold rounded-lg hover:bg-white/30 transition border border-white/30"
+            >
+              Sell Your Lists
+            </Link>
           </div>
         </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-500">Loading marketplace...</div>
-        </div>
-      )}
-
-      {/* Listings Grid */}
-      {!loading && listings.length > 0 && (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {listings.map((nft) => (
-            <div
-              key={nft.tokenId}
-              className="bg-white dark:bg-slate-800 rounded-lg shadow hover:shadow-lg transition p-6"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    {nft.name}
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-                    {nft.description}
-                  </p>
-                </div>
-                {nft.price && (
-                  <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-bold">
-                    {nft.price} Ⓝ
-                  </div>
-                )}
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="text-slate-500">Sources:</span>
-                  <span className="ml-2 font-semibold">{nft.sourceCount}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Domain:</span>
-                  <span className="ml-2 font-semibold">{nft.domain}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Royalty:</span>
-                  <span className="ml-2 font-semibold">{nft.royaltyPercent}%</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Status:</span>
-                  <span className={`ml-2 font-semibold ${nft.isActive ? 'text-green-600' : 'text-slate-400'}`}>
-                    {nft.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Creator */}
-              <div className="text-xs text-slate-500 mb-4">
-                Created by: <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">{nft.creator}</code>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Link
-                  href={`/marketplace/${nft.tokenId}`}
-                  className="flex-1 text-center px-4 py-2 bg-argus-600 text-white rounded-lg hover:bg-argus-700 transition font-medium"
-                >
-                  View Details
-                </Link>
-                {nft.price && (
-                  <button
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
-                    onClick={() => alert('Connect NEAR wallet to purchase')}
-                  >
-                    Buy
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loading && listings.length === 0 && (
-        <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg shadow">
-          <div className="text-6xl mb-4">🎨</div>
-          <h3 className="text-xl font-semibold mb-2">No NFTs Listed Yet</h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-md mx-auto">
-            The marketplace is empty. Be the first to mint a source list NFT and start trading curated intelligence!
-          </p>
-          <Link
-            href="/sources/manage"
-            className="inline-block px-6 py-3 bg-argus-600 text-white rounded-lg hover:bg-argus-700 transition font-medium"
-          >
-            Create a Source List
-          </Link>
-        </div>
-      )}
+      </div>
 
       {/* How It Works */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6">
-        <h3 className="font-semibold mb-4 text-lg">How NFT Source Lists Work</h3>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div>
-            <div className="text-2xl mb-2">1️⃣</div>
-            <h4 className="font-medium mb-1">Create & Curate</h4>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Build a source list in your dashboard. Add high-quality sources, set domains, and refine your curation.
-            </p>
-          </div>
-          <div>
-            <div className="text-2xl mb-2">2️⃣</div>
-            <h4 className="font-medium mb-1">Mint as NFT</h4>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Convert your list to an NFT. Data is encrypted and stored on IPFS. Ownership is recorded on NEAR.
-            </p>
-          </div>
-          <div>
-            <div className="text-2xl mb-2">3️⃣</div>
-            <h4 className="font-medium mb-1">Trade & Earn</h4>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              List for sale, set your price. Earn royalties on secondary sales. Buyers get access to your curated sources.
-            </p>
-          </div>
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 text-center">
+          <div className="text-4xl mb-3">📋</div>
+          <h3 className="font-semibold text-lg mb-2">Curated Sources</h3>
+          <p className="text-slate-500 text-sm">
+            Expert analysts curate and maintain high-quality source lists across domains
+          </p>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 text-center">
+          <div className="text-4xl mb-3">🎫</div>
+          <h3 className="font-semibold text-lg mb-2">NFT Access Passes</h3>
+          <p className="text-slate-500 text-sm">
+            Subscribe with any token - get an NFT that grants access to latest content
+          </p>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 text-center">
+          <div className="text-4xl mb-3">💰</div>
+          <h3 className="font-semibold text-lg mb-2">Direct Payments</h3>
+          <p className="text-slate-500 text-sm">
+            {settings ? `${100 - settings.feePercent}%` : '95%'} goes directly to creators. No middlemen.
+          </p>
         </div>
       </div>
 
-      {/* Benefits */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <span>👤</span> For Curators
-          </h3>
-          <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-            <li>• Monetize your research and curation work</li>
-            <li>• Earn ongoing royalties from resales</li>
-            <li>• Build reputation as a trusted curator</li>
-            <li>• Keep control with encrypted data</li>
-          </ul>
+      {/* My Subscriptions */}
+      {user && mySubscriptions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">My Subscriptions</h2>
+            <Link
+              href="/marketplace/my-subscriptions"
+              className="text-argus-600 hover:text-argus-700 text-sm"
+            >
+              View All →
+            </Link>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mySubscriptions.slice(0, 3).map((sub) => (
+              <Link
+                key={sub.id}
+                href={`/sources/lists/${sub.sourceListId}`}
+                className="bg-white dark:bg-slate-800 rounded-lg p-4 hover:shadow-lg transition border border-slate-200 dark:border-slate-700"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{sub.listName}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    sub.status === 'active' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {sub.status}
+                  </span>
+                </div>
+                <div className="text-sm text-slate-500">
+                  {sub.packageName}
+                  {sub.expiresAt && (
+                    <span className="ml-2">
+                      · Expires {new Date(sub.expiresAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <span>🔍</span> For Analysts
-          </h3>
-          <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-            <li>• Access expertly curated source collections</li>
-            <li>• Skip the research, get straight to analysis</li>
-            <li>• Verified quality through marketplace ratings</li>
-            <li>• Support independent curators</li>
-          </ul>
+      )}
+
+      {/* Featured Listings */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Popular Source Lists</h2>
+          <Link
+            href="/marketplace/source-lists"
+            className="text-argus-600 hover:text-argus-700 text-sm"
+          >
+            Browse All →
+          </Link>
+        </div>
+        
+        {featuredListings.length > 0 ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featuredListings.map((listing) => (
+              <Link
+                key={listing.id}
+                href={`/marketplace/source-lists/${listing.id}`}
+                className="bg-white dark:bg-slate-800 rounded-lg shadow hover:shadow-lg transition overflow-hidden group"
+              >
+                {/* Image */}
+                <div className="aspect-video bg-gradient-to-br from-argus-500 to-argus-700 relative">
+                  {listing.marketplaceImageCid ? (
+                    <img
+                      src={`https://ipfs.io/ipfs/${listing.marketplaceImageCid}`}
+                      alt={listing.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-white/50 text-6xl">
+                      📋
+                    </div>
+                  )}
+                  {listing.domainName && (
+                    <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 text-white text-xs rounded">
+                      {listing.domainName}
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg group-hover:text-argus-600 transition line-clamp-1">
+                    {listing.name}
+                  </h3>
+                  
+                  <div className="flex items-center gap-2 mt-2 text-sm">
+                    {renderStars(Math.round(listing.avgRating))}
+                    <span className="text-slate-500">({listing.ratingCount})</span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500">{listing.totalSubscribers} subscribers</span>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    <div className="text-sm text-slate-500">
+                      by {listing.creatorName}
+                    </div>
+                    <div className="font-semibold text-argus-600">
+                      {listing.minPackagePrice !== null 
+                        ? `From $${listing.minPackagePrice.toFixed(2)}`
+                        : 'Free'}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
+            <div className="text-4xl mb-4">🚀</div>
+            <h3 className="text-lg font-semibold mb-2">Marketplace Coming Soon</h3>
+            <p className="text-slate-500 mb-4">
+              Be the first to list your curated source collection!
+            </p>
+            <Link
+              href="/sources/manage"
+              className="inline-block px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+            >
+              Create a Listing
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* For Creators CTA */}
+      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-8 border border-purple-200 dark:border-purple-800">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-900 dark:text-purple-100 mb-2">
+              💰 Monetize Your Expertise
+            </h2>
+            <p className="text-purple-700 dark:text-purple-300">
+              Turn your curated source lists into recurring revenue. 
+              Set your own prices, get paid instantly in USDC.
+            </p>
+          </div>
+          <Link
+            href="/sources/manage"
+            className="shrink-0 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition text-center"
+          >
+            Start Selling →
+          </Link>
         </div>
       </div>
+
+      {/* Stats Footer */}
+      {settings && (
+        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 text-center text-sm text-slate-500">
+          Platform fee: {settings.feePercent}% · Creators receive: {100 - settings.feePercent}% · 
+          Payments converted to USDC via 1Click
+        </div>
+      )}
     </div>
   );
 }
