@@ -678,7 +678,15 @@ export default function SettingsPage() {
         setProfile(data.data);
         setName(data.data.name);
         if (data.data.preferences?.email) {
-          setEmailPrefs(data.data.preferences.email);
+          // Deep merge with defaults to handle missing nested objects
+          const loaded = data.data.preferences.email;
+          setEmailPrefs(prev => ({
+            ...prev,
+            ...loaded,
+            briefings: { ...prev.briefings, ...loaded?.briefings },
+            alerts: { ...prev.alerts, ...loaded?.alerts },
+            digest: { ...prev.digest, ...loaded?.digest },
+          }));
         }
         if (data.data.preferences?.notificationEmails) {
           setNotificationEmails(data.data.preferences.notificationEmails);
