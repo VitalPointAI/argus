@@ -1,9 +1,7 @@
 import { Hono, Context } from 'hono';
 import { db, users, sources, content, briefings, domains, apiKeys, platformSettings } from '../db';
 import { eq, desc, count, and, gte, isNull } from 'drizzle-orm';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'argus-secret-change-in-production';
+import { authMiddleware } from './auth';
 
 interface AdminUser {
   id: string;
@@ -14,36 +12,31 @@ interface AdminUser {
 
 type Variables = {
   adminUser: AdminUser;
+  user: AdminUser | null;
 };
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 
 /**
- * Middleware to verify admin status
+ * Middleware to verify admin status (uses authMiddleware for cookie/token support)
  */
 async function requireAdmin(c: Context<{ Variables: Variables }>, next: () => Promise<void>) {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const user = c.get('user');
+  
+  if (!user) {
     return c.json({ success: false, error: 'Not authenticated' }, 401);
   }
   
-  const token = authHeader.substring(7);
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    const [user] = await db.select().from(users).where(eq(users.id, decoded.userId)).limit(1);
-    
-    if (!user || !user.isAdmin) {
-      return c.json({ success: false, error: 'Admin access required' }, 403);
-    }
-    
-    c.set('adminUser', user);
-    await next();
-  } catch {
-    return c.json({ success: false, error: 'Invalid token' }, 401);
+  if (!user.isAdmin) {
+    return c.json({ success: false, error: 'Admin access required' }, 403);
   }
+  
+  c.set('adminUser', user);
+  await next();
 }
 
-// Apply admin middleware to all routes
+// Apply auth middleware first, then admin check
+adminRoutes.use('/*', authMiddleware);
 adminRoutes.use('/*', requireAdmin);
 
 /**

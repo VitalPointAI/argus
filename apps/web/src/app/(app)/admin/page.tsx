@@ -61,12 +61,12 @@ export default function AdminPage() {
 
   const fetchData = async () => {
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const fetchOpts = { credentials: 'include' as RequestCredentials };
       
       const [statsRes, usersRes, settingsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/stats`, { headers }),
-        fetch(`${API_URL}/api/admin/users`, { headers }),
-        fetch(`${API_URL}/api/admin/settings`, { headers }),
+        fetch(`${API_URL}/api/admin/stats`, fetchOpts),
+        fetch(`${API_URL}/api/admin/users`, fetchOpts),
+        fetch(`${API_URL}/api/admin/settings`, fetchOpts),
       ]);
 
       if (!statsRes.ok || !usersRes.ok) {
@@ -98,10 +98,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ isAdmin: !currentStatus }),
       });
 
@@ -459,10 +457,8 @@ export default function AdminPage() {
                     try {
                       const res = await fetch(`${API_URL}/api/admin/settings`, {
                         method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token}`,
-                        },
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(platformSettings),
                       });
                       const data = await res.json();
