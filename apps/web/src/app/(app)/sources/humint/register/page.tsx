@@ -87,7 +87,8 @@ export default function HumintSourceRegistrationPage() {
       const data = await res.json();
 
       if (data.success) {
-        router.push(`/sources/humint/${user?.codename}`);
+        const codename = user?.type === 'humint' ? user.codename : '';
+        router.push(`/sources/humint/${codename}`);
       } else {
         setError(data.error || 'Registration failed');
       }
