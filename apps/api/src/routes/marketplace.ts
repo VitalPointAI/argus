@@ -52,100 +52,56 @@ app.get('/listings', async (c) => {
       offset = '0'
     } = c.req.query();
 
-    let query = db
-      .select({
-        id: sourceLists.id,
-        name: sourceLists.name,
-        description: sql<string>`COALESCE(${sourceLists.description}, '')`,
-        marketplaceDescription: sql<string>`COALESCE(source_lists.marketplace_description, '')`,
-        marketplaceImageCid: sql<string>`source_lists.marketplace_image_cid`,
-        domainId: sourceLists.domainId,
-        domainName: domains.name,
-        domainSlug: domains.slug,
-        isPublic: sourceLists.isPublic,
-        createdBy: sourceLists.createdBy,
-        creatorName: users.name,
-        totalSubscribers: sql<number>`COALESCE(source_lists.total_subscribers, 0)`,
-        totalRevenueUsdc: sql<number>`COALESCE(source_lists.total_revenue_usdc, 0)`,
-        avgRating: sql<number>`COALESCE(source_lists.avg_rating, 0)`,
-        ratingCount: sql<number>`COALESCE(source_lists.rating_count, 0)`,
-        itemCount: sourceLists.itemCount,
-        createdAt: sourceLists.createdAt,
-        // Get minimum package price
-        minPackagePrice: sql<number>`(
-          SELECT MIN(price_usdc) 
-          FROM source_list_packages 
-          WHERE source_list_id = source_lists.id AND is_active = true
-        )`,
-      })
-      .from(sourceLists)
-      .leftJoin(domains, eq(sourceLists.domainId, domains.id))
-      .leftJoin(users, eq(sourceLists.createdBy, users.id))
-      .where(
-        and(
-          sql`source_lists.is_marketplace_listed = true`,
-          sql`EXISTS (SELECT 1 FROM source_list_packages WHERE source_list_id = source_lists.id AND is_active = true)`
-        )
-      );
-
-    // Filters
-    if (domain) {
-      query = query.where(eq(domains.slug, domain));
-    }
-
-    if (search) {
-      query = query.where(
-        or(
-          ilike(sourceLists.name, `%${search}%`),
-          sql`source_lists.marketplace_description ILIKE ${'%' + search + '%'}`
-        )
-      );
-    }
-
-    // Sorting
-    switch (sort) {
-      case 'popular':
-        query = query.orderBy(desc(sql`source_lists.total_subscribers`));
-        break;
-      case 'newest':
-        query = query.orderBy(desc(sourceLists.createdAt));
-        break;
-      case 'rating':
-        query = query.orderBy(desc(sql`source_lists.avg_rating`));
-        break;
-      case 'price-low':
-        query = query.orderBy(asc(sql`(
-          SELECT MIN(price_usdc) 
-          FROM source_list_packages 
-          WHERE source_list_id = source_lists.id AND is_active = true
-        )`));
-        break;
-      case 'price-high':
-        query = query.orderBy(desc(sql`(
-          SELECT MIN(price_usdc) 
-          FROM source_list_packages 
-          WHERE source_list_id = source_lists.id AND is_active = true
-        )`));
-        break;
-      default:
-        query = query.orderBy(desc(sql`source_lists.total_subscribers`));
-    }
-
-    query = query.limit(parseInt(limit)).offset(parseInt(offset));
-
-    const listings = await query;
+    // Use raw SQL to avoid Drizzle select field issues with nullable joins
+    const listings = await db.execute(sql`
+      SELECT 
+        sl.id,
+        sl.name,
+        COALESCE(sl.description, '') as description,
+        COALESCE(sl.marketplace_description, '') as "marketplaceDescription",
+        sl.marketplace_image_cid as "marketplaceImageCid",
+        sl.domain_id as "domainId",
+        d.name as "domainName",
+        d.slug as "domainSlug",
+        sl.is_public as "isPublic",
+        sl.created_by as "createdBy",
+        u.name as "creatorName",
+        COALESCE(sl.total_subscribers, 0) as "totalSubscribers",
+        COALESCE(sl.total_revenue_usdc, 0) as "totalRevenueUsdc",
+        COALESCE(sl.avg_rating, 0) as "avgRating",
+        COALESCE(sl.rating_count, 0) as "ratingCount",
+        sl.item_count as "itemCount",
+        sl.created_at as "createdAt",
+        (SELECT MIN(price_usdc) FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true) as "minPackagePrice"
+      FROM source_lists sl
+      LEFT JOIN domains d ON sl.domain_id = d.id
+      LEFT JOIN users u ON sl.created_by = u.id
+      WHERE sl.is_marketplace_listed = true
+        AND EXISTS (SELECT 1 FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true)
+        ${domain ? sql`AND d.slug = ${domain}` : sql``}
+        ${search ? sql`AND (sl.name ILIKE ${'%' + search + '%'} OR sl.marketplace_description ILIKE ${'%' + search + '%'})` : sql``}
+      ORDER BY ${sort === 'newest' ? sql`sl.created_at DESC` : 
+                sort === 'rating' ? sql`sl.avg_rating DESC NULLS LAST` :
+                sort === 'price-low' ? sql`(SELECT MIN(price_usdc) FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true) ASC NULLS LAST` :
+                sort === 'price-high' ? sql`(SELECT MIN(price_usdc) FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true) DESC NULLS LAST` :
+                sql`sl.total_subscribers DESC NULLS LAST`}
+      LIMIT ${parseInt(limit)}
+      OFFSET ${parseInt(offset)}
+    `);
 
     // Get total count
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(sourceLists)
-      .where(sql`source_lists.is_marketplace_listed = true`);
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as count 
+      FROM source_lists 
+      WHERE is_marketplace_listed = true
+        AND EXISTS (SELECT 1 FROM source_list_packages WHERE source_list_id = source_lists.id AND is_active = true)
+    `);
 
     return c.json({
       success: true,
-      data: listings,
+      data: listings.rows,
       pagination: {
-        total: countResult[0]?.count || 0,
+        total: parseInt(countResult.rows[0]?.count as string || '0'),
         limit: parseInt(limit),
         offset: parseInt(offset),
       }
