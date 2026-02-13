@@ -174,7 +174,6 @@ export default function HumintSourcesPage() {
           </div>
         </div>
       )}
-      </div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
