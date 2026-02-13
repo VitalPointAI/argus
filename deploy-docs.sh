@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-REMOTE_USER="root"
+REMOTE_USER="deploy"
 REMOTE_HOST="157.90.122.69"
 REMOTE_PATH="/var/www/argus-docs"
 SSH_KEY="$HOME/.ssh/hetzner_argus"

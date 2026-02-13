@@ -772,4 +772,76 @@ app.post('/reviews', async (c) => {
   }
 });
 
+// ============ 1Click Payment Integration ============
+
+import { getPaymentQuote, getPaymentStatus, USDC_TOKEN_IDS } from '../services/payments/one-click';
+
+// Get payment quote for marketplace subscription
+app.post('/payment/quote', async (c) => {
+  try {
+    const userId = c.get('userId');
+    if (!userId) {
+      return c.json({ success: false, error: 'Authentication required' }, 401);
+    }
+
+    const { amountUsdc, recipientNear } = await c.req.json();
+
+    if (!amountUsdc || !recipientNear) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400);
+    }
+
+    // Get user's NEAR account for refund
+    const [user] = await db
+      .select({ nearAccountId: users.nearAccountId })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    const refundAddress = user?.nearAccountId || 'argus-intel.near'; // Fallback to platform wallet
+
+    const quote = await getPaymentQuote({
+      amountUsdc: parseFloat(amountUsdc),
+      recipientAddress: recipientNear,
+      recipientChain: 'near',
+      refundAddress,
+      dry: false,
+    });
+
+    return c.json({
+      success: true,
+      quote: {
+        quoteId: quote.quoteId,
+        depositAddress: quote.depositAddress,
+        amountIn: quote.amountIn,
+        amountOut: quote.amountOut,
+        deadline: quote.deadline,
+        estimatedTimeMs: quote.estimatedTimeMs,
+      },
+    });
+  } catch (error) {
+    console.error('Payment quote error:', error);
+    return c.json({ success: false, error: 'Failed to get payment quote' }, 500);
+  }
+});
+
+// Check payment status
+app.get('/payment/status/:depositAddress', async (c) => {
+  try {
+    const depositAddress = c.req.param('depositAddress');
+    
+    const status = await getPaymentStatus(depositAddress);
+    
+    return c.json({
+      success: true,
+      status: status.status,
+      txHash: status.txHash,
+      amountIn: status.amountIn,
+      amountOut: status.amountOut,
+      error: status.error,
+    });
+  } catch (error) {
+    console.error('Payment status error:', error);
+    return c.json({ success: false, error: 'Failed to check payment status' }, 500);
+  }
+});
+
 export default app;
