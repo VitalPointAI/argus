@@ -353,7 +353,7 @@ function AddDomainForm({ onDomainAdded }: { onDomainAdded: () => void }) {
 }
 
 // Telegram Connect Section Component
-function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: () => void }) {
+function TelegramSection({ onUpdate }: { onUpdate: () => void }) {
   const [status, setStatus] = useState<{ connected: boolean; chatId?: string; username?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -361,14 +361,13 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (token) {
-      fetchStatus();
-    }
-  }, [token]);
+    // Always fetch - auth is handled via HttpOnly cookies
+    fetchStatus();
+  }, []);
 
   // Poll for connection status when waiting for user to connect
   useEffect(() => {
-    if (!connectData || !token) return;
+    if (!connectData) return;
 
     const interval = setInterval(async () => {
       const res = await fetch(`${API_URL}/api/profile/telegram/status`, {
@@ -383,7 +382,7 @@ function TelegramSection({ token, onUpdate }: { token: string | null; onUpdate: 
     }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [connectData, token]);
+  }, [connectData]);
 
   const fetchStatus = async () => {
     try {
@@ -1217,7 +1216,7 @@ export default function SettingsPage() {
         </section>
 
         {/* Telegram Notifications */}
-        <TelegramSection token={token} onUpdate={fetchProfile} />
+        <TelegramSection onUpdate={fetchProfile} />
 
         {/* Save Button */}
         <div className="flex justify-end">
