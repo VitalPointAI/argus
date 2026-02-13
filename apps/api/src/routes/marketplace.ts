@@ -53,6 +53,7 @@ app.get('/listings', async (c) => {
     } = c.req.query();
 
     // Use raw SQL to avoid Drizzle select field issues with nullable joins
+    // Note: source_lists uses user_id not created_by, and has no domain_id column
     const listings = await db.execute(sql`
       SELECT 
         sl.id,
@@ -60,25 +61,19 @@ app.get('/listings', async (c) => {
         COALESCE(sl.description, '') as description,
         COALESCE(sl.marketplace_description, '') as "marketplaceDescription",
         sl.marketplace_image_cid as "marketplaceImageCid",
-        sl.domain_id as "domainId",
-        d.name as "domainName",
-        d.slug as "domainSlug",
         sl.is_public as "isPublic",
-        sl.created_by as "createdBy",
+        sl.user_id as "createdBy",
         u.name as "creatorName",
         COALESCE(sl.total_subscribers, 0) as "totalSubscribers",
-        COALESCE(sl.total_revenue_usdc, 0) as "totalRevenueUsdc",
-        COALESCE(sl.avg_rating, 0) as "avgRating",
+        COALESCE(sl.total_revenue_usdc, 0)::float as "totalRevenueUsdc",
+        COALESCE(sl.avg_rating, 0)::float as "avgRating",
         COALESCE(sl.rating_count, 0) as "ratingCount",
-        sl.item_count as "itemCount",
         sl.created_at as "createdAt",
         (SELECT MIN(price_usdc) FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true) as "minPackagePrice"
       FROM source_lists sl
-      LEFT JOIN domains d ON sl.domain_id = d.id
-      LEFT JOIN users u ON sl.created_by = u.id
+      LEFT JOIN users u ON sl.user_id = u.id
       WHERE sl.is_marketplace_listed = true
         AND EXISTS (SELECT 1 FROM source_list_packages WHERE source_list_id = sl.id AND is_active = true)
-        ${domain ? sql`AND d.slug = ${domain}` : sql``}
         ${search ? sql`AND (sl.name ILIKE ${'%' + search + '%'} OR sl.marketplace_description ILIKE ${'%' + search + '%'})` : sql``}
       ORDER BY ${sort === 'newest' ? sql`sl.created_at DESC` : 
                 sort === 'rating' ? sql`sl.avg_rating DESC NULLS LAST` :
