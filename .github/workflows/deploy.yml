@@ -26,24 +26,17 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             
-            # Install dependencies
-            npm install --legacy-peer-deps
-            npm install snarkjs @types/snarkjs --legacy-peer-deps 2>/dev/null || true
+            # Stop PM2 if running (migrated to Docker)
+            pm2 stop all 2>/dev/null || true
+            pm2 delete all 2>/dev/null || true
             
-            # Build API
-            cd apps/api
-            npm run build
-            cd ../..
+            # Build and deploy with Docker Compose
+            docker compose down || true
+            docker compose build --no-cache
+            docker compose up -d
             
-            # Build Web (clean .next first)
-            cd apps/web
-            rm -rf .next
-            npm run build
-            cd ../..
+            # Clean up old images
+            docker image prune -f
             
-            # Restart PM2 services
-            pm2 restart argus-api argus-web
-            
-            # Show status
             echo "Deploy complete: $(date)"
-            pm2 list
+            docker compose ps

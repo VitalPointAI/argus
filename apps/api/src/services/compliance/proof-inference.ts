@@ -619,4 +619,4 @@ export function validateProofParams(
   return { valid: errors.length === 0, errors };
 }
 
-export { PROOF_TEMPLATES, CATEGORY_PROFILES };
+export { CATEGORY_PROFILES };
