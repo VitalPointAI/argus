@@ -52,7 +52,8 @@ export default function NavBar() {
   // Secondary navigation - in "More" dropdown
   const moreLinks = [
     { href: '/domains', label: 'Domains' },
-    { href: '/marketplace', label: '🎨 NFT Marketplace' },
+    { href: '/marketplace/source-lists', label: '🛒 Source Marketplace' },
+    { href: '/marketplace', label: '🎨 NFT Gallery' },
     { href: '/bounties', label: '📋 Intel Bounties' },
     { href: '/zk', label: '🔐 ZK Proofs' },
     { href: 'https://docs.argus.vitalpoint.ai', label: '📚 Documentation', external: true },

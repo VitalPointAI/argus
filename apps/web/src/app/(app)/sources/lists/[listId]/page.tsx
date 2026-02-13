@@ -267,12 +267,20 @@ export default function SourceListDetailPage() {
             )
           )}
           {list.isOwner && (
-            <a
-              href="/sources/manage"
-              className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-            >
-              Manage
-            </a>
+            <>
+              <a
+                href={`/sources/lists/${listId}/packages`}
+                className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-1"
+              >
+                💰 Sell Access
+              </a>
+              <a
+                href="/sources/manage"
+                className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+              >
+                Manage
+              </a>
+            </>
           )}
         </div>
       </div>
