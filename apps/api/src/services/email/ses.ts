@@ -5,6 +5,7 @@
  */
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { marked } from 'marked';
 
 const sesClient = new SESClient({
   region: process.env.AWS_REGION || 'ca-central-1',
@@ -88,6 +89,12 @@ export async function sendBriefingEmail(options: {
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const { to, briefingTitle, briefingContent, domain, generatedAt } = options;
   
+  // Convert markdown to HTML
+  const contentHtml = await marked.parse(briefingContent, {
+    gfm: true,
+    breaks: true,
+  });
+  
   const subject = `🦚 Argus Briefing: ${briefingTitle}`;
   
   const html = `
@@ -142,12 +149,61 @@ export async function sendBriefingEmail(options: {
       font-size: 14px;
     }
     .content {
-      white-space: pre-wrap;
       font-size: 15px;
     }
-    .content h2, .content h3 {
+    .content h2 {
       color: #0d9488;
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e5e5e5;
+      padding-bottom: 8px;
+    }
+    .content h3 {
+      color: #0d9488;
+      font-size: 17px;
       margin-top: 24px;
+      margin-bottom: 8px;
+    }
+    .content h4 {
+      color: #333;
+      font-size: 15px;
+      margin-top: 20px;
+      margin-bottom: 6px;
+    }
+    .content p {
+      margin: 12px 0;
+    }
+    .content ul, .content ol {
+      margin: 12px 0;
+      padding-left: 24px;
+    }
+    .content li {
+      margin: 6px 0;
+    }
+    .content strong {
+      color: #1a1a1a;
+    }
+    .content em {
+      font-style: italic;
+    }
+    .content blockquote {
+      border-left: 3px solid #0d9488;
+      margin: 16px 0;
+      padding: 8px 16px;
+      background: #f8f9fa;
+      color: #555;
+    }
+    .content code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 13px;
+    }
+    .content a {
+      color: #0d9488;
+      text-decoration: underline;
     }
     .footer {
       margin-top: 32px;
@@ -182,7 +238,7 @@ export async function sendBriefingEmail(options: {
     })}</p>
     
     <div class="content">
-${briefingContent}
+${contentHtml}
     </div>
     
     <div class="footer">
