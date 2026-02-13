@@ -173,6 +173,7 @@ interface Props {
   };
   onGenerate?: () => void;
   loading?: boolean;
+  hideGenerateCard?: boolean;
 }
 
 // Render markdown content as formatted JSX
@@ -250,7 +251,7 @@ function MarkdownRenderer({ content }: { content: string }) {
   return <div className="prose prose-slate dark:prose-invert max-w-none">{elements}</div>;
 }
 
-export default function ExecutiveBriefing({ briefing, onGenerate, loading }: Props) {
+export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideGenerateCard }: Props) {
   const [playingAudio, setPlayingAudio] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -339,7 +340,7 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading }: Pro
     );
   }
 
-  if (!briefing) {
+  if (!briefing && !hideGenerateCard) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-12 text-center">
         <div className="text-6xl mb-4">🦚</div>
@@ -360,6 +361,11 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading }: Pro
         )}
       </div>
     );
+  }
+  
+  // If hideGenerateCard is true but no briefing, show minimal placeholder
+  if (!briefing) {
+    return null;
   }
 
   // Check if we have sections (live generated) or just markdown (saved)
