@@ -103,7 +103,7 @@ function SourceManagePage() {
     if (!authLoading) {
       fetchData();
     }
-  }, [token, authLoading]);
+  }, [user, authLoading]);
   
   const fetchData = async () => {
     try {
