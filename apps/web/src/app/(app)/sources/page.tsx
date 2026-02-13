@@ -34,27 +34,26 @@ interface SourceList {
 }
 
 export default function SourcesPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [sources, setSources] = useState<Source[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [sourceLists, setSourceLists] = useState<SourceList[]>([]);
   const [loading, setLoading] = useState(true);
   const [addToListModal, setAddToListModal] = useState<{ sourceId: string; sourceName: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showCreateListModal, setShowCreateListModal] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [newListDescription, setNewListDescription] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
 
   useEffect(() => {
     fetchData();
-  }, [token]);
+  }, [user]);
 
   const fetchData = async () => {
     try {
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const [sourcesRes, domainsRes] = await Promise.all([
-        fetch(`${API_URL}/api/sources`, { headers, cache: 'no-store' }),
+        fetch(`${API_URL}/api/sources`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${API_URL}/api/v1/domains`, { cache: 'no-store' }),
       ]);
 
@@ -65,8 +64,8 @@ export default function SourcesPage() {
       setDomains(domainsData.data || []);
 
       // Fetch user's source lists if authenticated
-      if (token) {
-        const listsRes = await fetch(`${API_URL}/api/sources/lists/my`, { headers });
+      if (user) {
+        const listsRes = await fetch(`${API_URL}/api/sources/lists/my`, { credentials: 'include' });
         const listsData = await listsRes.json();
         if (listsData.success) {
           setSourceLists(listsData.data || []);
@@ -79,16 +78,46 @@ export default function SourcesPage() {
     }
   };
 
+  const createList = async () => {
+    if (!newListName.trim() || !user) return;
+    
+    setCreatingList(true);
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          name: newListName.trim(), 
+          description: newListDescription.trim(),
+          isPublic: false 
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(`Created list "${newListName}"`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+        setShowCreateListModal(false);
+        setNewListName('');
+        setNewListDescription('');
+        fetchData(); // Refresh lists
+      }
+    } catch (err) {
+      console.error('Failed to create list:', err);
+    } finally {
+      setCreatingList(false);
+    }
+  };
+
   const addToList = async (listId: string) => {
-    if (!addToListModal || !token) return;
+    if (!addToListModal) return;
 
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/${listId}/items`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ sourceId: addToListModal.sourceId }),
       });
 
@@ -197,24 +226,24 @@ export default function SourcesPage() {
                   <span className="ml-2 text-slate-500 text-sm">({list.itemCount} sources)</span>
                 </a>
               ))}
-              <a
-                href="/sources/manage?tab=lists"
+              <button
+                onClick={() => setShowCreateListModal(true)}
                 className="px-4 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-argus-400 hover:text-argus-600 transition flex items-center gap-2"
               >
                 <span>+</span> New List
-              </a>
+              </button>
             </div>
           ) : (
             <div className="text-center py-4">
               <p className="text-slate-500 dark:text-slate-400 mb-3">
                 Create lists to organize sources for focused briefings
               </p>
-              <a
-                href="/sources/manage?tab=lists"
+              <button
+                onClick={() => setShowCreateListModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
               >
                 <span>+</span> Create Your First List
-              </a>
+              </button>
             </div>
           )}
         </div>
@@ -349,6 +378,57 @@ export default function SourcesPage() {
         </div>
       </div>
 
+      {/* Create List Modal */}
+      {showCreateListModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Create Source List</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  placeholder="e.g., China Tech Watch"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description (optional)</label>
+                <textarea
+                  value={newListDescription}
+                  onChange={(e) => setNewListDescription(e.target.value)}
+                  placeholder="Describe what this list is for..."
+                  rows={2}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-argus-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateListModal(false);
+                  setNewListName('');
+                  setNewListDescription('');
+                }}
+                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createList}
+                disabled={!newListName.trim() || creatingList}
+                className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50"
+              >
+                {creatingList ? 'Creating...' : 'Create List'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add to List Modal */}
       {addToListModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -375,12 +455,15 @@ export default function SourcesPage() {
                   ))}
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mb-4">
-                  <a
-                    href="/sources/manage?tab=lists"
+                  <button
+                    onClick={() => {
+                      setAddToListModal(null);
+                      setShowCreateListModal(true);
+                    }}
                     className="text-sm text-argus-600 hover:text-argus-700 dark:text-argus-400"
                   >
                     + Create a new list
-                  </a>
+                  </button>
                 </div>
               </>
             ) : (
@@ -388,12 +471,15 @@ export default function SourcesPage() {
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
                   You don't have any lists yet. Create one to organize your sources.
                 </p>
-                <a
-                  href="/sources/manage?tab=lists"
+                <button
+                  onClick={() => {
+                    setAddToListModal(null);
+                    setShowCreateListModal(true);
+                  }}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm font-medium transition"
                 >
                   + Create Your First List
-                </a>
+                </button>
               </div>
             )}
             
