@@ -755,3 +755,92 @@ export const nearAttestations = pgTable('near_attestations', {
   blockTimestamp: timestamp('block_timestamp').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ============ Source List Marketplace ============
+
+// Subscription packages for source lists
+export const sourceListPackages = pgTable('source_list_packages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceListId: uuid('source_list_id').notNull().references(() => sourceLists.id),
+  creatorId: uuid('creator_id').notNull().references(() => users.id),
+  
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  imageCid: varchar('image_cid', { length: 100 }),
+  
+  priceUsdc: real('price_usdc').notNull(),
+  durationDays: integer('duration_days'), // NULL = lifetime
+  
+  benefits: jsonb('benefits').default([]),
+  
+  maxSupply: integer('max_supply'),
+  mintedCount: integer('minted_count').notNull().default(0),
+  
+  isActive: boolean('is_active').notNull().default(true),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// NFT subscriptions (access passes)
+export const sourceListSubscriptions = pgTable('source_list_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  packageId: uuid('package_id').notNull().references(() => sourceListPackages.id),
+  sourceListId: uuid('source_list_id').notNull().references(() => sourceLists.id),
+  subscriberId: uuid('subscriber_id').notNull().references(() => users.id),
+  
+  nftTokenId: varchar('nft_token_id', { length: 100 }),
+  nftContract: varchar('nft_contract', { length: 100 }).default('source-lists.argus-intel.near'),
+  
+  startsAt: timestamp('starts_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at'), // NULL = lifetime
+  
+  pricePaidUsdc: real('price_paid_usdc').notNull(),
+  paymentTxHash: varchar('payment_tx_hash', { length: 100 }),
+  paymentToken: varchar('payment_token', { length: 50 }),
+  
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Creator payout settings
+export const creatorPayoutSettings = pgTable('creator_payout_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id).unique(),
+  
+  payoutWallet: varchar('payout_wallet', { length: 100 }).notNull(),
+  customFeePercent: real('custom_fee_percent'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Creator earnings (indexed from on-chain)
+export const creatorEarnings = pgTable('creator_earnings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorId: uuid('creator_id').notNull().references(() => users.id),
+  subscriptionId: uuid('subscription_id').references(() => sourceListSubscriptions.id),
+  
+  grossAmountUsdc: real('gross_amount_usdc').notNull(),
+  platformFeeUsdc: real('platform_fee_usdc').notNull(),
+  netAmountUsdc: real('net_amount_usdc').notNull(),
+  
+  txHash: varchar('tx_hash', { length: 100 }),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Source list reviews
+export const sourceListReviews = pgTable('source_list_reviews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceListId: uuid('source_list_id').notNull().references(() => sourceLists.id),
+  reviewerId: uuid('reviewer_id').notNull().references(() => users.id),
+  subscriptionId: uuid('subscription_id').references(() => sourceListSubscriptions.id),
+  
+  rating: integer('rating').notNull(),
+  reviewText: text('review_text'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});

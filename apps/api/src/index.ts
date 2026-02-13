@@ -31,6 +31,7 @@ import zkRoutes from './routes/zk';
 import nftRoutes from './routes/nft';
 import phantomAuthRoutes from './routes/phantom-auth';
 import escrowRoutes from './routes/escrow';
+import marketplaceRoutes from './routes/marketplace';
 // TODO: Fix near-api-js ESM/CJS compatibility with Node 22
 // import nearRegistryRoutes from './routes/near-registry';
 import { initPhantomAuth } from './services/auth/phantom-auth';
@@ -79,6 +80,7 @@ app.route('/api/auth/passkey', phantomAuthRoutes); // Also mount at standard pat
 app.route('/api/escrow', escrowRoutes); // ZEC escrow and withdrawal system
 app.route('/api/subscriptions', subscriptionsRoutes); // Subscriber approval workflow
 app.route('/api/feed', feedRoutes); // Source feed items (intel published here)
+app.route('/api/marketplace', marketplaceRoutes); // Source list NFT marketplace
 // app.route('/api/near', nearRegistryRoutes); // On-chain proof verification via NEAR (disabled: near-api-js ESM issue)
 
 // Root
