@@ -3,7 +3,7 @@
  * TEE-based private inference for claim extraction and reasoning
  */
 
-const NEAR_AI_API_URL = 'https://api.near.ai/v1';
+const NEAR_AI_API_URL = 'https://cloud-api.near.ai/v1';
 const NEAR_AI_API_KEY = process.env.NEAR_AI_API_KEY;
 
 // Available models on NEAR AI
