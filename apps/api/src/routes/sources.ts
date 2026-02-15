@@ -678,6 +678,51 @@ sourcesRoutes.patch('/lists/:listId', async (c) => {
   }
 });
 
+// Activate a source list as the user's filter
+sourcesRoutes.post('/lists/:listId/activate', async (c) => {
+  const user = c.get('user');
+  const listId = c.req.param('listId');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  
+  // Verify the list exists and user has access
+  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, listId)).limit(1);
+  
+  if (!list) {
+    return c.json({ success: false, error: 'Source list not found' }, 404);
+  }
+  
+  // User can activate their own lists or public lists
+  if (list.userId !== user.id && !list.isPublic) {
+    return c.json({ success: false, error: 'Access denied' }, 403);
+  }
+  
+  try {
+    const currentPrefs = user.preferences as Record<string, unknown> || {};
+    
+    await db.update(users)
+      .set({ 
+        preferences: { 
+          ...currentPrefs, 
+          activeSourceListId: listId 
+        } 
+      })
+      .where(eq(users.id, user.id));
+    
+    return c.json({ 
+      success: true,
+      message: `Now filtering by "${list.name}"`,
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to activate list',
+    }, 500);
+  }
+});
+
 // Clear active source list (must be before :listId route!)
 sourcesRoutes.delete('/lists/active', async (c) => {
   const user = c.get('user');
