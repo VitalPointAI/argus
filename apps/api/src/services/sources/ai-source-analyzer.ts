@@ -167,6 +167,8 @@ For RSS sources, always prefer the direct feed URL.
 For YouTube, extract the channel ID.`;
 
   try {
+    console.log('[AI Analyzer] Prompt length:', prompt?.length);
+    console.log('[AI Analyzer] Calling Near AI...');
     const response = await callNearAI({ prompt, maxTokens: 1500 });
     
     console.log('[AI Analyzer] Raw response length:', response?.length);
@@ -265,11 +267,15 @@ export async function analyzeSource(input: string): Promise<AnalyzeResult> {
       
       // Substack - auto-detect feed URL, but use AI for trustworthiness
       if (urlObj.hostname.includes('substack.com')) {
+        console.log('[AI Analyzer] Detected Substack URL:', url);
         const pageInfo = await fetchPageInfo(url);
+        console.log('[AI Analyzer] Page info fetched:', pageInfo ? `title="${pageInfo.title}", content=${pageInfo.content?.length || 0} chars` : 'null');
         const feedUrl = `${urlObj.origin}/feed`;
         
         // Use AI to analyze trustworthiness, passing known feed URL
+        console.log('[AI Analyzer] Calling analyzeWithAI...');
         analysis = await analyzeWithAI(input, pageInfo?.content);
+        console.log('[AI Analyzer] analyzeWithAI returned:', JSON.stringify(analysis).substring(0, 200));
         analysis.sourceType = 'rss';
         analysis.feedUrl = feedUrl;
         analysis.websiteUrl = url;
