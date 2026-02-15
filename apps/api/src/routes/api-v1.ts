@@ -14,6 +14,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
 // Optional auth helper - doesn't reject unauthenticated requests
 async function getOptionalUser(c: any): Promise<{ id: string; preferences: Record<string, unknown> } | null> {
+  // First check if user was set by middleware (cookie auth)
+  const middlewareUser = c.get('user');
+  if (middlewareUser) {
+    return { id: middlewareUser.id, preferences: middlewareUser.preferences || {} };
+  }
+  
+  // Fallback to Bearer token auth
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return null;
