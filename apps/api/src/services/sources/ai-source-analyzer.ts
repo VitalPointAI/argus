@@ -229,6 +229,30 @@ export async function analyzeSource(input: string): Promise<AnalyzeResult> {
       // URL-based analysis
       const urlObj = new URL(url);
       
+      // Substack handling - easy RSS detection
+      if (urlObj.hostname.includes('substack.com')) {
+        const pageInfo = await fetchPageInfo(url);
+        const feedUrl = `${urlObj.origin}/feed`;
+        
+        // Extract author/publication name from URL or page title
+        const substackName = urlObj.hostname.split('.')[0];
+        const name = pageInfo?.title?.replace(' | Substack', '').trim() || 
+                    substackName.charAt(0).toUpperCase() + substackName.slice(1);
+        
+        analysis = {
+          sourceType: 'rss',
+          name,
+          description: pageInfo?.description || 'Substack newsletter',
+          feedUrl,
+          websiteUrl: url,
+          suggestedDomain: 'General',
+          confidence: 0.95,
+          notes: 'Substack newsletter - RSS feed auto-detected.',
+        };
+        
+        return { success: true, analysis };
+      }
+
       // YouTube handling
       if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
         const yt = parseYouTubeUrl(url);
