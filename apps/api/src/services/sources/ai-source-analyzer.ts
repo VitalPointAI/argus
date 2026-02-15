@@ -167,14 +167,29 @@ For RSS sources, always prefer the direct feed URL.
 For YouTube, extract the channel ID.`;
 
   try {
-    const response = await callNearAI(prompt, { maxTokens: 1000 });
+    const response = await callNearAI(prompt, { maxTokens: 1500 });
     
-    // Parse JSON from response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as SourceAnalysis;
+    console.log('[AI Analyzer] Raw response length:', response?.length);
+    console.log('[AI Analyzer] Raw response preview:', response?.substring(0, 500));
+    
+    // Parse JSON from response - handle markdown code blocks
+    let jsonStr = response;
+    
+    // Remove markdown code blocks if present
+    const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
     }
     
+    // Extract JSON object
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as SourceAnalysis;
+      console.log('[AI Analyzer] Parsed successfully:', parsed.name, 'confidence:', parsed.confidence);
+      return parsed;
+    }
+    
+    console.error('[AI Analyzer] No JSON found in response');
     throw new Error('No valid JSON in AI response');
   } catch (error) {
     console.error('AI analysis error:', error);
@@ -184,6 +199,9 @@ For YouTube, extract the channel ID.`;
       description: '',
       suggestedDomain: 'General',
       confidence: 0,
+      biases: [],
+      biasDirection: 'unknown',
+      disinfoRisk: 'medium',
       notes: 'AI analysis failed. Please configure manually.',
     };
   }
