@@ -12,7 +12,8 @@ interface SourceAnalysis {
   feedUrl?: string;
   websiteUrl?: string;
   youtubeChannelId?: string;
-  suggestedDomain: string;
+  suggestedDomains: string[];  // Top 1-3 relevant domains, ranked by relevance
+  suggestedDomain?: string;    // DEPRECATED: Keep for backwards compatibility
   confidence: number;  // Trustworthiness score (0-1), NOT detection accuracy
   biases?: string[];   // Detected biases (political, ideological, commercial, national)
   biasDirection?: 'left' | 'right' | 'center' | 'unknown';
@@ -143,13 +144,19 @@ Analyze and respond in JSON format:
   "feedUrl": "RSS/Atom feed URL if applicable",
   "websiteUrl": "Main website URL",
   "youtubeChannelId": "YouTube channel ID if applicable",
-  "suggestedDomain": "Best matching domain category (e.g., 'Geopolitics', 'Technology', 'Defense', 'Economics', 'Climate', 'Cybersecurity', etc.)",
+  "suggestedDomains": ["Primary domain", "Secondary domain", "Tertiary domain"],
   "confidence": 0.0-1.0,
   "biases": ["list", "of", "detected", "biases"],
   "biasDirection": "left" | "right" | "center" | "unknown",
   "disinfoRisk": "low" | "medium" | "high",
   "notes": "Any additional notes about reliability, bias, or concerns"
 }
+
+DOMAIN SELECTION:
+- Suggest 1-3 domains ranked by relevance to the source's primary coverage
+- Choose from: Geopolitics, Defense, Technology, Economics, Climate, Cybersecurity, Energy, Health, Space, AI/ML, Crypto/Blockchain, Trade, Intelligence, Terrorism, Nuclear, Maritime, Aviation
+- A military strategy blog might be: ["Defense", "Geopolitics", "Technology"]
+- A crypto news site might be: ["Crypto/Blockchain", "Technology", "Economics"]
 
 CONFIDENCE SCORING (this is about SOURCE TRUSTWORTHINESS, not detection accuracy):
 - 0.9-1.0: Highly trusted source (major wire services, established papers of record, official government sources)
@@ -187,7 +194,19 @@ For YouTube, extract the channel ID.`;
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as SourceAnalysis;
-      console.log('[AI Analyzer] Parsed successfully:', parsed.name, 'confidence:', parsed.confidence);
+      
+      // Backwards compatibility: convert old suggestedDomain to new suggestedDomains array
+      if (!parsed.suggestedDomains && parsed.suggestedDomain) {
+        parsed.suggestedDomains = [parsed.suggestedDomain];
+      } else if (!parsed.suggestedDomains) {
+        parsed.suggestedDomains = ['General'];
+      }
+      // Keep suggestedDomain for backwards compat (use first domain)
+      if (!parsed.suggestedDomain && parsed.suggestedDomains?.length) {
+        parsed.suggestedDomain = parsed.suggestedDomains[0];
+      }
+      
+      console.log('[AI Analyzer] Parsed successfully:', parsed.name, 'confidence:', parsed.confidence, 'domains:', parsed.suggestedDomains);
       return parsed;
     }
     
@@ -199,6 +218,7 @@ For YouTube, extract the channel ID.`;
       sourceType: 'unknown',
       name: 'Unknown Source',
       description: '',
+      suggestedDomains: ['General'],
       suggestedDomain: 'General',
       confidence: 0,
       biases: [],
