@@ -135,11 +135,45 @@ sourcesRoutes.post('/validate-feed', async (c) => {
         });
       } catch (parseError) {
         console.error('[Feed Validator] Parse error:', parseError);
+        
+        // RSS failed - check if we can fall back to web scraping
+        let canScrape = false;
+        let scrapePreview: { title?: string; articleCount?: number } = {};
+        
+        try {
+          // Try to fetch the base website
+          const baseUrl = new URL(url).origin;
+          const webRes = await fetch(baseUrl, {
+            headers: { 'User-Agent': 'Argus/1.0' },
+            signal: AbortSignal.timeout(10000),
+          });
+          
+          if (webRes.ok) {
+            canScrape = true;
+            const html = await webRes.text();
+            
+            // Extract title
+            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            scrapePreview.title = titleMatch ? titleMatch[1].trim() : undefined;
+            
+            // Count potential article elements
+            const articleMatches = html.match(/<article[^>]*>/gi);
+            scrapePreview.articleCount = articleMatches?.length || 0;
+          }
+        } catch (e) {
+          // Scraping test failed silently
+        }
+        
         return c.json({
           success: true,
           valid: false,
           error: parseError instanceof Error ? parseError.message : 'Failed to parse feed',
           message: '❌ Feed not accessible or invalid RSS/Atom format',
+          canFallbackToScraping: canScrape,
+          scrapePreview: canScrape ? scrapePreview : undefined,
+          fallbackSuggestion: canScrape 
+            ? '💡 This site can be monitored via web scraping instead of RSS' 
+            : undefined,
         });
       }
     } else if (type === 'youtube') {
@@ -228,8 +262,8 @@ sourcesRoutes.post('/from-analysis', async (c) => {
   }
 
   try {
-    // Determine source type
-    let type: 'rss' | 'website' | 'youtube';
+    // Determine source type (map to DB enum values)
+    let type: 'rss' | 'web' | 'youtube';
     let url: string;
     let config: Record<string, any> = {};
 
@@ -245,12 +279,12 @@ sourcesRoutes.post('/from-analysis', async (c) => {
         config.channelId = analysis.youtubeChannelId;
         break;
       case 'website':
-        type = 'website';
+        type = 'web'; // DB enum uses 'web' not 'website'
         url = analysis.websiteUrl;
         config.scrapeSelector = 'article, .article, .post, main';
         break;
       default:
-        type = 'website';
+        type = 'web';
         url = analysis.websiteUrl || analysis.feedUrl;
     }
 

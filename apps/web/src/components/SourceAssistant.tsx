@@ -35,6 +35,13 @@ interface FeedValidation {
     pubDate: string | null;
     snippet: string;
   }[];
+  // Fallback options when RSS fails
+  canFallbackToScraping?: boolean;
+  scrapePreview?: {
+    title?: string;
+    articleCount?: number;
+  };
+  fallbackSuggestion?: string;
 }
 
 interface Domain {
@@ -117,6 +124,26 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
     );
   };
 
+  const switchToWebScraping = () => {
+    if (!analysis) return;
+    
+    // Update the analysis to use website scraping instead of RSS
+    setAnalysis({
+      ...analysis,
+      sourceType: 'website',
+      feedUrl: undefined,
+      notes: analysis.notes 
+        ? `${analysis.notes} (Switched to web scraping - no RSS available)`
+        : 'Using web scraping - RSS feed not available',
+    });
+    
+    // Re-validate as website type
+    const url = analysis.websiteUrl || analysis.feedUrl;
+    if (url) {
+      validateFeed(url, 'website');
+    }
+  };
+
   const validateFeed = async (url: string, type: string) => {
     setValidating(true);
     setValidation(null);
@@ -137,6 +164,9 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
           message: data.message,
           feedInfo: data.feedInfo,
           sampleItems: data.sampleItems,
+          canFallbackToScraping: data.canFallbackToScraping,
+          scrapePreview: data.scrapePreview,
+          fallbackSuggestion: data.fallbackSuggestion,
         });
       }
     } catch (err) {
@@ -469,22 +499,51 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
                 )}
 
                 {validation?.valid === false && (
-                  <button
-                    onClick={() => {
-                      const feedUrl = analysis.feedUrl || analysis.websiteUrl;
-                      if (feedUrl) validateFeed(feedUrl, analysis.sourceType);
-                    }}
-                    className="mt-3 text-sm text-argus-600 hover:text-argus-700 underline"
-                  >
-                    🔄 Retry
-                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        const feedUrl = analysis.feedUrl || analysis.websiteUrl;
+                        if (feedUrl) validateFeed(feedUrl, analysis.sourceType);
+                      }}
+                      className="text-sm text-argus-600 hover:text-argus-700 underline"
+                    >
+                      🔄 Retry
+                    </button>
+                    
+                    {/* Offer web scraping fallback */}
+                    {validation.canFallbackToScraping && analysis.sourceType !== 'website' && (
+                      <button
+                        onClick={switchToWebScraping}
+                        className="px-3 py-1 text-sm bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition"
+                      >
+                        🌐 Switch to Web Scraping
+                      </button>
+                    )}
+                  </div>
+                )}
+                
+                {/* Fallback suggestion */}
+                {validation?.fallbackSuggestion && analysis.sourceType !== 'website' && (
+                  <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-blue-700 dark:text-blue-400">
+                    {validation.fallbackSuggestion}
+                    {validation.scrapePreview?.articleCount && validation.scrapePreview.articleCount > 0 && (
+                      <span className="ml-1">(Found {validation.scrapePreview.articleCount} article elements)</span>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Warning if validation failed */}
-              {validation?.valid === false && (
+              {/* Warning if validation failed and no fallback available */}
+              {validation?.valid === false && !validation.canFallbackToScraping && (
                 <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
                   <strong>⚠️ Feed validation failed.</strong> You can still add this source, but it may not retrieve content properly.
+                </div>
+              )}
+              
+              {/* Success message if switched to scraping */}
+              {validation?.valid === true && analysis.sourceType === 'website' && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
+                  <strong>✅ Web scraping enabled.</strong> Argus will periodically scan this site for new content.
                 </div>
               )}
             </div>
