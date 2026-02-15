@@ -165,7 +165,18 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
       console.log(`[FetchArticles] First article: "${articles[0].title?.substring(0, 50)}..." from ${articles[0].sourceName}`);
     }
 
-    return articles.map(a => ({
+    // Source diversity: limit to max 3 articles per source to prevent one source dominating
+    const MAX_PER_SOURCE = 3;
+    const sourceCount: Record<string, number> = {};
+    const diverseArticles = articles.filter(a => {
+      const sourceId = a.sourceId || 'unknown';
+      sourceCount[sourceId] = (sourceCount[sourceId] || 0) + 1;
+      return sourceCount[sourceId] <= MAX_PER_SOURCE;
+    });
+    
+    console.log(`[FetchArticles] After diversity filter: ${diverseArticles.length} articles (from ${Object.keys(sourceCount).length} sources)`);
+
+    return diverseArticles.map(a => ({
       id: a.id,
       title: a.title,
       body: a.body || '',
