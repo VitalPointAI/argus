@@ -167,7 +167,7 @@ For RSS sources, always prefer the direct feed URL.
 For YouTube, extract the channel ID.`;
 
   try {
-    const response = await callNearAI(prompt, { maxTokens: 1500 });
+    const response = await callNearAI({ prompt, maxTokens: 1500 });
     
     console.log('[AI Analyzer] Raw response length:', response?.length);
     console.log('[AI Analyzer] Raw response preview:', response?.substring(0, 500));
