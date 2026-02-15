@@ -49,20 +49,19 @@ export default function SourceListDetailPage() {
     // Once auth is settled, fetch the list
     setHasFetched(true);
     fetchList();
-    if (token) {
-      checkIfActive();
-    }
-  }, [listId, token, authLoading, hasFetched]);
+    checkIfActive(); // Always check - cookies will handle auth
+  }, [listId, authLoading, hasFetched]);
 
   const checkIfActive = async () => {
-    if (!token) return;
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/active`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success && data.data && data.data.id === listId) {
         setIsActive(true);
+      } else {
+        setIsActive(false);
       }
     } catch (err) {
       // Ignore errors
@@ -70,17 +69,17 @@ export default function SourceListDetailPage() {
   };
 
   const activateList = async () => {
-    if (!token || !listId) return;
+    if (!listId) return;
     setActivating(true);
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/${listId}/activate`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
         setIsActive(true);
-        setSuccessMessage('Source list activated! Dashboard and briefings will now use these sources.');
+        setSuccessMessage('✅ Source list activated! Dashboard and briefings will now use these sources.');
         setTimeout(() => setSuccessMessage(''), 5000);
       } else {
         setError(data.error || 'Failed to activate list');
@@ -93,12 +92,11 @@ export default function SourceListDetailPage() {
   };
 
   const deactivateList = async () => {
-    if (!token) return;
     setActivating(true);
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/active`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
