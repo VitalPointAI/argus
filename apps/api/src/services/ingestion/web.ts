@@ -110,6 +110,8 @@ export async function ingestWebSource(sourceId: string): Promise<number> {
       author: scraped.author || null,
       publishedAt: scraped.publishedAt || new Date(),
       fetchedAt: new Date(),
+      // Use source reliability score as base confidence
+      confidenceScore: source.reliabilityScore || 50,
     }).onConflictDoNothing();
 
     await db.update(sources)

@@ -118,6 +118,8 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
         author: item.creator || null,
         publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
         fetchedAt: new Date(),
+        // Use source reliability score as base confidence
+        confidenceScore: source.reliabilityScore || 50,
       }).onConflictDoNothing();
       
       ingested++;
