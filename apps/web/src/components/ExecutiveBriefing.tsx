@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -50,16 +51,14 @@ interface ExecutiveBriefingData {
 }
 
 function ConfidenceBadge({ score, articleId }: { score: number; articleId?: string }) {
-  const color = score >= 75 ? 'green' : score >= 60 ? 'yellow' : 'red';
-  const colors = {
-    green: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    yellow: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    red: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  };
+  const display = getConfidenceDisplay(score);
 
   const badge = (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[color]}`}>
-      {score}% verified
+    <span 
+      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${display.bgClass}`}
+      title={display.description}
+    >
+      {display.emoji} {display.label}
     </span>
   );
 
@@ -121,7 +120,7 @@ function StoryCard({ story }: { story: Story }) {
             className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-xs hover:border-argus-400 transition"
           >
             <span className="text-slate-700 dark:text-slate-300">{article.source}</span>
-            <span className="text-slate-400">({article.confidenceScore}%)</span>
+            <span className={`ml-1 ${getConfidenceDisplay(article.confidenceScore).color}`} title={getConfidenceDisplay(article.confidenceScore).description}>{getConfidenceDisplay(article.confidenceScore).emoji}</span>
           </a>
         ))}
         {story.articles.length > 3 && !expanded && (
@@ -418,7 +417,7 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
             <span>📊 {briefing.summary.totalStories} stories</span>
             <span>📰 {briefing.summary.totalArticles} sources</span>
             {'readTimeMinutes' in briefing && <span>⏱️ {briefing.readTimeMinutes} min read</span>}
-            <span>✅ {briefing.summary.avgConfidence}% avg confidence</span>
+            <span title={getConfidenceDisplay(briefing.summary.avgConfidence).description}>{getConfidenceDisplay(briefing.summary.avgConfidence).emoji} {getConfidenceDisplay(briefing.summary.avgConfidence).label} confidence</span>
           </div>
         )}
       </header>

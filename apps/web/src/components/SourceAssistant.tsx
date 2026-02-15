@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -268,8 +269,8 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
                     {analysis.description}
                   </p>
                 </div>
-                <span className="text-xs bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-400 px-2 py-1 rounded">
-                  {(analysis.confidence * 100).toFixed(0)}% confident
+                <span className={`text-xs px-2 py-1 rounded ${getConfidenceDisplay(analysis.confidence).bgClass}`} title={getConfidenceDisplay(analysis.confidence).description}>
+                  {getConfidenceDisplay(analysis.confidence).emoji} {getConfidenceDisplay(analysis.confidence).label} Confidence
                 </span>
               </div>
 

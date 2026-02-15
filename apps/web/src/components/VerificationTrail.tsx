@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -84,9 +85,8 @@ export function ConfidenceBadge({
   const [deepResult, setDeepResult] = useState<any>(null);
   const [displayScore, setDisplayScore] = useState(score); // Track current score for syncing
 
-  const color = displayScore >= 70 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                displayScore >= 40 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+  const confidenceDisplay = getConfidenceDisplay(displayScore);
+  const color = confidenceDisplay.bgClass;
 
   const handleClick = async () => {
     if (!clickable || !contentId) return;
@@ -152,9 +152,9 @@ export function ConfidenceBadge({
       <button
         onClick={handleClick}
         className={`px-3 py-1.5 rounded text-sm font-medium min-w-[48px] min-h-[36px] ${color} ${clickable && contentId ? 'cursor-pointer hover:ring-2 hover:ring-offset-2 hover:ring-argus-500 active:ring-2 active:ring-argus-500 transition shadow-sm hover:shadow' : ''}`}
-        title={clickable && contentId ? 'Tap to see verification trail' : undefined}
+        title={clickable && contentId ? `${confidenceDisplay.description} — Tap to see verification trail` : confidenceDisplay.description}
       >
-        {displayScore}%{clickable && contentId && <span className="ml-1 opacity-60">ⓘ</span>}
+        {confidenceDisplay.emoji} {confidenceDisplay.label}{clickable && contentId && <span className="ml-1 opacity-60">ⓘ</span>}
       </button>
 
       {/* Modal */}
