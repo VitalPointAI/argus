@@ -367,9 +367,11 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function ReliabilityBadge({ score }: { score: number }) {
-  const stars = Math.round(score / 20);
+  // Normalize score: handle both 0-1 (legacy) and 0-100 formats
+  const normalizedScore = score <= 1 ? Math.round(score * 100) : score;
+  const stars = Math.round(normalizedScore / 20);
   return (
-    <span className="text-yellow-400 text-sm">
+    <span className="text-yellow-400 text-sm" title={`${normalizedScore}% reliability`}>
       {'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
     </span>
   );

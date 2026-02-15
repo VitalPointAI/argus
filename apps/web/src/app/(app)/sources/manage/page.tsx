@@ -1045,7 +1045,9 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function StarRating({ score, onChange }: { score: number; onChange: (score: number) => void }) {
-  const stars = Math.round(score / 20);
+  // Normalize score: handle both 0-1 (legacy) and 0-100 formats
+  const normalizedScore = score <= 1 ? Math.round(score * 100) : score;
+  const stars = Math.round(normalizedScore / 20);
   
   const handleClick = (star: number) => {
     onChange(star * 20);
@@ -1066,7 +1068,7 @@ function StarRating({ score, onChange }: { score: number; onChange: (score: numb
           ★
         </button>
       ))}
-      <span className="ml-2 text-xs text-slate-500">({score})</span>
+      <span className="ml-2 text-xs text-slate-500">({normalizedScore})</span>
     </div>
   );
 }

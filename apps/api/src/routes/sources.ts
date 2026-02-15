@@ -298,7 +298,7 @@ sourcesRoutes.post('/from-analysis', async (c) => {
       type,
       url,
       domainId: selectedDomainIds[0],
-      reliabilityScore: analysis.confidence,
+      reliabilityScore: Math.round(analysis.confidence * 100), // Convert 0-1 to 0-100
       isActive: true,
       config,
       createdBy: isGlobal ? null : user.id,
