@@ -13,7 +13,10 @@ interface SourceAnalysis {
   websiteUrl?: string;
   youtubeChannelId?: string;
   suggestedDomain: string;
-  confidence: number;
+  confidence: number;  // Trustworthiness score (0-1), NOT detection accuracy
+  biases?: string[];   // Detected biases (political, ideological, commercial, national)
+  biasDirection?: 'left' | 'right' | 'center' | 'unknown';
+  disinfoRisk?: 'low' | 'medium' | 'high';
   notes: string;
 }
 
@@ -127,28 +130,41 @@ function parseYouTubeUrl(url: string): { type: 'channel' | 'playlist' | 'video' 
 
 // Use AI to analyze the source and suggest configuration
 async function analyzeWithAI(input: string, pageContent?: string): Promise<SourceAnalysis> {
-  const prompt = `You are a source analyzer for an intelligence platform. Analyze this input and suggest how to add it as a source.
+  const prompt = `You are a source reliability analyst for a strategic intelligence platform. Analyze this source for TRUSTWORTHINESS.
 
 INPUT: ${input}
-${pageContent ? `\nPAGE CONTENT SNIPPET:\n${pageContent.substring(0, 2000)}` : ''}
+${pageContent ? `\nPAGE CONTENT SNIPPET:\n${pageContent.substring(0, 3000)}` : ''}
 
-Respond in JSON format:
+Analyze and respond in JSON format:
 {
   "sourceType": "rss" | "youtube_channel" | "youtube_playlist" | "website" | "twitter" | "telegram" | "unknown",
   "name": "Human-readable source name",
-  "description": "Brief description of what this source covers",
+  "description": "Brief description of what this source covers and its perspective",
   "feedUrl": "RSS/Atom feed URL if applicable",
   "websiteUrl": "Main website URL",
   "youtubeChannelId": "YouTube channel ID if applicable",
   "suggestedDomain": "Best matching domain category (e.g., 'Geopolitics', 'Technology', 'Defense', 'Economics', 'Climate', 'Cybersecurity', etc.)",
   "confidence": 0.0-1.0,
-  "notes": "Any additional notes or caveats"
+  "biases": ["list", "of", "detected", "biases"],
+  "biasDirection": "left" | "right" | "center" | "unknown",
+  "disinfoRisk": "low" | "medium" | "high",
+  "notes": "Any additional notes about reliability, bias, or concerns"
 }
 
+CONFIDENCE SCORING (this is about SOURCE TRUSTWORTHINESS, not detection accuracy):
+- 0.9-1.0: Highly trusted source (major wire services, established papers of record, official government sources)
+- 0.7-0.9: Generally reliable (mainstream media, established analysts, academic institutions)
+- 0.5-0.7: Mixed reliability (blogs, opinion sources, partisan outlets - useful but needs verification)
+- 0.3-0.5: Questionable (known bias, poor fact-checking history, sensationalist)
+- 0.0-0.3: Unreliable (known disinfo, propaganda outlets, conspiracy sources)
+
+BIAS DETECTION:
+- Identify political leanings (left/right/center)
+- Note any ideological, national, or commercial biases
+- Flag if source is state-affiliated or has known agendas
+
 For RSS sources, always prefer the direct feed URL.
-For YouTube, extract the channel ID.
-For websites without RSS, note that web scraping will be used.
-Suggest the most appropriate strategic domain based on the content.`;
+For YouTube, extract the channel ID.`;
 
   try {
     const response = await callNearAI(prompt, { maxTokens: 1000 });
@@ -229,85 +245,66 @@ export async function analyzeSource(input: string): Promise<AnalyzeResult> {
       // URL-based analysis
       const urlObj = new URL(url);
       
-      // Substack handling - easy RSS detection
+      // Substack - auto-detect feed URL, but use AI for trustworthiness
       if (urlObj.hostname.includes('substack.com')) {
         const pageInfo = await fetchPageInfo(url);
         const feedUrl = `${urlObj.origin}/feed`;
         
-        // Extract author/publication name from URL or page title
-        const substackName = urlObj.hostname.split('.')[0];
-        const name = pageInfo?.title?.replace(' | Substack', '').trim() || 
-                    substackName.charAt(0).toUpperCase() + substackName.slice(1);
-        
-        analysis = {
-          sourceType: 'rss',
-          name,
-          description: pageInfo?.description || 'Substack newsletter',
-          feedUrl,
-          websiteUrl: url,
-          suggestedDomain: 'General',
-          confidence: 0.95,
-          notes: 'Substack newsletter - RSS feed auto-detected.',
-        };
+        // Use AI to analyze trustworthiness, passing known feed URL
+        analysis = await analyzeWithAI(input, pageInfo?.content);
+        analysis.sourceType = 'rss';
+        analysis.feedUrl = feedUrl;
+        analysis.websiteUrl = url;
+        if (pageInfo?.title) {
+          analysis.name = pageInfo.title.replace(' | Substack', '').trim();
+        }
         
         return { success: true, analysis };
       }
 
-      // YouTube handling
+      // YouTube handling - detect channel/playlist, use AI for trustworthiness
       if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
         const yt = parseYouTubeUrl(url);
         const pageInfo = await fetchPageInfo(url);
         
+        // Use AI for trustworthiness analysis
+        analysis = await analyzeWithAI(input, pageInfo?.content);
+        analysis.websiteUrl = url;
+        
         if (yt.type === 'channel') {
-          analysis = {
-            sourceType: 'youtube_channel',
-            name: pageInfo?.title?.replace(' - YouTube', '') || `YouTube Channel ${yt.id}`,
-            description: pageInfo?.description || 'YouTube channel',
-            websiteUrl: url,
-            youtubeChannelId: yt.id || undefined,
-            suggestedDomain: 'General',
-            confidence: 0.9,
-            notes: 'Will monitor for new video uploads.',
-          };
+          analysis.sourceType = 'youtube_channel';
+          analysis.youtubeChannelId = yt.id || undefined;
+          if (pageInfo?.title) {
+            analysis.name = pageInfo.title.replace(' - YouTube', '').trim();
+          }
         } else if (yt.type === 'playlist') {
-          analysis = {
-            sourceType: 'youtube_playlist',
-            name: pageInfo?.title?.replace(' - YouTube', '') || `YouTube Playlist`,
-            description: pageInfo?.description || 'YouTube playlist',
-            websiteUrl: url,
-            suggestedDomain: 'General',
-            confidence: 0.9,
-            notes: 'Will monitor for new videos added to playlist.',
-          };
-        } else {
-          // Single video - suggest the channel instead
-          analysis = await analyzeWithAI(input, pageInfo?.content);
+          analysis.sourceType = 'youtube_playlist';
+          if (pageInfo?.title) {
+            analysis.name = pageInfo.title.replace(' - YouTube', '').trim();
+          }
         }
+        // For single videos, analysis already done above
+        
+        return { success: true, analysis };
       }
-      // Twitter/X handling
+      // Twitter/X handling - use AI for trustworthiness
       else if (urlObj.hostname.includes('twitter.com') || urlObj.hostname.includes('x.com')) {
         const pageInfo = await fetchPageInfo(url);
-        analysis = {
-          sourceType: 'twitter',
-          name: pageInfo?.title || 'Twitter Account',
-          description: pageInfo?.description || '',
-          websiteUrl: url,
-          suggestedDomain: 'General',
-          confidence: 0.7,
-          notes: 'Twitter/X integration requires additional API setup.',
-        };
+        analysis = await analyzeWithAI(input, pageInfo?.content);
+        analysis.sourceType = 'twitter';
+        analysis.websiteUrl = url;
+        if (pageInfo?.title) {
+          analysis.name = pageInfo.title;
+        }
+        analysis.notes = (analysis.notes || '') + ' Twitter/X integration requires additional API setup.';
       }
-      // Telegram handling
+      // Telegram handling - use AI for trustworthiness
       else if (urlObj.hostname.includes('t.me') || urlObj.hostname.includes('telegram.me')) {
-        analysis = {
-          sourceType: 'telegram',
-          name: urlObj.pathname.substring(1),
-          description: 'Telegram channel',
-          websiteUrl: url,
-          suggestedDomain: 'General',
-          confidence: 0.7,
-          notes: 'Telegram channel integration.',
-        };
+        const pageInfo = await fetchPageInfo(url);
+        analysis = await analyzeWithAI(input, pageInfo?.content);
+        analysis.sourceType = 'telegram';
+        analysis.websiteUrl = url;
+        analysis.name = analysis.name || urlObj.pathname.substring(1);
       }
       // General website/RSS
       else {
