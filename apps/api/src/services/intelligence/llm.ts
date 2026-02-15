@@ -25,7 +25,7 @@ interface CompletionResponse {
 }
 
 const NEAR_AI_BASE_URL = 'https://cloud-api.near.ai/v1';
-const NEAR_AI_API_KEY = process.env.NEARAI_API_KEY || '';
+const NEAR_AI_API_KEY = process.env.NEAR_AI_API_KEY || '';
 
 // Default to DeepSeek V3.1 for reasoning tasks
 const DEFAULT_MODEL = 'deepseek-ai/DeepSeek-V3.1';
