@@ -157,21 +157,40 @@ export default function Dashboard() {
         {stats?.activeSourceList ? (
           <a 
             href={`/sources/lists/${stats.activeSourceList.id}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 rounded-lg hover:bg-argus-200 dark:hover:bg-argus-800 transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition border border-green-300 dark:border-green-700"
           >
-            <span className="text-green-500">●</span>
-            Filtered: <span className="font-medium">{stats.activeSourceList.name}</span>
-            <span className="text-xs text-slate-500">(click to change)</span>
+            <span className="text-green-500 text-lg">●</span>
+            <span className="font-medium">Filtered by: {stats.activeSourceList.name}</span>
+            <span className="text-xs opacity-70">(click to manage)</span>
           </a>
         ) : user ? (
           <a 
-            href="/sources"
+            href="/sources/manage"
             className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm"
           >
-            📋 Create a source list to filter
+            📋 Create a source list to filter your feed
           </a>
         ) : null}
       </div>
+      
+      {/* Active Filter Banner */}
+      {stats?.activeSourceList && (
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🎯</span>
+            <div>
+              <p className="font-semibold">Source List Active: {stats.activeSourceList.name}</p>
+              <p className="text-sm opacity-90">Showing articles only from sources in this list</p>
+            </div>
+          </div>
+          <a 
+            href={`/sources/lists/${stats.activeSourceList.id}`}
+            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition"
+          >
+            Manage List →
+          </a>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
