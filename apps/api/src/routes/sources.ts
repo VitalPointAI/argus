@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { db, sources, domains, sourceLists, sourceListItems, users } from '../db';
-import { eq, or, isNull, and } from 'drizzle-orm';
+import { db, sources, domains, sourceLists, sourceListItems, users, sourceDomains } from '../db';
+import { eq, or, isNull, and, inArray } from 'drizzle-orm';
 import { authMiddleware } from './auth';
 import { suggestSourcesForTopic, suggestSourcesForDomain, validateRSSUrl } from '../services/intelligence/source-suggestions';
 import { analyzeSource } from '../services/sources/ai-source-analyzer';
@@ -211,10 +211,15 @@ sourcesRoutes.post('/from-analysis', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({}));
-  const { analysis, domainId, isGlobal = false } = body;
+  const { analysis, domainId, domainIds, isGlobal = false } = body;
+  
+  // Support both single domainId and array of domainIds
+  const selectedDomainIds: string[] = domainIds?.length > 0 
+    ? domainIds 
+    : (domainId ? [domainId] : []);
 
-  if (!analysis || !domainId) {
-    return c.json({ success: false, error: 'Analysis and domainId are required' }, 400);
+  if (!analysis || selectedDomainIds.length === 0) {
+    return c.json({ success: false, error: 'Analysis and at least one domain are required' }, 400);
   }
 
   // Only admins can create global sources
@@ -253,19 +258,29 @@ sourcesRoutes.post('/from-analysis', async (c) => {
       return c.json({ success: false, error: 'No valid URL found in analysis' }, 400);
     }
 
-    // Create the source
+    // Create the source (use first domain as primary for backwards compat)
     const [newSource] = await db.insert(sources).values({
       name: analysis.name,
       type,
       url,
-      domainId,
+      domainId: selectedDomainIds[0],
       reliabilityScore: analysis.confidence,
       isActive: true,
       config,
       createdBy: isGlobal ? null : user.id,
     }).returning();
 
-    console.log(`[AI Analyzer] Created source: ${newSource.name} (${newSource.id})`);
+    // Insert all domain associations into junction table
+    if (selectedDomainIds.length > 0) {
+      await db.insert(sourceDomains).values(
+        selectedDomainIds.map(did => ({
+          sourceId: newSource.id,
+          domainId: did,
+        }))
+      ).onConflictDoNothing();
+    }
+
+    console.log(`[AI Analyzer] Created source: ${newSource.name} (${newSource.id}) with ${selectedDomainIds.length} domains`);
 
     return c.json({
       success: true,
@@ -289,36 +304,93 @@ sourcesRoutes.get('/', async (c) => {
   const domainId = c.req.query('domainId');
   const includeUserSources = c.req.query('includeUserSources') !== 'false';
   
-  // Build conditions: global sources (createdBy is null) OR user's own sources
-  let conditions: any[] = [];
+  // Build base conditions: global sources (createdBy is null) OR user's own sources
+  let baseConditions: any[] = [];
   
   if (user && includeUserSources) {
-    conditions.push(or(isNull(sources.createdBy), eq(sources.createdBy, user.id)));
+    baseConditions.push(or(isNull(sources.createdBy), eq(sources.createdBy, user.id)));
   } else {
-    conditions.push(isNull(sources.createdBy));
+    baseConditions.push(isNull(sources.createdBy));
   }
   
+  // If filtering by domain, find sources that have that domain in junction table
+  let sourceIdsInDomain: string[] | null = null;
   if (domainId) {
-    conditions.push(eq(sources.domainId, domainId));
+    const domainSources = await db.select({ sourceId: sourceDomains.sourceId })
+      .from(sourceDomains)
+      .where(eq(sourceDomains.domainId, domainId));
+    sourceIdsInDomain = domainSources.map(ds => ds.sourceId);
+    
+    // Also include sources with legacy domainId field (for migration)
+    const legacySources = await db.select({ id: sources.id })
+      .from(sources)
+      .where(eq(sources.domainId, domainId));
+    const legacyIds = legacySources.map(s => s.id);
+    sourceIdsInDomain = [...new Set([...sourceIdsInDomain, ...legacyIds])];
   }
   
-  const allSources = await db.select({
-    id: sources.id,
-    name: sources.name,
-    type: sources.type,
-    url: sources.url,
-    domainId: sources.domainId,
-    reliabilityScore: sources.reliabilityScore,
-    isActive: sources.isActive,
-    config: sources.config,
-    lastFetchedAt: sources.lastFetchedAt,
-    createdAt: sources.createdAt,
-    createdBy: sources.createdBy,
-  }).from(sources).where(and(...conditions));
+  let allSources;
+  if (sourceIdsInDomain !== null) {
+    if (sourceIdsInDomain.length === 0) {
+      // No sources match this domain
+      return c.json({ success: true, data: [] });
+    }
+    allSources = await db.select({
+      id: sources.id,
+      name: sources.name,
+      type: sources.type,
+      url: sources.url,
+      domainId: sources.domainId,
+      reliabilityScore: sources.reliabilityScore,
+      isActive: sources.isActive,
+      config: sources.config,
+      lastFetchedAt: sources.lastFetchedAt,
+      createdAt: sources.createdAt,
+      createdBy: sources.createdBy,
+    }).from(sources).where(and(...baseConditions, inArray(sources.id, sourceIdsInDomain)));
+  } else {
+    allSources = await db.select({
+      id: sources.id,
+      name: sources.name,
+      type: sources.type,
+      url: sources.url,
+      domainId: sources.domainId,
+      reliabilityScore: sources.reliabilityScore,
+      isActive: sources.isActive,
+      config: sources.config,
+      lastFetchedAt: sources.lastFetchedAt,
+      createdAt: sources.createdAt,
+      createdBy: sources.createdBy,
+    }).from(sources).where(and(...baseConditions));
+  }
   
-  // Add ownership info
+  // Get all domain associations for these sources
+  const sourceIds = allSources.map(s => s.id);
+  const domainAssocs = sourceIds.length > 0 
+    ? await db.select({
+        sourceId: sourceDomains.sourceId,
+        domainId: sourceDomains.domainId,
+        domainName: domains.name,
+      })
+        .from(sourceDomains)
+        .leftJoin(domains, eq(sourceDomains.domainId, domains.id))
+        .where(inArray(sourceDomains.sourceId, sourceIds))
+    : [];
+  
+  // Group domain associations by source
+  const domainsBySource = new Map<string, Array<{ id: string; name: string | null }>>();
+  for (const assoc of domainAssocs) {
+    if (!domainsBySource.has(assoc.sourceId)) {
+      domainsBySource.set(assoc.sourceId, []);
+    }
+    domainsBySource.get(assoc.sourceId)!.push({ id: assoc.domainId, name: assoc.domainName });
+  }
+  
+  // Add ownership info and domain associations
   const enrichedSources = allSources.map(s => ({
     ...s,
+    domains: domainsBySource.get(s.id) || [],
+    domainIds: (domainsBySource.get(s.id) || []).map(d => d.id),
     isGlobal: s.createdBy === null,
     isOwner: user ? s.createdBy === user.id : false,
     canEdit: user ? (s.createdBy === user.id || (s.createdBy === null && isAdmin(user))) : false,
@@ -364,10 +436,22 @@ sourcesRoutes.get('/:id', async (c) => {
     return c.json({ success: false, error: 'Source not found' }, 404);
   }
   
+  // Get all domains for this source
+  const domainAssocs = await db.select({
+    domainId: sourceDomains.domainId,
+    domainName: domains.name,
+    domainSlug: domains.slug,
+  })
+    .from(sourceDomains)
+    .leftJoin(domains, eq(sourceDomains.domainId, domains.id))
+    .where(eq(sourceDomains.sourceId, id));
+  
   return c.json({ 
     success: true, 
     data: {
       ...source,
+      domainIds: domainAssocs.map(d => d.domainId),
+      domains: domainAssocs.map(d => ({ id: d.domainId, name: d.domainName, slug: d.domainSlug })),
       isGlobal: source.createdBy === null,
       isOwner: user ? source.createdBy === user.id : false,
       canEdit: user ? (source.createdBy === user.id || (source.createdBy === null && isAdmin(user))) : false,

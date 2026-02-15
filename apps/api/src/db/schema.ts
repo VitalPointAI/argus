@@ -106,6 +106,14 @@ export const sourceListItems = pgTable('source_list_items', {
   addedAt: timestamp('added_at').notNull().defaultNow(),
 });
 
+// Many-to-many: sources can belong to multiple domains
+export const sourceDomains = pgTable('source_domains', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  domainId: uuid('domain_id').notNull().references(() => domains.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const userDomains = pgTable('user_domains', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

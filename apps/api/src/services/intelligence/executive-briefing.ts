@@ -9,7 +9,7 @@
  * - TTS-ready format option
  */
 
-import { db, content, sources, domains } from '../../db';
+import { db, content, sources, domains, sourceDomains } from '../../db';
 import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 
 const NEARAI_API_KEY = process.env.NEARAI_API_KEY;
@@ -132,9 +132,30 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   ];
   
   // Add domain filter if specified (from user preferences)
+  // Use junction table for multi-domain sources
+  let sourceIdsInDomains: string[] | null = null;
   if (options.domainIds && options.domainIds.length > 0) {
     console.log(`[FetchArticles] Filtering by ${options.domainIds.length} domains`);
-    conditions.push(inArray(sources.domainId, options.domainIds));
+    
+    // Find sources that have any of the specified domains
+    const domainSources = await db.select({ sourceId: sourceDomains.sourceId })
+      .from(sourceDomains)
+      .where(inArray(sourceDomains.domainId, options.domainIds));
+    sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
+    
+    // Also include sources with legacy domainId field
+    const legacySources = await db.select({ id: sources.id })
+      .from(sources)
+      .where(inArray(sources.domainId, options.domainIds));
+    sourceIdsInDomains = [...new Set([...sourceIdsInDomains, ...legacySources.map(s => s.id)])];
+    
+    if (sourceIdsInDomains.length > 0) {
+      conditions.push(inArray(content.sourceId, sourceIdsInDomains));
+    } else {
+      // No sources match these domains
+      console.log(`[FetchArticles] No sources found for specified domains`);
+      return [];
+    }
   }
   
   try {
