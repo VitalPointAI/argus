@@ -82,6 +82,126 @@ sourcesRoutes.post('/analyze', async (c) => {
   }
 });
 
+// Validate a feed URL - test if it actually works and return sample items
+sourcesRoutes.post('/validate-feed', async (c) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const { url, type = 'rss' } = body;
+
+  if (!url || typeof url !== 'string') {
+    return c.json({ success: false, error: 'URL is required' }, 400);
+  }
+
+  try {
+    console.log(`[Feed Validator] Testing: ${url}`);
+    
+    if (type === 'rss') {
+      // Import RSS parser dynamically
+      const Parser = (await import('rss-parser')).default;
+      const parser = new Parser({
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Argus/1.0 (+https://argus.vitalpoint.ai)',
+        },
+      });
+
+      try {
+        const feed = await parser.parseURL(url);
+        
+        // Get sample items (up to 3)
+        const sampleItems = (feed.items || []).slice(0, 3).map(item => ({
+          title: item.title || 'Untitled',
+          link: item.link || '',
+          pubDate: item.pubDate || item.isoDate || null,
+          snippet: (item.contentSnippet || item.content || '').substring(0, 200),
+        }));
+
+        return c.json({
+          success: true,
+          valid: true,
+          feedInfo: {
+            title: feed.title || 'Unknown Feed',
+            description: feed.description || '',
+            itemCount: feed.items?.length || 0,
+            lastBuildDate: feed.lastBuildDate || null,
+          },
+          sampleItems,
+          message: `✅ Feed working! Found ${feed.items?.length || 0} items.`,
+        });
+      } catch (parseError) {
+        console.error('[Feed Validator] Parse error:', parseError);
+        return c.json({
+          success: true,
+          valid: false,
+          error: parseError instanceof Error ? parseError.message : 'Failed to parse feed',
+          message: '❌ Feed not accessible or invalid RSS/Atom format',
+        });
+      }
+    } else if (type === 'youtube') {
+      // For YouTube, we'd check the channel/playlist exists
+      // For now, just validate the URL format
+      const ytMatch = url.match(/youtube\.com\/(channel\/|c\/|@|user\/|playlist\?list=)/);
+      if (ytMatch) {
+        return c.json({
+          success: true,
+          valid: true,
+          message: '✅ YouTube URL looks valid. Will monitor for new uploads.',
+        });
+      }
+      return c.json({
+        success: true,
+        valid: false,
+        message: '❌ Not a valid YouTube channel or playlist URL',
+      });
+    } else if (type === 'website') {
+      // For websites, check if we can fetch the page
+      try {
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Argus/1.0' },
+          signal: AbortSignal.timeout(10000),
+        });
+        
+        if (res.ok) {
+          return c.json({
+            success: true,
+            valid: true,
+            message: '✅ Website accessible. Will scrape for content updates.',
+          });
+        }
+        return c.json({
+          success: true,
+          valid: false,
+          message: `❌ Website returned ${res.status} ${res.statusText}`,
+        });
+      } catch (fetchError) {
+        return c.json({
+          success: true,
+          valid: false,
+          error: fetchError instanceof Error ? fetchError.message : 'Fetch failed',
+          message: '❌ Website not accessible',
+        });
+      }
+    }
+
+    return c.json({
+      success: true,
+      valid: null,
+      message: '⚠️ Validation not available for this source type',
+    });
+  } catch (error) {
+    console.error('[Feed Validator] Error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Validation failed',
+    }, 500);
+  }
+});
+
 // Add source from AI analysis
 sourcesRoutes.post('/from-analysis', async (c) => {
   const user = c.get('user');

@@ -16,6 +16,22 @@ interface SourceAnalysis {
   notes: string;
 }
 
+interface FeedValidation {
+  valid: boolean | null;
+  message: string;
+  feedInfo?: {
+    title: string;
+    description: string;
+    itemCount: number;
+  };
+  sampleItems?: {
+    title: string;
+    link: string;
+    pubDate: string | null;
+    snippet: string;
+  }[];
+}
+
 interface Domain {
   id: string;
   name: string;
@@ -57,6 +73,40 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
   const [success, setSuccess] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [step, setStep] = useState<'input' | 'review' | 'done'>('input');
+  const [validation, setValidation] = useState<FeedValidation | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  const validateFeed = async (url: string, type: string) => {
+    setValidating(true);
+    setValidation(null);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/sources/validate-feed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ url, type }),
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        setValidation({
+          valid: data.valid,
+          message: data.message,
+          feedInfo: data.feedInfo,
+          sampleItems: data.sampleItems,
+        });
+      }
+    } catch (err) {
+      setValidation({
+        valid: false,
+        message: '❌ Failed to validate feed',
+      });
+    } finally {
+      setValidating(false);
+    }
+  };
 
   const analyze = async () => {
     if (!input.trim()) return;
@@ -64,6 +114,7 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
     setLoading(true);
     setError(null);
     setAnalysis(null);
+    setValidation(null);
 
     try {
       const res = await fetch(`${API_URL}/api/sources/analyze`, {
@@ -81,6 +132,12 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
         setMatchedDomain(data.data.matchedDomain);
         setSelectedDomain(data.data.matchedDomain?.id || '');
         setStep('review');
+        
+        // Auto-validate the feed
+        const feedUrl = data.data.analysis.feedUrl || data.data.analysis.websiteUrl;
+        if (feedUrl) {
+          validateFeed(feedUrl, data.data.analysis.sourceType);
+        }
       } else {
         setError(data.error || 'Analysis failed');
       }
@@ -132,6 +189,7 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
     setMatchedDomain(null);
     setError(null);
     setSuccess(null);
+    setValidation(null);
     setStep('input');
   };
 
@@ -243,6 +301,77 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
               )}
             </div>
 
+            {/* Feed Validation Status */}
+            <div className="p-4 rounded-lg border-2 transition-all duration-300" style={{
+              borderColor: validating ? '#94a3b8' : validation?.valid === true ? '#22c55e' : validation?.valid === false ? '#ef4444' : '#94a3b8',
+              backgroundColor: validating ? '#f8fafc' : validation?.valid === true ? '#f0fdf4' : validation?.valid === false ? '#fef2f2' : '#f8fafc',
+            }}>
+              <div className="flex items-center gap-3 mb-2">
+                {validating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-400 border-t-transparent"></div>
+                    <span className="font-medium text-slate-600">Testing feed connection...</span>
+                  </>
+                ) : validation?.valid === true ? (
+                  <>
+                    <span className="text-2xl">✅</span>
+                    <span className="font-medium text-green-700">Feed Working!</span>
+                  </>
+                ) : validation?.valid === false ? (
+                  <>
+                    <span className="text-2xl">❌</span>
+                    <span className="font-medium text-red-700">Feed Not Working</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-2xl">⚠️</span>
+                    <span className="font-medium text-slate-600">Validation pending</span>
+                  </>
+                )}
+              </div>
+
+              {validation?.message && !validating && (
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{validation.message}</p>
+              )}
+
+              {/* Sample Items Preview */}
+              {validation?.sampleItems && validation.sampleItems.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Recent Items:</p>
+                  {validation.sampleItems.map((item, i) => (
+                    <div key={i} className="p-2 bg-white dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                      <a 
+                        href={item.link} 
+                        target="_blank" 
+                        rel="noopener" 
+                        className="text-sm font-medium text-argus-600 hover:underline line-clamp-1"
+                      >
+                        {item.title}
+                      </a>
+                      {item.pubDate && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {new Date(item.pubDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Retry validation button if failed */}
+              {validation?.valid === false && (
+                <button
+                  onClick={() => {
+                    const feedUrl = analysis.feedUrl || analysis.websiteUrl;
+                    if (feedUrl) validateFeed(feedUrl, analysis.sourceType);
+                  }}
+                  className="mt-3 text-sm text-argus-600 hover:text-argus-700 underline"
+                >
+                  🔄 Retry Validation
+                </button>
+              )}
+            </div>
+
             {/* Domain selection */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -273,6 +402,16 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
               </div>
             )}
 
+            {/* Validation Warning */}
+            {validation?.valid === false && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm flex items-start gap-2">
+                <span>⚠️</span>
+                <div>
+                  <strong>Feed validation failed.</strong> You can still add this source, but it may not retrieve content properly. Check that the URL is correct.
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3">
               <button
@@ -283,17 +422,29 @@ export default function SourceAssistant({ onSourceAdded }: Props) {
               </button>
               <button
                 onClick={addSource}
-                disabled={adding || !selectedDomain}
-                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white rounded-lg font-medium transition flex items-center justify-center gap-2"
+                disabled={adding || !selectedDomain || validating}
+                className={`flex-1 px-6 py-3 text-white rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                  validation?.valid === false 
+                    ? 'bg-amber-600 hover:bg-amber-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } disabled:bg-slate-400`}
               >
                 {adding ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                     Adding...
                   </>
+                ) : validating ? (
+                  <>
+                    Validating...
+                  </>
+                ) : validation?.valid === false ? (
+                  <>
+                    ⚠️ Add Anyway
+                  </>
                 ) : (
                   <>
-                    ✓ Add This Source
+                    ✅ Add This Source
                   </>
                 )}
               </button>
