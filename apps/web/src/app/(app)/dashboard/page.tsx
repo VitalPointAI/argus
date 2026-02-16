@@ -192,24 +192,8 @@ export default function Dashboard() {
         ) : null}
       </div>
       
-      {/* Active Filter Banner */}
-      {stats?.activeSourceList ? (
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎯</span>
-            <div>
-              <p className="font-semibold">Source List Active: {stats.activeSourceList.name}</p>
-              <p className="text-sm opacity-90">Showing articles only from sources in this list</p>
-            </div>
-          </div>
-          <a 
-            href={`/sources/lists/${stats.activeSourceList.id}`}
-            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition"
-          >
-            Manage List →
-          </a>
-        </div>
-      ) : stats?.selectedDomains && stats.selectedDomains.length > 0 ? (
+      {/* Domain Filter Banner (only shown when domain filter active, not source list) */}
+      {!stats?.activeSourceList && stats?.selectedDomains && stats.selectedDomains.length > 0 ? (
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🏷️</span>
