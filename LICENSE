@@ -1,0 +1,43 @@
+Business Source License 1.1
+
+Parameters
+
+Licensor:             VitalPoint AI Inc.
+Licensed Work:        Argus Strategic Intelligence Platform
+                      The Licensed Work is (c) 2026 VitalPoint AI Inc.
+
+Additional Use Grant: You may use the Licensed Work for any purpose except
+                      offering it as a competing commercial hosted service.
+                      
+                      Permitted uses include:
+                      - Self-hosting for internal business use
+                      - Non-commercial research and education  
+                      - Development and testing
+                      - Contributing improvements back to the project
+
+Change Date:          February 16, 2030
+Change License:       Apache License, Version 2.0
+
+Terms
+
+The Licensor grants you the right to copy, modify, create derivative works,
+redistribute, and make non-production use of the Licensed Work.
+
+Effective on the Change Date, or the fourth anniversary of the first publicly
+available distribution of a specific version of the Licensed Work under this
+License, whichever comes first, the Licensor grants you rights under the
+terms of the Change License.
+
+If your use does not comply with the requirements in this License, you must
+purchase a commercial license from the Licensor or refrain from using the
+Licensed Work.
+
+All copies of the original and modified Licensed Work are subject to this
+License.
+
+THE LICENSED WORK IS PROVIDED "AS IS". LICENSOR DISCLAIMS ALL WARRANTIES
+AND CONDITIONS, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND TITLE.
+
+For the full Business Source License 1.1 text, see:
+https://mariadb.com/bsl11/

@@ -21,7 +21,7 @@
     "verification"
   ],
   "author": "Jim <jimmy.agent@vitalpoint.ai>",
-  "license": "MIT",
+  "license": "BSL-1.1",
   "dependencies": {
     "autoprefixer": "10.4.24",
     "postcss": "8.5.6",
