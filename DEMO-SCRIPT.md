@@ -113,7 +113,7 @@
 ## ROADMAP & CLOSE (2:40 - 3:00)
 
 **NARRATION:**
-> "Coming next: OAuth and passkey login for mainstream adoption. Collaborative verification where communities validate claims together. And mobile apps bringing Argus everywhere you go."
+> "Coming next: real-time breaking news alerts the moment critical intel drops. Twitter and Telegram channel ingestion for social intelligence. And mobile apps bringing Argus everywhere you go."
 
 > "In a world drowning in noise, Argus gives you clarity. In a world that silences truth, Argus lets it speak."
 
@@ -122,10 +122,13 @@
 **📹 SCREEN RECORDING SEQUENCE:**
 1. Show Docs site → Roadmap page (if exists) OR
 2. *Static slide with roadmap items:*
-   - ✅ Phase 1-4 Complete
-   - 🔨 Phase 5: NFT Marketplace (Live!)
-   - ⏳ Phase 6: OAuth + Passkeys
-   - ⏳ Phase 7: Mobile Apps
+   - ✅ AI Briefings & Verification
+   - ✅ Anonymous HUMINT + Zcash Payments
+   - ✅ ZK Proofs (Production Ready)
+   - ✅ NFT Marketplace + 1Click Payments
+   - ⏳ Real-time Alerts
+   - ⏳ Social Intel (Twitter/Telegram)
+   - ⏳ Mobile Apps
 3. End on landing page with logo prominent
 
 ---
