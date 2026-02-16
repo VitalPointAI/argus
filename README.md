@@ -16,12 +16,20 @@
 Every day, analysts and researchers face the same challenge: hundreds of sources to monitor, contradicting reports to reconcile, and critical signals buried in noise. The tools we have aren't built for this reality:
 
 - **Information overload** — RSS feeds, newsletters, social media, reports. No human can process it all, and most never gets read.
+
 - **Trust crisis** — How do you know what's true? Misinformation spreads faster than corrections. Source reliability is a black box.
+
+- **Privacy nightmare** — Every search, every read, every interest becomes data for Big Tech. Your research patterns reveal your intentions. Intelligence work requires confidentiality that centralized platforms can't provide.
+
+- **AI that extracts, not empowers** — Today's AI tools harvest your data to train models you don't control. They optimize for engagement, not insight. The AI works for the platform, not for you.
+
 - **Source protection failure** — Human intelligence is invaluable, but sources risk exposure. One leak can be fatal. Current systems force a terrible choice: share intel and risk your source, or protect them and stay silent.
+
 - **Gatekept intelligence** — The best analysis is locked behind institutional walls. Independent researchers can't monetize their expertise. Good intelligence stays siloed.
+
 - **No verification trail** — Claims get repeated until they feel true. There's no systematic way to trace how information was verified or who vouched for it.
 
-The intelligence community has expensive solutions. Everyone else gets Google Alerts.
+The intelligence community has expensive solutions. Everyone else gets Google Alerts and surveillance capitalism.
 
 **There has to be a better way.**
 
@@ -29,19 +37,30 @@ The intelligence community has expensive solutions. Everyone else gets Google Al
 
 ## The Solution
 
-**Argus is strategic intelligence infrastructure for the AI age.**
+**Argus is strategic intelligence infrastructure for the AI age — built on NEAR.**
 
-We built Argus to solve these problems with a fundamentally different approach:
+We built Argus to solve these problems with a fundamentally different approach, and **NEAR Protocol is essential to making it work**:
 
-| Problem | Argus Solution |
-|---------|----------------|
-| **Information overload** | AI synthesizes hundreds of sources into actionable briefings with confidence scores |
-| **Trust crisis** | Every claim links back to sources. Cross-reference verification shows what's corroborated. |
-| **Source protection** | Zero-knowledge proofs let sources build reputation without revealing identity |
-| **Gatekept intelligence** | NFT marketplace lets anyone monetize curated source lists and analysis |
-| **No verification trail** | Full audit trail for every verification. Portable reputation that follows analysts. |
+| Problem | Argus Solution | Why NEAR? |
+|---------|----------------|-----------|
+| **Information overload** | AI synthesizes hundreds of sources into actionable briefings with confidence scores | NEAR AI provides private inference in TEEs — your queries never leave secure enclaves |
+| **Privacy nightmare** | Your data stays yours. No surveillance. No profiling. | Decentralized architecture means no central server logging your every move |
+| **AI that extracts** | AI that works *for you*, not platforms. User-owned, user-controlled. | NEAR AI runs in Trusted Execution Environments — even the operators can't see your data |
+| **Trust crisis** | Every claim links to sources. Cross-reference verification shows what's corroborated. | On-chain verification trails provide immutable audit history |
+| **Source protection** | Zero-knowledge proofs let sources build reputation without revealing identity | NEAR's account model + ZK proofs enable privacy-preserving credentials |
+| **Gatekept intelligence** | NFT marketplace lets anyone monetize curated source lists and analysis | NEAR smart contracts enable direct creator payments, no middlemen |
+| **No verification trail** | Full audit trail for every verification. Portable reputation that follows analysts. | Blockchain provides tamper-proof provenance that follows you across platforms |
 
-The result: Intelligence you can trust, sources you can protect, and expertise you can monetize.
+### Why This Needs NEAR
+
+Argus couldn't exist on traditional infrastructure:
+
+- **🔒 Privacy-Preserving AI** — NEAR AI runs in TEEs (Trusted Execution Environments). Your intelligence queries are processed privately — not logged, not trained on, not sold.
+- **🪪 Self-Sovereign Identity** — Sources control their own credentials. Reputation is portable. No platform can deplatform your professional history.
+- **💸 Trustless Payments** — Near Intents enable payments in any token. Zcash integration adds shielded transactions for sensitive HUMINT work.
+- **📜 Immutable Verification** — On-chain trails mean verification history can't be altered. Trust is cryptographic, not institutional.
+
+The result: **Intelligence you can trust, AI that works for you, and privacy by default.**
 
 ---
 
