@@ -32,3 +32,4 @@ coverage/
 # Drizzle
 drizzle/
 .claude/
+.planning/
