@@ -66,7 +66,19 @@ export default function NavBar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <a href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-            <span className="text-2xl">🦚</span>
+            <svg className="w-8 h-8" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="argusGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#1d4ed8" />
+                </linearGradient>
+              </defs>
+              <circle cx="16" cy="16" r="15" fill="url(#argusGrad)"/>
+              <ellipse cx="16" cy="16" rx="10" ry="7" fill="white"/>
+              <circle cx="16" cy="16" r="5" fill="#1e40af"/>
+              <circle cx="16" cy="16" r="2.5" fill="#0f172a"/>
+              <circle cx="14" cy="14.5" r="1" fill="white" opacity="0.8"/>
+            </svg>
             <span className="text-xl font-bold">Argus</span>
           </a>
 
