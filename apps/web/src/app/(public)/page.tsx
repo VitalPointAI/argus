@@ -300,7 +300,7 @@ export default function LandingPage() {
             Ready to Transform Your Intelligence Workflow?
           </h2>
           <p className="text-slate-300 mb-8 text-lg">
-            Join thousands of analysts, researchers, and sources using Argus to stay ahead.
+            Join analysts, researchers, and sources using Argus to stay ahead.
           </p>
           <button
             onClick={() => setShowAccountModal(true)}
