@@ -113,7 +113,7 @@
 ## ROADMAP & CLOSE (2:40 - 3:00)
 
 **NARRATION:**
-> "Coming next: real-time breaking news alerts the moment critical intel drops. Twitter and Telegram channel ingestion for social intelligence. And mobile apps bringing Argus everywhere you go."
+> "We're live, but we're not done. The trust scoring algorithm needs refinement—we're tuning it against real-world accuracy data. NFT contracts are designed and ready to deploy on NEAR mainnet. And we're adding real-time alerts, social intelligence from Twitter and Telegram, and mobile apps."
 
 > "In a world drowning in noise, Argus gives you clarity. In a world that silences truth, Argus lets it speak."
 
@@ -126,6 +126,8 @@
    - ✅ Anonymous HUMINT + Zcash Payments
    - ✅ ZK Proofs (Production Ready)
    - ✅ NFT Marketplace + 1Click Payments
+   - 🔧 Trust Score Algorithm (refining)
+   - 🔧 NFT Contracts (deploying to mainnet)
    - ⏳ Real-time Alerts
    - ⏳ Social Intel (Twitter/Telegram)
    - ⏳ Mobile Apps
