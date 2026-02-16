@@ -150,22 +150,19 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   ];
   
   // Add source filter if specified (from user's active source list)
+  // When an active source list is set, it takes priority over domain preferences
   if (options.sourceIds && options.sourceIds.length > 0) {
-    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list`);
+    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list (ignoring domain filter)`);
     conditions.push(inArray(content.sourceId, options.sourceIds));
-  }
-  
-  // Add domain filter if specified (from user preferences)
-  // Use junction table for multi-domain sources
-  let sourceIdsInDomains: string[] | null = null;
-  if (options.domainIds && options.domainIds.length > 0) {
-    console.log(`[FetchArticles] Filtering by ${options.domainIds.length} domains`);
+  } else if (options.domainIds && options.domainIds.length > 0) {
+    // Only apply domain filter when NO active source list is set
+    console.log(`[FetchArticles] No active source list - filtering by ${options.domainIds.length} domains`);
     
     // Find sources that have any of the specified domains
     const domainSources = await db.select({ sourceId: sourceDomains.sourceId })
       .from(sourceDomains)
       .where(inArray(sourceDomains.domainId, options.domainIds));
-    sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
+    let sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
     
     // Also include sources with legacy domainId field
     const legacySources = await db.select({ id: sources.id })
