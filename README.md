@@ -154,8 +154,8 @@ Full documentation available at **[docs.argus.vitalpoint.ai](https://docs.argus.
 - [x] **Phase 3**: HUMINT with Zcash payments
 - [x] **Phase 4**: Verification engine
 - [x] **Phase 5**: NFT Marketplace
-- [ ] **Phase 6**: OAuth + Passkey auth overhaul
-- [ ] **Phase 7**: Mobile apps
+- [x] **Phase 6**: OAuth + Passkey auth overhaul
+- [x] **Phase 7**: Mobile apps
 - [ ] **Phase 8**: Collaborative verification
 
 ## Contributing
