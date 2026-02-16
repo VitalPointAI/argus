@@ -114,6 +114,7 @@ interface BriefingOptions {
   maxArticles?: number;
   domains?: string[]; // Domain slugs to filter by
   domainIds?: string[]; // Domain IDs to filter by (from user preferences)
+  sourceIds?: string[]; // Source IDs to filter by (from active source list)
   includeTTS?: boolean;
 }
 
@@ -147,6 +148,12 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   const conditions = [
     gte(content.fetchedAt, since),
   ];
+  
+  // Add source filter if specified (from user's active source list)
+  if (options.sourceIds && options.sourceIds.length > 0) {
+    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list`);
+    conditions.push(inArray(content.sourceId, options.sourceIds));
+  }
   
   // Add domain filter if specified (from user preferences)
   // Use junction table for multi-domain sources

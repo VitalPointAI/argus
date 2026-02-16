@@ -1,6 +1,23 @@
 import { Hono } from 'hono';
-import { db, briefings, users } from '../db';
+import { db, briefings, users, sourceListItems } from '../db';
 import { eq, desc, sql, and } from 'drizzle-orm';
+
+// Helper to get source IDs from user's active source list
+async function getActiveSourceIds(user: { id: string; preferences?: Record<string, unknown> } | null): Promise<string[] | null> {
+  if (!user) return null;
+  
+  const prefs = (user.preferences || {}) as { activeSourceListId?: string };
+  const activeListId = prefs.activeSourceListId;
+  
+  if (!activeListId) return null;
+  
+  // Get source IDs from the list
+  const items = await db.select({ sourceId: sourceListItems.sourceId })
+    .from(sourceListItems)
+    .where(eq(sourceListItems.sourceListId, activeListId));
+  
+  return items.length > 0 ? items.map(i => i.sourceId) : null;
+}
 import { generateBriefing, createBriefing } from '../services/intelligence/briefing';
 import { generateLLMBriefing, generateFactCheckedBriefing } from '../services/intelligence/llm-briefing';
 import { generateExecutiveBriefing } from '../services/intelligence/executive-briefing';
@@ -319,8 +336,9 @@ briefingsRoutes.post('/factcheck', async (c) => {
 
 // Generate executive briefing (new structured format)
 // Always saves when user is authenticated
+// Respects user's active source list if set
 briefingsRoutes.post('/executive', async (c) => {
-  const user = c.get('user' as never) as { id: string } | null;
+  const sessionUser = c.get('user' as never) as { id: string } | null;
   const body = await c.req.json().catch(() => ({}));
   const { 
     type = 'morning', 
@@ -328,11 +346,27 @@ briefingsRoutes.post('/executive', async (c) => {
     minConfidence = 45,
     maxArticles = 100,
     includeTTS = false,
+    useAllSources = false, // bypass source list filter
   } = body;
 
   try {
+    // Get full user with preferences if authenticated
+    let user: { id: string; preferences?: Record<string, unknown> } | null = null;
+    if (sessionUser) {
+      const [fullUser] = await db.select({ id: users.id, preferences: users.preferences })
+        .from(users)
+        .where(eq(users.id, sessionUser.id));
+      user = fullUser || sessionUser;
+    }
+    
+    // Get active source IDs from user's source list
+    const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
+    
     console.log(`[Briefing] Generating executive ${type} briefing...`);
     console.log(`[Briefing] Options: hoursBack=${hoursBack}, minConfidence=${minConfidence}, maxArticles=${maxArticles}`);
+    if (activeSourceIds) {
+      console.log(`[Briefing] Filtering by ${activeSourceIds.length} sources from user's active source list`);
+    }
     
     const briefing = await generateExecutiveBriefing({
       type,
@@ -340,6 +374,7 @@ briefingsRoutes.post('/executive', async (c) => {
       minConfidence,
       maxArticles,
       includeTTS,
+      sourceIds: activeSourceIds || undefined,
     });
 
     console.log(`[Briefing] Generated: ${briefing.summary?.totalStories || 0} stories, ${briefing.summary?.totalArticles || 0} articles`);
