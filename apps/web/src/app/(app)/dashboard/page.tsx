@@ -24,6 +24,12 @@ interface ContentItem {
   domain?: { name: string; slug: string };
 }
 
+interface SelectedDomain {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface Stats {
   content?: {
     total: number;
@@ -34,7 +40,9 @@ interface Stats {
   sources?: number;
   domains?: number;
   activeSourceList?: ActiveSourceList | null;
+  selectedDomains?: SelectedDomain[];
   isFiltered?: boolean;
+  filterType?: 'sourceList' | 'domains' | null;
 }
 
 interface Domain {
@@ -153,7 +161,7 @@ export default function Dashboard() {
           </p>
         </div>
         
-        {/* Active Source List Indicator */}
+        {/* Active Filter Indicator */}
         {stats?.activeSourceList ? (
           <a 
             href={`/sources/lists/${stats.activeSourceList.id}`}
@@ -162,6 +170,17 @@ export default function Dashboard() {
             <span className="text-green-500 text-lg">●</span>
             <span className="font-medium">Filtered by: {stats.activeSourceList.name}</span>
             <span className="text-xs opacity-70">(click to manage)</span>
+          </a>
+        ) : stats?.selectedDomains && stats.selectedDomains.length > 0 ? (
+          <a 
+            href="/settings"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition border border-blue-300 dark:border-blue-700"
+          >
+            <span className="text-blue-500 text-lg">●</span>
+            <span className="font-medium">
+              Domain filter: {stats.selectedDomains.length} selected
+            </span>
+            <span className="text-xs opacity-70">(click to change)</span>
           </a>
         ) : user ? (
           <a 
@@ -174,7 +193,7 @@ export default function Dashboard() {
       </div>
       
       {/* Active Filter Banner */}
-      {stats?.activeSourceList && (
+      {stats?.activeSourceList ? (
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🎯</span>
@@ -190,7 +209,25 @@ export default function Dashboard() {
             Manage List →
           </a>
         </div>
-      )}
+      ) : stats?.selectedDomains && stats.selectedDomains.length > 0 ? (
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🏷️</span>
+            <div>
+              <p className="font-semibold">Domain Filter Active</p>
+              <p className="text-sm opacity-90">
+                Showing: {stats.selectedDomains.map(d => d.name).join(', ')}
+              </p>
+            </div>
+          </div>
+          <a 
+            href="/settings"
+            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition"
+          >
+            Change Domains →
+          </a>
+        </div>
+      ) : null}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

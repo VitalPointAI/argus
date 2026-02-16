@@ -469,8 +469,12 @@ apiV1Routes.get('/stats', async (c) => {
 
   // Get active list info if user has one
   let activeListInfo = null;
+  let selectedDomainsInfo: { id: string; name: string; slug: string }[] = [];
+  
   if (user && !useAllSources) {
-    const prefs = user.preferences as { activeSourceListId?: string } || {};
+    const prefs = user.preferences as { activeSourceListId?: string; domains?: { selected?: string[] } } || {};
+    
+    // Check for active source list
     if (prefs.activeSourceListId) {
       const [list] = await db.select({ id: sourceLists.id, name: sourceLists.name })
         .from(sourceLists)
@@ -479,6 +483,14 @@ apiV1Routes.get('/stats', async (c) => {
       if (list) {
         activeListInfo = list;
       }
+    }
+    
+    // Check for selected domains (only relevant if no source list active)
+    if (!activeListInfo && prefs.domains?.selected && prefs.domains.selected.length > 0) {
+      const selectedDomains = await db.select({ id: domains.id, name: domains.name, slug: domains.slug })
+        .from(domains)
+        .where(inArray(domains.id, prefs.domains.selected));
+      selectedDomainsInfo = selectedDomains;
     }
   }
 
@@ -495,7 +507,9 @@ apiV1Routes.get('/stats', async (c) => {
       domains: Number(domainTotal.count),
       lastUpdated: new Date().toISOString(),
       activeSourceList: activeListInfo,
-      isFiltered: !!activeListInfo,
+      selectedDomains: selectedDomainsInfo,
+      isFiltered: !!(activeListInfo || selectedDomainsInfo.length > 0),
+      filterType: activeListInfo ? 'sourceList' : selectedDomainsInfo.length > 0 ? 'domains' : null,
     },
   });
 });
