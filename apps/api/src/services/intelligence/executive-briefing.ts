@@ -446,7 +446,7 @@ export async function generateExecutiveBriefing(options: BriefingOptions): Promi
         domain,
         domainSlug: slug,
         icon: DOMAIN_ICONS[slug] || DOMAIN_ICONS.default,
-        stories: stories.slice(0, 4), // Max 4 stories per domain
+        stories, // Show all stories in domain
       });
     }
   }

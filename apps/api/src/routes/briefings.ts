@@ -362,10 +362,17 @@ briefingsRoutes.post('/executive', async (c) => {
     // Get active source IDs from user's source list
     const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
     
+    // Get user's selected domains from preferences
+    const prefs = (user?.preferences || {}) as { domains?: { selected?: string[] } };
+    const selectedDomainIds = prefs.domains?.selected;
+    
     console.log(`[Briefing] Generating executive ${type} briefing...`);
     console.log(`[Briefing] Options: hoursBack=${hoursBack}, minConfidence=${minConfidence}, maxArticles=${maxArticles}`);
     if (activeSourceIds) {
       console.log(`[Briefing] Filtering by ${activeSourceIds.length} sources from user's active source list`);
+    }
+    if (selectedDomainIds && selectedDomainIds.length > 0) {
+      console.log(`[Briefing] Filtering by ${selectedDomainIds.length} selected domains`);
     }
     
     const briefing = await generateExecutiveBriefing({
@@ -375,6 +382,7 @@ briefingsRoutes.post('/executive', async (c) => {
       maxArticles,
       includeTTS,
       sourceIds: activeSourceIds || undefined,
+      domainIds: selectedDomainIds && selectedDomainIds.length > 0 ? selectedDomainIds : undefined,
     });
 
     console.log(`[Briefing] Generated: ${briefing.summary?.totalStories || 0} stories, ${briefing.summary?.totalArticles || 0} articles`);
