@@ -54,7 +54,7 @@ export default function NavBar() {
     { href: '/marketplace', label: '🛒 Marketplace' },
     { href: '/leaderboard', label: '🏆 Leaderboard' },
     { href: '/analytics', label: '📊 Analytics' },
-    { href: '/domains', label: 'Domains' },
+    { href: '/domains', label: '🌐 Domains' },
     { href: '/bounties', label: '📋 Intel Bounties' },
     { href: '/zk', label: '🔐 ZK Proofs' },
     { href: 'https://docs.argus.vitalpoint.ai', label: '📚 Documentation', external: true },
