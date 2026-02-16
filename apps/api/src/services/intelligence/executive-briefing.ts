@@ -15,6 +15,23 @@ import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 const NEARAI_API_KEY = process.env.NEARAI_API_KEY;
 const ARGUS_BASE_URL = process.env.ARGUS_BASE_URL || 'https://argus.vitalpoint.ai';
 
+/**
+ * Strip HTML tags from text and clean up whitespace
+ */
+function stripHtml(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ') // Replace &nbsp;
+    .replace(/&amp;/g, '&') // Replace &amp;
+    .replace(/&lt;/g, '<') // Replace &lt;
+    .replace(/&gt;/g, '>') // Replace &gt;
+    .replace(/&quot;/g, '"') // Replace &quot;
+    .replace(/&#\d+;/g, '') // Remove numeric HTML entities
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+}
+
 interface Article {
   id: string;
   title: string;
@@ -224,8 +241,8 @@ async function clusterIntoStories(articles: Article[], domain: string): Promise<
     return articles.slice(0, 5).map((a, i) => ({
       id: `story-${domain}-${i}`,
       headline: a.title,
-      context: a.body.substring(0, 300) + '...',
-      latestUpdate: a.body.substring(0, 200),
+      context: stripHtml(a.body).substring(0, 300) + '...',
+      latestUpdate: stripHtml(a.body).substring(0, 200),
       significance: a.confidenceScore >= 75 ? 'high' : a.confidenceScore >= 60 ? 'medium' : 'low',
       articles: [{
         id: a.id,
@@ -241,7 +258,7 @@ async function clusterIntoStories(articles: Article[], domain: string): Promise<
   }
 
   const articleList = articles.slice(0, 15).map((a, i) => 
-    `[${i + 1}] "${a.title}" (${a.sourceName}, ${a.confidenceScore}% confidence)\nContent: ${a.body.substring(0, 400)}...\nURL: ${a.url}`
+    `[${i + 1}] "${a.title}" (${a.sourceName}, ${a.confidenceScore}% confidence)\nContent: ${stripHtml(a.body).substring(0, 400)}...\nURL: ${a.url}`
   ).join('\n\n');
 
   const prompt = `You are an intelligence analyst creating an executive briefing.
@@ -343,7 +360,7 @@ RULES:
     return articles.slice(0, 3).map((a, i) => ({
       id: `story-${domain}-${i}`,
       headline: a.title,
-      context: a.body.substring(0, 300) + '...',
+      context: stripHtml(a.body).substring(0, 300) + '...',
       latestUpdate: 'See full article for details.',
       significance: 'medium' as const,
       articles: [{
