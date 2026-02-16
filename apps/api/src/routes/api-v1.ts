@@ -108,16 +108,17 @@ apiV1Routes.get('/intelligence', async (c) => {
     conditions.push(gte(content.fetchedAt, new Date(since)));
   }
 
-  // Domain filter: query param takes precedence, then user preferences
-  if (domainSlug) {
-    conditions.push(eq(domains.slug, domainSlug));
-  } else if (userDomainIds && userDomainIds.length > 0) {
-    conditions.push(inArray(sources.domainId, userDomainIds));
-  }
-
-  // Filter by active source list if user has one
+  // Filter by active source list if user has one (takes precedence over domain filter)
   if (activeSourceIds && activeSourceIds.length > 0) {
     conditions.push(inArray(content.sourceId, activeSourceIds));
+    // Source list overrides domain preferences - the list IS the filter
+  } else {
+    // Domain filter: only apply if no source list is active
+    if (domainSlug) {
+      conditions.push(eq(domains.slug, domainSlug));
+    } else if (userDomainIds && userDomainIds.length > 0) {
+      conditions.push(inArray(sources.domainId, userDomainIds));
+    }
   }
 
   const items = await db
