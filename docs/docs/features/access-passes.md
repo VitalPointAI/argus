@@ -14,7 +14,7 @@ Subscribe → Payment → Access Pass Minted → Content Unlocked
 
 1. **Browse** the marketplace for source lists
 2. **Choose a package** (Free, Monthly, Yearly, Lifetime)
-3. **Subscribe** with any supported token via 1Click
+3. **Subscribe** with any supported token via Near Intents
 4. **Receive** your Access Pass automatically
 5. **Access** the source list content instantly
 
@@ -65,11 +65,9 @@ Creators can offer free Access Passes to build their audience:
 4. Toggle **Free Tier** for $0 packages
 5. Save and your package appears in the marketplace
 
-### Revenue Split
+### Revenue
 
-- **95%** goes directly to you
-- **5%** platform fee
-- Payments sent immediately via smart contract
+- Payments sent directly to you via smart contract
 - No middlemen, no custodial holding
 
 ## API Reference

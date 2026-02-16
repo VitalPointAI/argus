@@ -128,7 +128,7 @@ Three ways to earn:
 
 **For high-risk sources**: Use a Zcash z-address (starts with `zs1`). Payments go through our shielded escrow - there's no on-chain link between Argus and you.
 
-**For convenience**: Receive on any chain - ETH, SOL, BTC, ARB, etc. Payments converted via 1Click.
+**For convenience**: Receive on any chain - ETH, SOL, BTC, ARB, etc. Payments converted via Near Intents.
 
 ---
 

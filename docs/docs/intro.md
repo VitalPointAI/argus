@@ -20,7 +20,7 @@ Crowdsourced intelligence from anonymous sources. Sources register with cryptogr
 ## Key Features
 
 ### Source Monitoring
-- **📡 Multi-Source Aggregation** - 100+ sources across 20+ domains (RSS, web, YouTube)
+- **📡 Multi-Source Aggregation** - Curated sources across multiple domains (RSS, web, YouTube)
 - **🔍 AI Verification** - Cross-reference claims, bias detection, confidence scoring
 - **📋 Executive Briefings** - LLM-generated summaries clustered by domain
 - **🔔 Scheduled Delivery** - Automatic briefings via Telegram/email
@@ -83,7 +83,7 @@ Crowdsourced intelligence from anonymous sources. Sources register with cryptogr
        │              PAYMENT LAYER                   │
        │  ┌─────────────┐  ┌─────────────────────┐   │
        │  │ NEAR Intents│  │  Zcash Shielded     │   │
-       │  │  (1Click)   │  │     Escrow          │   │
+       │  │  (Intents)  │  │     Escrow          │   │
        │  └─────────────┘  └─────────────────────┘   │
        └─────────────────────────────────────────────┘
 ```

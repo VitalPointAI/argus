@@ -20,10 +20,10 @@ Argus is a strategic intelligence platform that helps analysts, researchers, and
 ## Features
 
 ### 📊 Strategic Intelligence Dashboard
-- Real-time feed from 100+ curated sources across 20+ domains
+- Real-time feed from curated sources across multiple domains
 - AI-generated briefings with confidence scores
 - Deep verification with cross-reference analysis
-- Full-text search across 27,000+ articles
+- Full-text search across all ingested content
 
 ### 🎭 Human Intelligence (HUMINT)
 - Anonymous source registration via passkeys
@@ -34,8 +34,8 @@ Argus is a strategic intelligence platform that helps analysts, researchers, and
 ### 🛒 Source List Marketplace
 - Sell access to curated source collections
 - NFT Access Passes on NEAR blockchain
-- 95% to creators, 5% platform fee
-- Pay with any token via 1Click
+- Direct payments to creators via smart contract
+- Pay with any token via Near Intents
 
 ### 🔐 Privacy & Verification
 - ZK proofs for claims without revealing sources
@@ -50,7 +50,7 @@ Argus is a strategic intelligence platform that helps analysts, researchers, and
 | **AI** | NEAR AI (DeepSeek V3.1 via TEE) |
 | **Blockchain** | NEAR Protocol |
 | **ZK Proofs** | Circom + snarkjs (Groth16) |
-| **Payments** | Zcash (shielded), 1Click (multi-token) |
+| **Payments** | Zcash (shielded), Near Intents (multi-token) |
 | **Backend** | Hono + Node.js + PostgreSQL |
 | **Frontend** | Next.js 14 + Tailwind CSS |
 | **Auth** | Passkeys (WebAuthn) + JWT |
@@ -128,7 +128,7 @@ See `.env.example` for full configuration options.
 │                  (Hono + Node.js)                            │
 ├─────────────┬─────────────┬─────────────┬───────────────────┤
 │  Briefings  │   Sources   │  Marketplace │    HUMINT        │
-│  (NEAR AI)  │ (RSS/Web)   │  (NFT/1Click)│  (ZK/Zcash)      │
+│  (NEAR AI)  │ (RSS/Web)   │  (NFT/Intents)│  (ZK/Zcash)     │
 └─────────────┴─────────────┴─────────────┴───────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────────────┐

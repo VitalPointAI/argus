@@ -20,7 +20,7 @@ Zcash shielded transactions (z-addresses) solve this by hiding:
 ```
 Consumer pays (USDC/NEAR/etc)
          ↓
-    1Click API
+    Near Intents
          ↓
 Transparent ZEC → Argus t-address
          ↓
@@ -34,7 +34,7 @@ Transparent ZEC → Argus t-address
 ### Flow Details
 
 1. **Consumer Payment**: Consumer pays for bounty/subscription in any supported currency
-2. **1Click Conversion**: NEAR Intents converts to ZEC, deposited to our transparent address
+2. **Near Intents Conversion**: Converts to ZEC, deposited to our transparent address
 3. **Shielding**: We move ZEC from t-address to our z-address (shielded pool)
 4. **Escrow Hold**: Funds held in shielded pool until release conditions met
 5. **Shielded Payout**: z→z transfer to source's z-address - completely private
@@ -43,14 +43,14 @@ Transparent ZEC → Argus t-address
 
 | Type | Address | Purpose |
 |------|---------|---------|
-| Transparent (t-addr) | `t1L5D4HtBGFgkKQGL7AMH8613sUPd4Mt6ek` | Receiving 1Click deposits |
+| Transparent (t-addr) | `t1L5D4HtBGFgkKQGL7AMH8613sUPd4Mt6ek` | Receiving Near Intents deposits |
 | Shielded (z-addr) | `zs1e0jxyugqem4sg...` | Escrow pool for payouts |
 
 ## Bounty Escrow
 
 When a bounty is posted:
 
-1. Creator deposits funds (converted to ZEC via 1Click)
+1. Creator deposits funds (converted to ZEC via Near Intents)
 2. ZEC is shielded into escrow pool
 3. Bounty status: `open` → funds locked
 

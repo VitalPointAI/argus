@@ -127,7 +127,7 @@ If you can only partially fulfill a request:
 ### How It Works
 
 1. Requester deposits funds when creating bounty
-2. Funds converted to ZEC via NEAR Intents (1Click)
+2. Funds converted to ZEC via Near Intents
 3. ZEC is **shielded** into our escrow pool (t→z transfer)
 4. Funds remain in shielded escrow until:
    - Bounty fulfilled → Shielded payout (z→z) to source's z-address
@@ -137,7 +137,7 @@ If you can only partially fulfill a request:
 ### Privacy Guarantee
 
 ```
-Requester pays USDC → 1Click → Transparent ZEC → Shield → Escrow Pool
+Requester pays USDC → Near Intents → Transparent ZEC → Shield → Escrow Pool
                                                               ↓
 Source receives ←────────── Shielded ZEC (z→z) ←─────────────┘
 ```

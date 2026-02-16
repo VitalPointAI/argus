@@ -28,7 +28,7 @@ The marketplace enables:
 │       │                  │                   │              │
 │       ↓                  ↓                   ↓              │
 │  Marketplace        Pay with any        Access Pass        │
-│  /marketplace       token via 1Click    minted on NEAR     │
+│  /marketplace       token via Intents    minted on NEAR     │
 │                                                             │
 │  4. VERIFY (On-Chain)                                       │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -52,8 +52,8 @@ Creators can offer multiple subscription tiers:
 
 ## Pricing
 
-- **Direct payments** - 95% goes to creator, 5% platform fee
-- **Any token** - Pay with NEAR, USDC, or other tokens via 1Click
+- **Direct payments** - Payments go directly to creators via smart contract
+- **Any token** - Pay with NEAR, USDC, or other tokens via Near Intents
 - **No custodial holding** - Funds go directly to creator wallet
 
 ## For Creators

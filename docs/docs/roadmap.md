@@ -9,7 +9,7 @@ Argus development status and upcoming features.
 ## ✅ Completed
 
 ### Core Platform
-- **Strategic Intelligence Dashboard** — Real-time feed from 100+ sources across 20+ domains
+- **Strategic Intelligence Dashboard** — Real-time feed from curated sources across multiple domains
 - **AI-Powered Briefings** — Daily synthesis via NEAR AI (DeepSeek V3.1)
 - **Full-Text Search** — 27,000+ articles indexed
 - **Source Management** — Add, rate, organize sources
@@ -32,8 +32,8 @@ Argus development status and upcoming features.
 ### NFT Marketplace
 - **Source List NFTs** — Contract live at `source-lists.argus-intel.near`
 - **Access Passes** — Subscribe to curated lists
-- **1Click Payments** — Pay with any token (13 chains supported)
-- **Creator Payouts** — 95% to creators, 5% platform fee
+- **Near Intents** — Pay with any token (multi-chain support)
+- **Creator Payouts** — Direct payments to creators via smart contract
 - **Package Tiers** — Free, monthly, lifetime options
 
 ### Privacy & Security
