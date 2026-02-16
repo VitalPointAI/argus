@@ -149,34 +149,46 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
     gte(content.fetchedAt, since),
   ];
   
-  // Add source filter if specified (from user's active source list)
-  // When an active source list is set, it takes priority over domain preferences
-  if (options.sourceIds && options.sourceIds.length > 0) {
-    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list (ignoring domain filter)`);
-    conditions.push(inArray(content.sourceId, options.sourceIds));
-  } else if (options.domainIds && options.domainIds.length > 0) {
-    // Only apply domain filter when NO active source list is set
-    console.log(`[FetchArticles] No active source list - filtering by ${options.domainIds.length} domains`);
-    
+  // Get sources matching domain filter if specified
+  let sourceIdsInDomains: string[] | null = null;
+  if (options.domainIds && options.domainIds.length > 0) {
     // Find sources that have any of the specified domains
     const domainSources = await db.select({ sourceId: sourceDomains.sourceId })
       .from(sourceDomains)
       .where(inArray(sourceDomains.domainId, options.domainIds));
-    let sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
+    sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
     
     // Also include sources with legacy domainId field
     const legacySources = await db.select({ id: sources.id })
       .from(sources)
       .where(inArray(sources.domainId, options.domainIds));
     sourceIdsInDomains = [...new Set([...sourceIdsInDomains, ...legacySources.map(s => s.id)])];
-    
-    if (sourceIdsInDomains.length > 0) {
-      conditions.push(inArray(content.sourceId, sourceIdsInDomains));
+    console.log(`[FetchArticles] Found ${sourceIdsInDomains.length} sources matching ${options.domainIds.length} domains`);
+  }
+  
+  // Determine final source filter
+  if (options.sourceIds && options.sourceIds.length > 0 && sourceIdsInDomains) {
+    // BOTH source list AND domain filter: use intersection
+    const intersection = options.sourceIds.filter(id => sourceIdsInDomains!.includes(id));
+    console.log(`[FetchArticles] Intersection: ${intersection.length} sources (from ${options.sourceIds.length} in list, ${sourceIdsInDomains.length} in domains)`);
+    if (intersection.length > 0) {
+      conditions.push(inArray(content.sourceId, intersection));
     } else {
-      // No sources match these domains
-      console.log(`[FetchArticles] No sources found for specified domains`);
-      return [];
+      console.log(`[FetchArticles] No sources in list match selected domains - falling back to full source list`);
+      conditions.push(inArray(content.sourceId, options.sourceIds));
     }
+  } else if (options.sourceIds && options.sourceIds.length > 0) {
+    // Only source list
+    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list`);
+    conditions.push(inArray(content.sourceId, options.sourceIds));
+  } else if (sourceIdsInDomains && sourceIdsInDomains.length > 0) {
+    // Only domain filter
+    console.log(`[FetchArticles] Filtering by ${sourceIdsInDomains.length} sources from domain filter`);
+    conditions.push(inArray(content.sourceId, sourceIdsInDomains));
+  } else if (options.domainIds && options.domainIds.length > 0) {
+    // Domains specified but no matching sources
+    console.log(`[FetchArticles] No sources found for specified domains`);
+    return [];
   }
   
   try {
