@@ -75,14 +75,18 @@ verificationRoutes.post('/deep', async (c) => {
       });
     }
 
-    // Get source info
-    const [source] = await db
-      .select({
-        name: sources.name,
-        reliabilityScore: sources.reliabilityScore,
-      })
-      .from(sources)
-      .where(eq(sources.id, item.sourceId));
+    // Get source info (only if sourceId exists)
+    let source = null;
+    if (item.sourceId) {
+      const [sourceResult] = await db
+        .select({
+          name: sources.name,
+          reliabilityScore: sources.reliabilityScore,
+        })
+        .from(sources)
+        .where(eq(sources.id, item.sourceId));
+      source = sourceResult;
+    }
 
     // Get cross-reference results if any
     const crossRefs = await db
