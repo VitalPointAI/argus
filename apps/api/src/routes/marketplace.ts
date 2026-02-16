@@ -842,12 +842,12 @@ app.post('/payment/quote', async (c) => {
     }
 
     // Get user's NEAR account for refund
-    const [user] = await db
+    const [userRecord] = await db
       .select({ nearAccountId: users.nearAccountId })
       .from(users)
       .where(eq(users.id, userId));
 
-    const refundAddress = user?.nearAccountId || 'argus-intel.near'; // Fallback to platform wallet
+    const refundAddress = userRecord?.nearAccountId || 'argus-intel.near'; // Fallback to platform wallet
 
     const quote = await getPaymentQuote({
       amountUsdc: parseFloat(amountUsdc),
