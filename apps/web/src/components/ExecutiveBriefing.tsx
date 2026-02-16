@@ -175,9 +175,64 @@ interface Props {
   hideGenerateCard?: boolean;
 }
 
+// Parse markdown links and add verify buttons
+function parseMarkdownWithLinks(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  // Match markdown links: [text](url)
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let match;
+  let keyIndex = 0;
+  
+  while ((match = linkRegex.exec(text)) !== null) {
+    // Add text before the link
+    if (match.index > lastIndex) {
+      const beforeText = text.slice(lastIndex, match.index)
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      parts.push(<span key={`t${keyIndex++}`} dangerouslySetInnerHTML={{ __html: beforeText }} />);
+    }
+    
+    const linkText = match[1];
+    const linkUrl = match[2];
+    
+    // Add the link with a verify button
+    parts.push(
+      <span key={`l${keyIndex++}`} className="inline-flex items-center gap-1">
+        <a 
+          href={linkUrl} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-argus-600 dark:text-argus-400 hover:underline"
+        >
+          {linkText}
+        </a>
+        <a
+          href={`/verify?url=${encodeURIComponent(linkUrl)}`}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-argus-100 dark:bg-argus-900/30 text-argus-600 dark:text-argus-400 rounded text-xs hover:bg-argus-200 dark:hover:bg-argus-800 transition"
+          title="Verify this source"
+        >
+          🔍 Verify
+        </a>
+      </span>
+    );
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    const remainingText = text.slice(lastIndex)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    parts.push(<span key={`t${keyIndex++}`} dangerouslySetInnerHTML={{ __html: remainingText }} />);
+  }
+  
+  return parts.length > 0 ? parts : [<span key="empty" dangerouslySetInnerHTML={{ __html: text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>') }} />];
+}
+
 // Render markdown content as formatted JSX
 function MarkdownRenderer({ content }: { content: string }) {
-  console.log('[MarkdownRenderer] Content length:', content?.length, 'Preview:', content?.substring(0, 100));
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   
@@ -218,33 +273,54 @@ function MarkdownRenderer({ content }: { content: string }) {
       return;
     }
     
-    // Bullet points
+    // Bullet points - check for links
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      const content = trimmed.substring(2)
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-      elements.push(
-        <li 
-          key={i} 
-          className="text-slate-600 dark:text-slate-300 ml-4 mb-1"
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
-      );
+      const bulletContent = trimmed.substring(2);
+      const hasLink = /\[([^\]]+)\]\(([^)]+)\)/.test(bulletContent);
+      
+      if (hasLink) {
+        elements.push(
+          <li key={i} className="text-slate-600 dark:text-slate-300 ml-4 mb-1">
+            {parseMarkdownWithLinks(bulletContent)}
+          </li>
+        );
+      } else {
+        const content = bulletContent
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        elements.push(
+          <li 
+            key={i} 
+            className="text-slate-600 dark:text-slate-300 ml-4 mb-1"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        );
+      }
       return;
     }
     
-    // Regular paragraphs
-    const content = trimmed
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Regular paragraphs - check for links
+    const hasLink = /\[([^\]]+)\]\(([^)]+)\)/.test(trimmed);
     
-    elements.push(
-      <p 
-        key={i} 
-        className="text-slate-600 dark:text-slate-300 leading-relaxed mb-2"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    );
+    if (hasLink) {
+      elements.push(
+        <p key={i} className="text-slate-600 dark:text-slate-300 leading-relaxed mb-2">
+          {parseMarkdownWithLinks(trimmed)}
+        </p>
+      );
+    } else {
+      const content = trimmed
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      
+      elements.push(
+        <p 
+          key={i} 
+          className="text-slate-600 dark:text-slate-300 leading-relaxed mb-2"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      );
+    }
   });
   
   return <div className="prose prose-slate dark:prose-invert max-w-none">{elements}</div>;
