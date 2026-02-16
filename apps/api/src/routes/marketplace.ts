@@ -125,17 +125,13 @@ app.get('/listings/:listId', async (c) => {
         COALESCE(sl.description, '') as description,
         COALESCE(sl.marketplace_description, '') as "marketplaceDescription",
         sl.marketplace_image_cid as "marketplaceImageCid",
-        sl.domain_id as "domainId",
-        d.name as "domainName",
         sl.user_id as "createdBy",
         u.name as "creatorName",
         COALESCE(sl.total_subscribers, 0) as "totalSubscribers",
         COALESCE(sl.avg_rating, 0)::float as "avgRating",
         COALESCE(sl.rating_count, 0) as "ratingCount",
-        sl.item_count as "itemCount",
         sl.created_at as "createdAt"
       FROM source_lists sl
-      LEFT JOIN domains d ON sl.domain_id = d.id
       LEFT JOIN users u ON sl.user_id = u.id
       WHERE sl.id = ${listId}
     `);
