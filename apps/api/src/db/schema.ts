@@ -125,6 +125,7 @@ export const userDomains = pgTable('user_domains', {
 export const content = pgTable('content', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  domainId: uuid('domain_id').references(() => domains.id), // classified domain
   externalId: text('external_id').notNull(),
   title: text('title').notNull(),
   body: text('body').notNull(),

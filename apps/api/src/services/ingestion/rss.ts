@@ -1,7 +1,69 @@
 import Parser from 'rss-parser';
-import { db, sources, content } from '../../db';
+import { db, sources, content, domains } from '../../db';
 import { eq } from 'drizzle-orm';
 import { extractArticle, type RateLimitConfig } from '../extraction/article';
+
+// Domain keyword mappings for classification
+const DOMAIN_KEYWORDS: Record<string, string[]> = {
+  'russia-ukraine': ['russia', 'ukraine', 'putin', 'zelensky', 'kremlin', 'moscow', 'kyiv', 'donbas', 'crimea', 'nato expansion'],
+  'defense': ['military', 'defense', 'pentagon', 'armed forces', 'weapon', 'missile', 'army', 'navy', 'air force', 'warfare', 'combat', 'troops', 'soldier'],
+  'ai-tech': ['artificial intelligence', 'ai ', ' ai,', 'machine learning', 'deep learning', 'chatgpt', 'openai', 'technology', 'semiconductor', 'chip', 'quantum'],
+  'cyber': ['cyber', 'hacking', 'ransomware', 'malware', 'data breach', 'cybersecurity', 'infosec'],
+  'china': ['china', 'beijing', 'chinese', 'xi jinping', 'taiwan', 'south china sea', 'ccp'],
+  'middle-east': ['middle east', 'israel', 'iran', 'saudi', 'gaza', 'hamas', 'hezbollah', 'syria', 'iraq', 'yemen'],
+  'climate': ['climate', 'carbon', 'emissions', 'global warming', 'renewable', 'solar', 'wind energy', 'environment'],
+  'energy': ['oil', 'gas', 'opec', 'energy', 'petroleum', 'pipeline', 'lng', 'fossil fuel'],
+  'markets': ['stock', 'market', 'fed', 'interest rate', 'inflation', 'economy', 'gdp', 'recession', 'bond', 'treasury'],
+  'trade': ['tariff', 'trade war', 'sanctions', 'export', 'import', 'wto', 'trade deal'],
+  'geopolitics': ['geopolitical', 'diplomacy', 'foreign policy', 'alliance', 'summit', 'treaty', 'international relations'],
+};
+
+// Cache domain IDs
+let domainIdCache: Record<string, string> | null = null;
+
+async function getDomainIdCache(): Promise<Record<string, string>> {
+  if (domainIdCache) return domainIdCache;
+  
+  const allDomains = await db.select({ id: domains.id, slug: domains.slug }).from(domains);
+  domainIdCache = {};
+  for (const d of allDomains) {
+    domainIdCache[d.slug] = d.id;
+  }
+  return domainIdCache;
+}
+
+/**
+ * Classify article content into a domain based on keywords
+ */
+async function classifyArticleDomain(title: string, body: string): Promise<string | null> {
+  const cache = await getDomainIdCache();
+  const text = `${title} ${body}`.toLowerCase();
+  
+  let bestMatch: { slug: string; score: number } | null = null;
+  
+  for (const [slug, keywords] of Object.entries(DOMAIN_KEYWORDS)) {
+    let score = 0;
+    for (const keyword of keywords) {
+      // Count occurrences
+      const regex = new RegExp(keyword.toLowerCase(), 'gi');
+      const matches = text.match(regex);
+      if (matches) {
+        score += matches.length;
+      }
+    }
+    
+    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = { slug, score };
+    }
+  }
+  
+  if (bestMatch && cache[bestMatch.slug]) {
+    return cache[bestMatch.slug];
+  }
+  
+  // Default to geopolitics if no strong match
+  return cache['geopolitics'] || null;
+}
 
 const parser = new Parser({
   timeout: 10000,
@@ -108,6 +170,9 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
     try {
       // Fetch full content if configured
       const articleBody = await getArticleContent(item, config);
+      
+      // Classify article into a domain
+      const domainId = await classifyArticleDomain(item.title, articleBody);
 
       await db.insert(content).values({
         sourceId: source.id,
@@ -120,6 +185,7 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
         fetchedAt: new Date(),
         // Use source reliability score as base confidence
         confidenceScore: source.reliabilityScore || 50,
+        domainId,
       }).onConflictDoNothing();
       
       ingested++;

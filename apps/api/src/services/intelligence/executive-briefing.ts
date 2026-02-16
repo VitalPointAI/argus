@@ -149,34 +149,16 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
     gte(content.fetchedAt, since),
   ];
   
-  // Source list takes priority - it IS the user's curation
-  // Domain preferences only apply when NO source list is active
+  // Add source list filter if specified
   if (options.sourceIds && options.sourceIds.length > 0) {
-    console.log(`[FetchArticles] Using active source list: ${options.sourceIds.length} sources`);
+    console.log(`[FetchArticles] Filtering by ${options.sourceIds.length} sources from active source list`);
     conditions.push(inArray(content.sourceId, options.sourceIds));
-  } else if (options.domainIds && options.domainIds.length > 0) {
-    // No source list - filter by domain preferences
-    console.log(`[FetchArticles] No source list - filtering by ${options.domainIds.length} domain preferences`);
-    
-    // Find sources that have any of the specified domains
-    const domainSources = await db.select({ sourceId: sourceDomains.sourceId })
-      .from(sourceDomains)
-      .where(inArray(sourceDomains.domainId, options.domainIds));
-    let sourceIdsInDomains = [...new Set(domainSources.map(ds => ds.sourceId))];
-    
-    // Also include sources with legacy domainId field
-    const legacySources = await db.select({ id: sources.id })
-      .from(sources)
-      .where(inArray(sources.domainId, options.domainIds));
-    sourceIdsInDomains = [...new Set([...sourceIdsInDomains, ...legacySources.map(s => s.id)])];
-    
-    if (sourceIdsInDomains.length > 0) {
-      console.log(`[FetchArticles] Found ${sourceIdsInDomains.length} sources in selected domains`);
-      conditions.push(inArray(content.sourceId, sourceIdsInDomains));
-    } else {
-      console.log(`[FetchArticles] No sources found for specified domains`);
-      return [];
-    }
+  }
+  
+  // Add domain filter - filters by ARTICLE's classified domain, not source
+  if (options.domainIds && options.domainIds.length > 0) {
+    console.log(`[FetchArticles] Filtering by ${options.domainIds.length} article domains`);
+    conditions.push(inArray(content.domainId, options.domainIds));
   }
   
   try {
