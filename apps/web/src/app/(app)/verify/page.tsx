@@ -68,16 +68,10 @@ function VerifyContent() {
     }
   };
 
-  const getConfidenceColor = (score: number) => {
-    if (score >= 70) return 'text-green-600 bg-green-100 dark:bg-green-900/30';
-    if (score >= 40) return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
-    return 'text-red-600 bg-red-100 dark:bg-red-900/30';
-  };
-
-  const getConfidenceEmoji = (score: number) => {
-    if (score >= 70) return '✅';
-    if (score >= 40) return '⚠️';
-    return '❌';
+  const getConfidenceDisplay = (score: number) => {
+    if (score >= 70) return { label: 'High', emoji: '🟢', color: 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400' };
+    if (score >= 40) return { label: 'Medium', emoji: '🟡', color: 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400' };
+    return { label: 'Low', emoji: '🔴', color: 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400' };
   };
 
   if (!urlToVerify) {
@@ -156,11 +150,11 @@ function VerifyContent() {
               {/* Confidence Score */}
               <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
                 <div>
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200">Confidence Score</h3>
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200">Confidence Level</h3>
                   <p className="text-sm text-slate-500">{result.verificationStatus}</p>
                 </div>
-                <div className={`text-3xl font-bold px-4 py-2 rounded-lg ${getConfidenceColor(result.confidence)}`}>
-                  {getConfidenceEmoji(result.confidence)} {result.confidence}%
+                <div className={`text-2xl font-bold px-4 py-2 rounded-lg ${getConfidenceDisplay(result.confidence).color}`}>
+                  {getConfidenceDisplay(result.confidence).emoji} {getConfidenceDisplay(result.confidence).label}
                 </div>
               </div>
 
@@ -170,7 +164,9 @@ function VerifyContent() {
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Source Reliability</h3>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600 dark:text-slate-300">{result.sourceReliability.name}</span>
-                    <span className="font-medium">{result.sourceReliability.score}% reliable</span>
+                    <span className={`font-medium px-2 py-1 rounded ${getConfidenceDisplay(result.sourceReliability.score).color}`}>
+                      {getConfidenceDisplay(result.sourceReliability.score).emoji} {getConfidenceDisplay(result.sourceReliability.score).label}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     Based on {result.sourceReliability.articlesAnalyzed} articles analyzed

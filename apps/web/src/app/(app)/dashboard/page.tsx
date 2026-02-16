@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
 import { ConfidenceBadge } from '@/components/VerificationTrail';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -223,7 +224,7 @@ export default function Dashboard() {
         <StatCard
           title="Verified"
           value={stats?.content?.verified || 0}
-          subtitle={`${stats?.content?.averageConfidence || 0}% avg confidence`}
+          subtitle={`${getConfidenceDisplay(stats?.content?.averageConfidence || 0).label} avg confidence`}
         />
         <StatCard
           title="Sources"

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import ExecutiveBriefing from '@/components/ExecutiveBriefing';
 import { useAuth } from '@/lib/auth';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -238,7 +239,7 @@ export default function BriefingsPage() {
           <StatCard
             title="Verified"
             value={stats.content?.verified || 0}
-            subtitle={`${stats.content?.averageConfidence || 0}% conf`}
+            subtitle={`${getConfidenceDisplay(stats.content?.averageConfidence || 0).label} confidence`}
           />
           <StatCard
             title="Sources"

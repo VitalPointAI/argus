@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -74,8 +75,8 @@ function PredictionCard({ forecast, index }: { forecast: Forecast; index: number
 
             <div className="flex items-center flex-wrap gap-3 mt-4">
               <TimeframeBadge timeframe={forecast.timeframe} />
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Confidence: {forecast.confidence}%
+              <span className={`text-xs px-2 py-0.5 rounded ${getConfidenceDisplay(forecast.confidence).bgClass}`}>
+                {getConfidenceDisplay(forecast.confidence).emoji} {getConfidenceDisplay(forecast.confidence).label} Confidence
               </span>
               {forecast.briefingDate && (
                 <span className="text-xs text-slate-400 dark:text-slate-500">
