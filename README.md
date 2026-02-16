@@ -164,6 +164,7 @@ Full documentation available at **[docs.argus.vitalpoint.ai](https://docs.argus.
 - Prediction markets / forecasting
 - Geospatial intelligence mapping
 - Agent-assisted research
+- TEE content gating via NEAR Shade Agents (implementation ready, awaiting mainnet)
 
 ## Contributing
 
