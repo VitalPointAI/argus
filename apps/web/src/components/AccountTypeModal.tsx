@@ -17,7 +17,7 @@ export function AccountTypeModal({ isOpen, onClose, onSourceSelected }: AccountT
 
   const handleContinue = () => {
     if (selectedType === 'user') {
-      router.push('/login');
+      router.push('/register');
       onClose();
     } else if (selectedType === 'source') {
       if (onSourceSelected) {
