@@ -1,127 +1,116 @@
 # Argus Demo Script (3 Minutes)
 
 *Target: ~450 words @ 150 wpm*
+*Core themes: TRUST, PRIVACY, TRUTH*
 
 ---
 
 ## OPENING HOOK (0:00 - 0:15)
 
 **NARRATION:**
-> "Every morning, you wake up to a thousand voices fighting for your attention. Some are true. Some are lies. Most are noise. What if you had a trusted analyst cutting through it all—delivering only what matters, verified and ready to act on?"
+> "In 2024, 78% of people couldn't tell real news from misinformation. Not because they weren't smart—but because they had no way to know who to trust. What if trust wasn't a guess? What if it was *proven*?"
 
 **📹 SCREEN RECORDING:**
-- *Use stock footage or skip screen recording here*
-- *Alternative: Quick montage of Twitter/news sites with overwhelming content*
+- *Stock footage or quick montage of conflicting headlines, "BREAKING" chaos*
 
 ---
 
-## THE PROBLEM (0:15 - 0:40)
+## THE PROBLEM (0:15 - 0:45)
 
 **NARRATION:**
-> "Intelligence professionals, researchers, and decision-makers face the same problem: too much information, too little trust. Mainstream platforms are censored. Alternative sources are scattered. And the people with real on-the-ground knowledge? They can't speak up without risking everything."
+> "The information crisis isn't about too little information—it's about too little *trust*. Mainstream sources get things wrong. Alternative sources have agendas. And the people who actually *know* what's happening—journalists in conflict zones, researchers facing censorship, insiders risking their careers—they can't speak up. Because speaking up could cost them everything."
 
-> "The information you need exists. It's just buried, fragmented, or silenced."
+> "We don't have a content problem. We have a trust problem. And a protection problem."
 
 **📹 SCREEN RECORDING:**
 - *Stock footage or skip — this is context-setting*
 
 ---
 
-## INTRODUCING ARGUS (0:40 - 1:00)
+## INTRODUCING ARGUS (0:45 - 1:05)
 
 **NARRATION:**
-> "This is Argus—a strategic intelligence platform where you own your data, sources are verified, and truth can flow freely."
+> "Argus is built on two principles: *prove trust, protect truth-tellers*."
 
-> "Every day, Argus scans over a hundred curated sources across geopolitics, technology, markets, and security—then delivers a personalized briefing with confidence scores for every claim."
+> "Every source earns its reputation through accuracy—not popularity, not algorithms. Cross a line into misinformation? Your score drops. Consistently verify? You rise. Trust isn't assumed. It's *earned and proven*."
 
 **📹 SCREEN RECORDING SEQUENCE:**
-1. Open https://argus.vitalpoint.ai (show landing page briefly ~2 sec)
-2. Click Login → Show logged-in dashboard
-3. Pause on dashboard showing article feed with domains/confidence scores
+1. Open https://argus.vitalpoint.ai → show landing page (2 sec)
+2. Login → Dashboard with article feed
+3. Hover over articles showing confidence scores and source reliability ratings
 
 ---
 
-## FEATURE 1: DAILY STRATEGIC SCAN (1:00 - 1:25)
+## FEATURE 1: VERIFIED INTELLIGENCE (1:05 - 1:30)
 
 **NARRATION:**
-> "Sarah is a policy analyst. She used to spend three hours each morning reading. Now, Argus does it for her—using NEAR AI to synthesize, cross-reference, and highlight what actually matters."
+> "Every morning, Argus scans a hundred curated sources—not scraped from the open web, but hand-selected and continuously scored for accuracy."
 
-> "Each story shows verification status, source reliability, and related intel. No algorithm pushing engagement. Just signal, no noise."
+> "See this article? 73% confidence. Why? Because we cross-referenced it against three wire services, checked the source's track record, and flagged the bias. You're not guessing anymore. You're *seeing the work*."
 
 **📹 SCREEN RECORDING SEQUENCE:**
-1. From Dashboard → Click "Briefings" in nav
-2. Show existing briefing OR click "Generate Briefing"
-3. Show briefing content with bullet points generating
-4. Scroll to show confidence scores and source citations
-5. Click "Deep Verify" on one claim → show verification panel with cross-references
+1. Dashboard → Click "Briefings"
+2. Show AI briefing with bullet points and confidence scores
+3. Click "Deep Verify" on one claim → show verification panel
+4. Point out: cross-references, source reliability, verification trail
 
 ---
 
-## FEATURE 2: ANONYMOUS HUMAN INTELLIGENCE (1:25 - 1:55)
+## FEATURE 2: PROTECTING TRUTH-TELLERS (1:30 - 2:05)
 
 **NARRATION:**
-> "Now meet Viktor. He's on the ground in a conflict zone with information the world needs to see—but sharing it could cost him his life."
+> "Now here's where it gets powerful. Meet someone we'll call 'Nightingale.' She's a nurse in a conflict zone. She sees supply shortages the news isn't reporting. She wants to speak—but if anyone traces it back to her, she loses her job. Maybe worse."
 
-> "With Argus, Viktor submits intel anonymously through zero-knowledge proofs. His identity stays hidden. His reputation builds over time. And when his intel proves accurate, he earns Zcash payments that can't be traced or frozen."
+> "With Argus, Nightingale registers anonymously—no email, no identity, just a cryptographic key. She submits intel, and zero-knowledge proofs let her *prove* her track record without revealing *who she is*. When her intel checks out, she earns Zcash—payments that can't be traced, frozen, or seized."
 
-> "Truth finally has an incentive—and whistleblowers finally have protection."
+> "For the first time, truth-tellers have both *protection* and *incentive*."
 
 **📹 SCREEN RECORDING SEQUENCE:**
-1. Navigate to Sources → HUMINT tab (or /sources/humint)
-2. Show list of anonymous sources with codenames & reputation scores
-3. Click on one HUMINT source profile → show their submissions, reputation, domains
-4. Navigate to /sources/humint/register (show registration flow briefly)
-5. Show the ZK Proofs page (/zk) → demonstrate "Prove Reputation" generating a proof
+1. Navigate to Sources → HUMINT tab
+2. Show anonymous sources with codenames and reputation scores
+3. Click one profile → show submissions, reputation building over time
+4. Go to ZK Proofs page (/zk) → show "Prove Reputation" generating a proof
+5. Brief flash of OPSEC guide or wallet setup
 
 ---
 
-## FEATURE 3: SOURCE LIST MARKETPLACE (1:55 - 2:25)
+## FEATURE 3: CURATED INTELLIGENCE MARKETPLACE (2:05 - 2:30)
 
 **NARRATION:**
-> "Maria spent years curating the best China-tech sources. Now she packages them into a subscription—and sells access through NFT Access Passes."
+> "Trust isn't just for sources—it's for curators too. Analysts who spend years building expertise can now package their curated source lists and sell access through NFT passes."
 
-> "Subscribers pay in any token. 95% goes directly to Maria—no middlemen. The NFT proves access on-chain, so her list can integrate with any app in the ecosystem."
-
-> "Expert knowledge becomes a portable, verifiable asset."
+> "Subscribers pay once, get continuous updates. 95% goes directly to the curator. And because it's on-chain, that access pass works across any app in the ecosystem. Expertise becomes portable, verifiable, and *owned*."
 
 **📹 SCREEN RECORDING SEQUENCE:**
-1. Navigate to Marketplace (/marketplace)
-2. Browse source list listings → hover over a few cards
-3. Click into one listing → show packages (Free tier, paid tiers)
-4. Show "Subscribe" flow (can stop before actual payment)
-5. Navigate to Sources → Manage → Lists tab
-6. Click "Sell Access" on a list → show package builder
-7. Show image upload for Access Pass (drag & drop)
-8. Show the pricing/duration options
+1. Navigate to Marketplace
+2. Browse listings → show ratings, subscriber counts
+3. Click into one listing → show packages
+4. Navigate to Manage Sources → "Sell Access" → show package builder with image upload
 
 ---
 
-## THE TECH (Benefits, Not Jargon) (2:25 - 2:40)
+## THE TECH (2:30 - 2:40)
 
 **NARRATION:**
-> "Under the hood: NEAR AI powers intelligent analysis. Zero-knowledge proofs verify claims without exposing sources. Zcash enables untraceable payments. And programmable NFTs make access passes that work everywhere."
+> "Under the hood: NEAR AI for intelligent synthesis. Zero-knowledge proofs for privacy-preserving reputation. Zcash for untraceable payments. NFTs for verifiable access. All user-owned—your data never lives on our servers."
 
-> "All of it—your sources, your data, your intelligence—lives in your hands, not ours."
-
-**📹 SCREEN RECORDING SEQUENCE:**
-1. Show ZK Proofs page (/zk) with "✅ Production Ready" status
-2. Quick flash of the Docs site (https://docs.argus.vitalpoint.ai) → Architecture page
-3. *Or use a simple animated diagram overlay*
+**📹 SCREEN RECORDING:**
+- Quick flash of ZK page showing "✅ Production Ready"
+- Optional: architecture diagram overlay
 
 ---
 
 ## ROADMAP & CLOSE (2:40 - 3:00)
 
 **NARRATION:**
-> "We're live, but we're not done. The trust scoring algorithm needs refinement—we're tuning it against real-world accuracy data. And we're adding real-time alerts, social intelligence from Twitter and Telegram, and mobile apps."
+> "We're live, but we're still building. The trust-scoring algorithm is being refined against real accuracy data. Next up: real-time alerts when critical intel drops, social platform monitoring, and mobile apps."
 
-> "In a world drowning in noise, Argus gives you clarity. In a world that silences truth, Argus lets it speak."
+> "Misinformation wins when trust is broken. Argus rebuilds it—source by source, proof by proof."
 
-> "Own your intelligence. Visit argus.vitalpoint.ai."
+> "Own your intelligence. Protect your sources. Visit argus.vitalpoint.ai."
 
 **📹 SCREEN RECORDING SEQUENCE:**
-1. Show Docs site → Roadmap page (if exists) OR
-2. *Static slide with roadmap items:*
+1. Static slide or docs page with roadmap:
    - ✅ AI Briefings & Verification
    - ✅ Anonymous HUMINT + Zcash Payments
    - ✅ ZK Proofs (Production Ready)
@@ -131,58 +120,57 @@
    - ⏳ Real-time Alerts
    - ⏳ Social Intel (Twitter/Telegram)
    - ⏳ Mobile Apps
-3. End on landing page with logo prominent
+2. End on landing page with logo + URL
 
 ---
 
 # 📹 COMPLETE RECORDING CHECKLIST
 
-Record these screens in order (you can edit/trim later):
+Record these screens in order:
 
 | # | Page | Action | Duration |
 |---|------|--------|----------|
 | 1 | Landing page | Load, pause | 3 sec |
-| 2 | Login | Click login, authenticate | 5 sec |
-| 3 | Dashboard | Show feed, scroll slightly | 8 sec |
-| 4 | Briefings | Navigate, show/generate briefing | 15 sec |
-| 5 | Briefing detail | Scroll, show confidence, click Deep Verify | 10 sec |
+| 2 | Login | Authenticate | 5 sec |
+| 3 | Dashboard | Show feed with confidence scores, hover on articles | 10 sec |
+| 4 | Briefings | Show/generate briefing | 12 sec |
+| 5 | Deep Verify | Click verify, show cross-references + trail | 10 sec |
 | 6 | Sources → HUMINT | Show anonymous sources list | 8 sec |
-| 7 | HUMINT profile | Click one, show reputation | 8 sec |
-| 8 | ZK Proofs | Show status, generate a proof | 10 sec |
-| 9 | Marketplace | Browse listings | 8 sec |
-| 10 | Listing detail | Show packages, subscribe button | 8 sec |
-| 11 | Manage Sources → Lists | Show your lists | 5 sec |
-| 12 | Package builder | "Sell Access", show form, image upload | 12 sec |
-| 13 | Docs (optional) | Flash architecture | 3 sec |
-| 14 | Landing page | End on logo/URL | 5 sec |
+| 7 | HUMINT profile | Click one, show reputation + submissions | 8 sec |
+| 8 | ZK Proofs | Show status, generate proof | 8 sec |
+| 9 | Marketplace | Browse listings | 6 sec |
+| 10 | Listing detail | Show packages | 6 sec |
+| 11 | Package builder | "Sell Access", image upload | 8 sec |
+| 12 | Roadmap slide | Static or docs | 5 sec |
+| 13 | Landing page | End on logo/URL | 5 sec |
 
-**Total raw recording: ~2-3 minutes** (will be edited with narration overlay)
+**Total raw recording: ~2 minutes** (edited with narration overlay)
+
+---
+
+## KEY MESSAGES TO LAND
+
+1. **Trust is proven, not assumed** — Sources rise and fall based on accuracy
+2. **Truth-tellers are protected** — Anonymous identity + ZK proofs + untraceable payments
+3. **Expertise is owned** — Curators monetize knowledge, subscribers get verified access
+4. **Decentralized by design** — User-owned data, no central gatekeeper
 
 ---
 
 ## PRODUCTION NOTES
 
-### Pacing
-- Speak at ~150 wpm (conversational, not rushed)
-- Pause briefly between sections for visual transitions
-- Total narration: ~430 words
+### Tone
+- Confident but not salesy
+- Empowering, not fear-based
+- Human stories over feature lists
+- "We're building this together" energy
 
-### Visuals Needed
-1. Opening montage (stock footage: news chaos)
-2. Argus dashboard walkthrough
-3. Briefing generation demo
-4. HUMINT submission flow (can be mockup)
-5. Marketplace + NFT purchase flow
-6. Simple architecture diagram
-7. Roadmap slide
-8. Closing logo + URL
+### Pacing
+- 150 wpm narration (conversational)
+- Brief pauses between sections
+- Let visuals breathe
 
 ### Music
 - Subtle electronic/cinematic underscore
-- Build tension in problem section
-- Resolve to confident in solution sections
-
-### Tone
-- Confident but not salesy
-- Human stories over feature lists
-- Empowering, not fear-based
+- Tension in problem section → resolve in solution
+- Builds to confident close
