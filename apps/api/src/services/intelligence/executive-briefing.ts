@@ -162,6 +162,7 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   }
   
   try {
+    // Join domains on article's classified domain_id, not source's domain
     const articles = await db
       .select({
         id: content.id,
@@ -178,7 +179,7 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
       })
       .from(content)
       .leftJoin(sources, eq(content.sourceId, sources.id))
-      .leftJoin(domains, eq(sources.domainId, domains.id))
+      .leftJoin(domains, eq(content.domainId, domains.id))
       .where(and(...conditions))
       .orderBy(desc(content.publishedAt))
       .limit(maxArticles);

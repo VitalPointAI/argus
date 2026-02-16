@@ -5,10 +5,24 @@
  * Supports both Email (SES) and Telegram delivery.
  */
 
-import { db, users, briefings } from '../../db';
-import { sql } from 'drizzle-orm';
+import { db, users, briefings, sourceListItems } from '../../db';
+import { sql, eq } from 'drizzle-orm';
 import { generateExecutiveBriefing } from '../intelligence/executive-briefing';
 import { sendBriefingEmail } from '../email/ses';
+
+// Helper to get source IDs from user's active source list
+async function getActiveSourceIds(userId: string, preferences: any): Promise<string[] | null> {
+  const activeListId = preferences?.activeSourceListId;
+  
+  if (!activeListId) return null;
+  
+  // Get source IDs from the list
+  const items = await db.select({ sourceId: sourceListItems.sourceId })
+    .from(sourceListItems)
+    .where(eq(sourceListItems.sourceListId, activeListId));
+  
+  return items.length > 0 ? items.map(i => i.sourceId) : null;
+}
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -157,16 +171,23 @@ export async function deliverScheduledBriefings(): Promise<{
         const prefs = user.preferences as any;
         const userDomains = prefs?.domains?.selected || [];
         
+        // Get user's active source list
+        const activeSourceIds = await getActiveSourceIds(user.id, prefs);
+        
         console.log(`[Delivery] Generating briefing for ${user.name} (${user.email})`);
         console.log(`[Delivery] User domains: ${userDomains.length > 0 ? userDomains.join(', ') : 'all'}`);
+        if (activeSourceIds) {
+          console.log(`[Delivery] Using active source list: ${activeSourceIds.length} sources`);
+        }
 
-        // Generate user-specific briefing
+        // Generate user-specific briefing with BOTH source list AND domain filters
         let briefing;
         try {
           briefing = await generateExecutiveBriefing({
             type: 'morning',
             hoursBack: 14,
             includeTTS: false,
+            sourceIds: activeSourceIds || undefined,
             domainIds: userDomains.length > 0 ? userDomains : undefined,
           });
           console.log(`[Delivery] Briefing generated: ${briefing.summary?.totalStories || 0} stories`);
