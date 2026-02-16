@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { getConfidenceDisplay } from '@/lib/confidence';
+import VerifyModal from './VerifyModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -176,7 +177,7 @@ interface Props {
 }
 
 // Parse markdown links and add verify buttons
-function parseMarkdownWithLinks(text: string): React.ReactNode[] {
+function parseMarkdownWithLinks(text: string, onVerify?: (url: string) => void): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   // Match markdown links: [text](url)
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
@@ -207,13 +208,16 @@ function parseMarkdownWithLinks(text: string): React.ReactNode[] {
         >
           {linkText}
         </a>
-        <a
-          href={`/verify?url=${encodeURIComponent(linkUrl)}`}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onVerify?.(linkUrl);
+          }}
           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-argus-100 dark:bg-argus-900/30 text-argus-600 dark:text-argus-400 rounded text-xs hover:bg-argus-200 dark:hover:bg-argus-800 transition"
           title="Verify this source"
         >
           🔍 Verify
-        </a>
+        </button>
       </span>
     );
     
@@ -232,7 +236,7 @@ function parseMarkdownWithLinks(text: string): React.ReactNode[] {
 }
 
 // Render markdown content as formatted JSX
-function MarkdownRenderer({ content }: { content: string }) {
+function MarkdownRenderer({ content, onVerify }: { content: string; onVerify?: (url: string) => void }) {
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   
@@ -281,7 +285,7 @@ function MarkdownRenderer({ content }: { content: string }) {
       if (hasLink) {
         elements.push(
           <li key={i} className="text-slate-600 dark:text-slate-300 ml-4 mb-1">
-            {parseMarkdownWithLinks(bulletContent)}
+            {parseMarkdownWithLinks(bulletContent, onVerify)}
           </li>
         );
       } else {
@@ -305,7 +309,7 @@ function MarkdownRenderer({ content }: { content: string }) {
     if (hasLink) {
       elements.push(
         <p key={i} className="text-slate-600 dark:text-slate-300 leading-relaxed mb-2">
-          {parseMarkdownWithLinks(trimmed)}
+          {parseMarkdownWithLinks(trimmed, onVerify)}
         </p>
       );
     } else {
@@ -330,6 +334,11 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
   const [playingAudio, setPlayingAudio] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [verifyModalUrl, setVerifyModalUrl] = useState<string | null>(null);
+  
+  const handleVerify = (url: string) => {
+    setVerifyModalUrl(url);
+  };
 
   const handlePlayAudio = async () => {
     if (audioUrl) {
@@ -518,7 +527,7 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
           ))
         ) : hasMarkdown ? (
           // Render markdown content
-          <MarkdownRenderer content={briefing.markdownContent!} />
+          <MarkdownRenderer content={briefing.markdownContent!} onVerify={handleVerify} />
         ) : (
           <p className="text-slate-500 dark:text-slate-400 text-center py-8">
             No content available
@@ -535,6 +544,15 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
           </p>
         </footer>
       </div>
+
+      {/* Verify Modal */}
+      {verifyModalUrl && (
+        <VerifyModal 
+          url={verifyModalUrl} 
+          isOpen={true} 
+          onClose={() => setVerifyModalUrl(null)} 
+        />
+      )}
     </div>
   );
 }
