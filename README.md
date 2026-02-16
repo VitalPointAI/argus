@@ -7,6 +7,44 @@
 
 > Own your intelligence. Verify your sources. Protect your analysts.
 
+---
+
+## The Problem
+
+**We're drowning in information but starving for intelligence.**
+
+Every day, analysts and researchers face the same challenge: hundreds of sources to monitor, contradicting reports to reconcile, and critical signals buried in noise. The tools we have aren't built for this reality:
+
+- **Information overload** — RSS feeds, newsletters, social media, reports. No human can process it all, and most never gets read.
+- **Trust crisis** — How do you know what's true? Misinformation spreads faster than corrections. Source reliability is a black box.
+- **Source protection failure** — Human intelligence is invaluable, but sources risk exposure. One leak can be fatal. Current systems force a terrible choice: share intel and risk your source, or protect them and stay silent.
+- **Gatekept intelligence** — The best analysis is locked behind institutional walls. Independent researchers can't monetize their expertise. Good intelligence stays siloed.
+- **No verification trail** — Claims get repeated until they feel true. There's no systematic way to trace how information was verified or who vouched for it.
+
+The intelligence community has expensive solutions. Everyone else gets Google Alerts.
+
+**There has to be a better way.**
+
+---
+
+## The Solution
+
+**Argus is strategic intelligence infrastructure for the AI age.**
+
+We built Argus to solve these problems with a fundamentally different approach:
+
+| Problem | Argus Solution |
+|---------|----------------|
+| **Information overload** | AI synthesizes hundreds of sources into actionable briefings with confidence scores |
+| **Trust crisis** | Every claim links back to sources. Cross-reference verification shows what's corroborated. |
+| **Source protection** | Zero-knowledge proofs let sources build reputation without revealing identity |
+| **Gatekept intelligence** | NFT marketplace lets anyone monetize curated source lists and analysis |
+| **No verification trail** | Full audit trail for every verification. Portable reputation that follows analysts. |
+
+The result: Intelligence you can trust, sources you can protect, and expertise you can monetize.
+
+---
+
 ## What is Argus?
 
 Argus is a strategic intelligence platform that helps analysts, researchers, and decision-makers cut through information noise. It combines:
