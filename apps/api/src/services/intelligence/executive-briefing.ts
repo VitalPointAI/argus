@@ -594,10 +594,11 @@ function generateMarkdown(briefing: ExecutiveBriefing): string {
     for (const story of section.stories) {
       const sigMarker = story.significance === 'high' ? '🔴' : story.significance === 'medium' ? '🟡' : '⚪';
       
+      const primaryArticle = story.articles[0];
       md += `### ${sigMarker} ${story.headline}\n\n`;
-      md += `**Confidence: ${story.avgConfidence}%** | [Verify](${story.articles[0]?.verificationUrl})\n\n`;
-      md += `**Context:** ${story.context}\n\n`;
-      md += `**Latest:** ${story.latestUpdate}\n\n`;
+      md += `**Confidence: ${story.avgConfidence}%** | [Verify](${primaryArticle?.verificationUrl})\n\n`;
+      md += `**Context:** ${story.context} [Read more →](${primaryArticle?.url})\n\n`;
+      md += `**Latest:** ${story.latestUpdate} [Full article →](${primaryArticle?.url})\n\n`;
       md += `**Sources:**\n`;
       for (const a of story.articles) {
         md += `- [${a.source}](${a.url}) (${a.confidenceScore}%)\n`;
