@@ -36,6 +36,7 @@ import accessRoutes from './routes/access';
 import analyticsRoutes from './routes/analytics';
 import { payments as paymentsRoutes } from './routes/payments';
 import uploadRoutes from './routes/upload';
+import { searchRoutes } from './routes/search';
 // TODO: Fix near-api-js ESM/CJS compatibility with Node 22
 // import nearRegistryRoutes from './routes/near-registry';
 import { initPhantomAuth } from './services/auth/phantom-auth';
@@ -89,6 +90,7 @@ app.route('/api/access', accessRoutes); // On-chain Access Pass verification
 app.route('/api/analytics', analyticsRoutes); // Platform analytics and leaderboards
 app.route('/api/payments', paymentsRoutes); // 1Click payment flow for subscriptions
 app.route('/api/upload', uploadRoutes); // Image upload to IPFS
+app.route('/api/search', searchRoutes); // Full-text article search
 // app.route('/api/near', nearRegistryRoutes); // On-chain proof verification via NEAR (disabled: near-api-js ESM issue)
 
 // Root
