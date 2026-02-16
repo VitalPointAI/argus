@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db, sources, domains, sourceLists, sourceListItems, users, sourceDomains } from '../db';
-import { eq, or, isNull, and, inArray } from 'drizzle-orm';
+import { eq, or, isNull, and, inArray, sql } from 'drizzle-orm';
 import { authMiddleware } from './auth';
 import { suggestSourcesForTopic, suggestSourcesForDomain, validateRSSUrl } from '../services/intelligence/source-suggestions';
 import { analyzeSource } from '../services/sources/ai-source-analyzer';
@@ -558,7 +558,21 @@ sourcesRoutes.get('/lists/:listId', async (c) => {
   const user = c.get('user');
   const listId = c.req.param('listId');
   
-  const [list] = await db.select().from(sourceLists).where(eq(sourceLists.id, listId)).limit(1);
+  // Use raw SQL to include marketplace fields
+  const result = await db.execute(sql`
+    SELECT 
+      id, user_id as "userId", name, description, is_public as "isPublic",
+      clone_count as "cloneCount", rating_sum as "ratingSum", rating_count as "ratingCount",
+      created_at as "createdAt",
+      COALESCE(marketplace_description, '') as "marketplaceDescription",
+      marketplace_image_cid as "marketplaceImageCid"
+    FROM source_lists 
+    WHERE id = ${listId}
+    LIMIT 1
+  `);
+  
+  const rows = Array.isArray(result) ? result : (result.rows || []);
+  const list = rows[0] as any;
   
   if (!list) {
     return c.json({ success: false, error: 'Source list not found' }, 404);

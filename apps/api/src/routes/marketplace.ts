@@ -680,6 +680,57 @@ app.put('/payout-settings', async (c) => {
   }
 });
 
+// ============ Listing Settings ============
+
+// Update marketplace listing settings (cover image, description)
+app.patch('/listings/:listId', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const listId = c.req.param('listId');
+
+    if (!userId) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { marketplaceDescription, marketplaceImageCid } = body;
+
+    // Verify ownership
+    const [list] = await db
+      .select()
+      .from(sourceLists)
+      .where(and(
+        eq(sourceLists.id, listId),
+        eq(sourceLists.createdBy, userId)
+      ));
+
+    if (!list) {
+      return c.json({ success: false, error: 'List not found or not owned' }, 404);
+    }
+
+    // Update the listing settings using raw SQL for columns not in schema
+    await db.execute(sql`
+      UPDATE source_lists 
+      SET 
+        marketplace_description = COALESCE(${marketplaceDescription}, marketplace_description),
+        marketplace_image_cid = COALESCE(${marketplaceImageCid}, marketplace_image_cid),
+        updated_at = NOW()
+      WHERE id = ${listId}
+    `);
+
+    return c.json({ 
+      success: true, 
+      data: {
+        marketplaceDescription,
+        marketplaceImageCid,
+      }
+    });
+  } catch (error) {
+    console.error('Update listing error:', error);
+    return c.json({ success: false, error: 'Failed to update listing' }, 500);
+  }
+});
+
 // ============ Reviews ============
 
 // Add review

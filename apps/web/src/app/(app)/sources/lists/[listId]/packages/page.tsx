@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ImageUpload from '@/components/ImageUpload';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -25,6 +26,8 @@ interface SourceList {
   id: string;
   name: string;
   description: string;
+  marketplaceDescription?: string;
+  marketplaceImageCid?: string;
 }
 
 const DURATION_OPTIONS = [
@@ -47,6 +50,14 @@ export default function PackageBuilderPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Listing settings state
+  const [listingSettings, setListingSettings] = useState({
+    marketplaceDescription: '',
+    marketplaceImageCid: '',
+  });
+  const [savingListing, setSavingListing] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -72,6 +83,10 @@ export default function PackageBuilderPage() {
       const listData = await listRes.json();
       if (listData.success) {
         setList(listData.data);
+        setListingSettings({
+          marketplaceDescription: listData.data.marketplaceDescription || '',
+          marketplaceImageCid: listData.data.marketplaceImageCid || '',
+        });
       }
 
       // Fetch packages
@@ -211,6 +226,30 @@ export default function PackageBuilderPage() {
     return `${days} Days`;
   };
 
+  const saveListingSettings = async () => {
+    setSavingListing(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/marketplace/listings/${listId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(listingSettings),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage('Listing settings saved!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(data.error || 'Failed to save listing settings');
+      }
+    } catch (err) {
+      setError('Failed to save listing settings');
+    } finally {
+      setSavingListing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -254,6 +293,54 @@ export default function PackageBuilderPage() {
           {showForm ? 'Cancel' : '+ Create Package'}
         </button>
       </div>
+
+      {/* Messages */}
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
+          {successMessage}
+        </div>
+      )}
+
+      {/* Listing Settings */}
+      <details className="bg-white dark:bg-slate-800 rounded-lg shadow">
+        <summary className="px-6 py-4 cursor-pointer font-semibold flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
+          <span>📋 Listing Settings</span>
+          <span className="text-sm text-slate-500 font-normal">Cover image & description</span>
+        </summary>
+        <div className="px-6 pb-6 space-y-4 border-t border-slate-100 dark:border-slate-700 pt-4">
+          <ImageUpload
+            value={listingSettings.marketplaceImageCid}
+            onChange={(cid) => setListingSettings(prev => ({ ...prev, marketplaceImageCid: cid }))}
+            label="Cover Image"
+            helpText="This image appears in the marketplace browse view."
+          />
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Marketplace Description</label>
+            <textarea
+              value={listingSettings.marketplaceDescription}
+              onChange={(e) => setListingSettings(prev => ({ ...prev, marketplaceDescription: e.target.value }))}
+              placeholder="Describe your source list for potential subscribers..."
+              rows={3}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              This description is shown in the marketplace listing. Make it compelling!
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={saveListingSettings}
+              disabled={savingListing}
+              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg disabled:opacity-50 transition"
+            >
+              {savingListing ? 'Saving...' : 'Save Listing Settings'}
+            </button>
+          </div>
+        </div>
+      </details>
 
       {/* Package Form */}
       {showForm && (
@@ -395,22 +482,13 @@ export default function PackageBuilderPage() {
               />
             </div>
 
-            {/* Image CID */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Access Pass Image (IPFS CID) <span className="text-slate-400 font-normal">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={formData.imageCid}
-                onChange={(e) => setFormData(prev => ({ ...prev, imageCid: e.target.value }))}
-                placeholder="Qm..."
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Upload your image to IPFS and paste the CID here. This appears on the subscriber's Access Pass.
-              </p>
-            </div>
+            {/* Access Pass Image */}
+            <ImageUpload
+              value={formData.imageCid}
+              onChange={(cid) => setFormData(prev => ({ ...prev, imageCid: cid }))}
+              label="Access Pass Image"
+              helpText="This image appears on the subscriber's Access Pass."
+            />
 
             {/* Submit */}
             <div className="flex justify-end gap-3 pt-4">
