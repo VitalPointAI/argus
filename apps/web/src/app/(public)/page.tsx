@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { AccountTypeModal } from '@/components/AccountTypeModal';
 import { SourceRegistrationModal } from '@/components/SourceRegistrationModal';
 
@@ -84,17 +83,11 @@ export default function LandingPage() {
             >
               Get Started
             </button>
-            <Link
-              href="/dashboard"
-              className="px-8 py-4 bg-slate-700/50 hover:bg-slate-700 text-white font-semibold rounded-xl border border-slate-600 transition-all"
-            >
-              View Demo
-            </Link>
             <a
               href="https://docs.argus.vitalpoint.ai"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-8 py-4 bg-transparent hover:bg-slate-700/50 text-white font-semibold rounded-xl border border-slate-600 transition-all"
+              className="px-8 py-4 bg-slate-700/50 hover:bg-slate-700 text-white font-semibold rounded-xl border border-slate-600 transition-all"
             >
               Learn More →
             </a>
