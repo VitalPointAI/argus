@@ -31,3 +31,4 @@ coverage/
 
 # Drizzle
 drizzle/
+.claude/
