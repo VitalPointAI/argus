@@ -187,7 +187,7 @@ app.get('/listings/:listId', async (c) => {
 // Get my packages for a source list
 app.get('/lists/:listId/packages', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const listId = c.req.param('listId');
 
     if (!userId) {
@@ -223,7 +223,7 @@ app.get('/lists/:listId/packages', async (c) => {
 // Create a new package
 app.post('/lists/:listId/packages', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const listId = c.req.param('listId');
 
     if (!userId) {
@@ -284,7 +284,7 @@ app.post('/lists/:listId/packages', async (c) => {
 // Update a package
 app.patch('/packages/:packageId', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const packageId = c.req.param('packageId');
 
     if (!userId) {
@@ -332,7 +332,7 @@ app.patch('/packages/:packageId', async (c) => {
 // Delete a package (soft delete - set inactive)
 app.delete('/packages/:packageId', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const packageId = c.req.param('packageId');
 
     if (!userId) {
@@ -368,7 +368,7 @@ app.delete('/packages/:packageId', async (c) => {
 // Subscribe to a package (mint NFT)
 app.post('/subscribe', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -481,7 +481,7 @@ app.post('/subscribe', async (c) => {
 // Check access to a source list
 app.get('/access/:listId', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const listId = c.req.param('listId');
 
     if (!userId) {
@@ -528,7 +528,7 @@ app.get('/access/:listId', async (c) => {
 // Get my subscriptions
 app.get('/my-subscriptions', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -564,7 +564,7 @@ app.get('/my-subscriptions', async (c) => {
 // Get my earnings
 app.get('/my-earnings', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -619,7 +619,7 @@ app.get('/my-earnings', async (c) => {
 // Get my payout settings
 app.get('/payout-settings', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -640,7 +640,7 @@ app.get('/payout-settings', async (c) => {
 // Update payout settings
 app.put('/payout-settings', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -685,7 +685,7 @@ app.put('/payout-settings', async (c) => {
 // Update marketplace listing settings (cover image, description)
 app.patch('/listings/:listId', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     const listId = c.req.param('listId');
 
     if (!userId) {
@@ -736,7 +736,7 @@ app.patch('/listings/:listId', async (c) => {
 // Add review
 app.post('/reviews', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
 
     if (!userId) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -830,7 +830,7 @@ import { getPaymentQuote, getPaymentStatus, USDC_TOKEN_IDS } from '../services/p
 // Get payment quote for marketplace subscription
 app.post('/payment/quote', async (c) => {
   try {
-    const userId = c.get('userId');
+    const user = c.get('user') as any; const userId = user?.id;
     if (!userId) {
       return c.json({ success: false, error: 'Authentication required' }, 401);
     }
