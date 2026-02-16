@@ -88,17 +88,23 @@ verificationRoutes.post('/deep', async (c) => {
       source = sourceResult;
     }
 
-    // Get cross-reference results if any
-    const crossRefs = await db
-      .select({
-        verificationSource: crossReferenceResults.verificationSource,
-        matchType: crossReferenceResults.matchType,
-        matchedUrl: crossReferenceResults.matchedUrl,
-        matchedTitle: crossReferenceResults.matchedTitle,
-      })
-      .from(crossReferenceResults)
-      .where(eq(crossReferenceResults.contentId, item.id))
-      .limit(5);
+    // Get cross-reference results if any (wrapped in try-catch for safety)
+    let crossRefs: any[] = [];
+    try {
+      crossRefs = await db
+        .select({
+          verificationSource: crossReferenceResults.verificationSource,
+          matchType: crossReferenceResults.matchType,
+          matchedUrl: crossReferenceResults.matchedUrl,
+          matchedTitle: crossReferenceResults.matchedTitle,
+        })
+        .from(crossReferenceResults)
+        .where(eq(crossReferenceResults.contentId, item.id))
+        .limit(5);
+    } catch (crossRefError) {
+      console.warn('Cross-reference query failed:', crossRefError);
+      crossRefs = [];
+    }
 
     return c.json({
       success: true,
