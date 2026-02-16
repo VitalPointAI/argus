@@ -248,8 +248,8 @@ async function clusterIntoStories(articles: Article[], domain: string): Promise<
     return articles.slice(0, 5).map((a, i) => ({
       id: `story-${domain}-${i}`,
       headline: a.title,
-      context: stripHtml(a.body).substring(0, 300) + '...',
-      latestUpdate: stripHtml(a.body).substring(0, 200),
+      context: stripHtml(a.body).substring(0, 600) + '...',
+      latestUpdate: stripHtml(a.body).substring(0, 400),
       significance: a.confidenceScore >= 75 ? 'high' : a.confidenceScore >= 60 ? 'medium' : 'low',
       articles: [{
         id: a.id,
@@ -367,7 +367,7 @@ RULES:
     return articles.slice(0, 3).map((a, i) => ({
       id: `story-${domain}-${i}`,
       headline: a.title,
-      context: stripHtml(a.body).substring(0, 300) + '...',
+      context: stripHtml(a.body).substring(0, 600) + '...',
       latestUpdate: 'See full article for details.',
       significance: 'medium' as const,
       articles: [{
