@@ -156,7 +156,14 @@ Full documentation available at **[docs.argus.vitalpoint.ai](https://docs.argus.
 - [x] **Phase 5**: NFT Marketplace
 - [x] **Phase 6**: OAuth + Passkey auth overhaul
 - [x] **Phase 7**: Mobile apps
-- [ ] **Phase 8**: Collaborative verification
+
+### Under Consideration
+- Real-time alerts & notifications
+- API for third-party integrations
+- Multi-language source support
+- Prediction markets / forecasting
+- Geospatial intelligence mapping
+- Agent-assisted research
 
 ## Contributing
 
