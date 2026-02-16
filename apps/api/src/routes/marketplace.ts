@@ -266,13 +266,7 @@ app.post('/lists/:listId/packages', async (c) => {
       .returning();
 
     // Auto-list on marketplace if first package
-    await db
-      .update(sourceLists)
-      .set({ 
-        // @ts-ignore - column exists from migration
-        is_marketplace_listed: true 
-      })
-      .where(eq(sourceLists.id, listId));
+    await db.execute(sql`UPDATE source_lists SET is_marketplace_listed = true WHERE id = ${listId}`);
 
     return c.json({ success: true, data: pkg });
   } catch (error) {
