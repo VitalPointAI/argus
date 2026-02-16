@@ -254,7 +254,7 @@ export default function MarketplacePage() {
                     </div>
                     <div className="font-semibold text-argus-600">
                       {listing.minPackagePrice !== null 
-                        ? `From $${listing.minPackagePrice.toFixed(2)}`
+                        ? `From $${parseFloat(String(listing.minPackagePrice)).toFixed(2)}`
                         : 'Free'}
                     </div>
                   </div>
