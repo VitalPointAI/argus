@@ -54,8 +54,10 @@ export default function BriefingsPage() {
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/current`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const data = await res.json();
+      console.log('[Briefings] Current briefing:', data.data?.id);
       if (data.success && data.data) {
         setCurrentSavedBriefing(data.data);
         setExecutiveBriefing({
@@ -77,8 +79,10 @@ export default function BriefingsPage() {
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/history?limit=20`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const data = await res.json();
+      console.log('[Briefings] History:', data.data?.length, 'items');
       if (data.success && data.data) {
         setExecutiveHistory(data.data);
       }
@@ -145,12 +149,15 @@ export default function BriefingsPage() {
 
   // Load a specific briefing from history
   const loadHistoricalBriefing = async (id: string) => {
+    console.log(`[Briefings] Loading historical briefing: ${id}`);
     setExecutiveLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/briefings/executive/${id}`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const data = await res.json();
+      console.log(`[Briefings] Response for ${id}:`, data.success, data.data?.id);
       if (data.success && data.data) {
         setExecutiveBriefing({
           title: data.data.title,
@@ -159,6 +166,8 @@ export default function BriefingsPage() {
           briefingId: data.data.id,
           isHistorical: true,
         });
+      } else {
+        console.error('[Briefings] Failed to load:', data.error);
       }
     } catch (error) {
       console.error('Failed to load briefing:', error);
