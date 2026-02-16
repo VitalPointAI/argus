@@ -1,7 +1,7 @@
 pragma circom 2.0.0;
 
-include "circomlib/circuits/comparators.circom";
-include "circomlib/circuits/poseidon.circom";
+include "comparators.circom";
+include "poseidon.circom";
 
 /*
  * Location Attestation Circuit

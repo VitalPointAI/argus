@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
@@ -12,6 +12,13 @@ interface ProofResult {
   claim?: string;
   success: boolean;
   error?: string;
+  mock?: boolean;
+}
+
+interface ZKStatus {
+  ready: boolean;
+  circuits: string[];
+  message: string;
 }
 
 export default function ZKProofsPage() {
@@ -19,6 +26,7 @@ export default function ZKProofsPage() {
   const [activeTab, setActiveTab] = useState<'location' | 'reputation' | 'info'>('info');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ProofResult | null>(null);
+  const [zkStatus, setZkStatus] = useState<ZKStatus | null>(null);
   
   // Location proof state
   const [actualLat, setActualLat] = useState('');
@@ -30,6 +38,18 @@ export default function ZKProofsPage() {
   // Reputation proof state
   const [publicKey, setPublicKey] = useState('');
   const [threshold, setThreshold] = useState('70');
+
+  // Fetch ZK status on mount
+  useEffect(() => {
+    fetch(`${API_URL}/api/zk/status`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setZkStatus(data.data);
+        }
+      })
+      .catch(err => console.error('Failed to fetch ZK status:', err));
+  }, []);
 
   const generateLocationProof = async () => {
     setLoading(true);
@@ -60,6 +80,7 @@ export default function ZKProofsPage() {
           publicSignals: data.data.publicSignals,
           claim: data.data.claim.statement,
           success: true,
+          mock: data.data.mock,
         });
       } else {
         setResult({
@@ -254,18 +275,38 @@ export default function ZKProofsPage() {
             </div>
           </div>
 
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 md:col-span-2 border border-amber-200 dark:border-amber-800">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">⚠️</span>
-              <div>
-                <h4 className="font-medium text-amber-800 dark:text-amber-200">Development Status</h4>
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  ZK circuits are currently in mock mode. Proofs are simulated for testing.
-                  Production deployment requires compiled Circom circuits.
-                </p>
+          {zkStatus && (
+            <div className={`rounded-lg p-4 md:col-span-2 border ${
+              zkStatus.ready 
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+            }`}>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">{zkStatus.ready ? '✅' : '⚠️'}</span>
+                <div>
+                  <h4 className={`font-medium ${
+                    zkStatus.ready 
+                      ? 'text-green-800 dark:text-green-200'
+                      : 'text-amber-800 dark:text-amber-200'
+                  }`}>
+                    {zkStatus.ready ? 'Production Ready' : 'Development Mode'}
+                  </h4>
+                  <p className={`text-sm ${
+                    zkStatus.ready 
+                      ? 'text-green-700 dark:text-green-300'
+                      : 'text-amber-700 dark:text-amber-300'
+                  }`}>
+                    {zkStatus.message}
+                  </p>
+                  {zkStatus.circuits.length > 0 && (
+                    <p className="text-xs mt-1 opacity-75">
+                      Compiled circuits: {zkStatus.circuits.join(', ')}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -360,12 +401,25 @@ export default function ZKProofsPage() {
 
             {result && result.success && (
               <div className="space-y-4">
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
-                    ✅ Proof Generated
+                <div className={`rounded-lg p-4 border ${
+                  result.mock 
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                }`}>
+                  <div className={`font-semibold flex items-center gap-2 ${
+                    result.mock 
+                      ? 'text-amber-800 dark:text-amber-200'
+                      : 'text-green-800 dark:text-green-200'
+                  }`}>
+                    {result.mock ? '⚠️ Mock Proof Generated' : '✅ Real Proof Generated'}
                   </div>
-                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  <p className={`text-sm mt-1 ${
+                    result.mock 
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : 'text-green-700 dark:text-green-300'
+                  }`}>
                     {result.claim}
+                    {result.mock && ' (Simulated - for testing only)'}
                   </p>
                 </div>
 
@@ -508,7 +562,7 @@ export default function ZKProofsPage() {
           </div>
           <div>
             <strong>Verification:</strong> On-chain or off-chain<br/>
-            <strong>Status:</strong> Mock mode (circuits not compiled)<br/>
+            <strong>Status:</strong> {zkStatus?.ready ? '✅ Production (real proofs)' : '⚠️ Mock mode'}<br/>
             <strong>API:</strong> <code>/api/zk/*</code>
           </div>
         </div>

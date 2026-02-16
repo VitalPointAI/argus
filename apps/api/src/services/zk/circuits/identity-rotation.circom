@@ -1,7 +1,7 @@
 pragma circom 2.0.0;
 
-include "circomlib/circuits/poseidon.circom";
-include "circomlib/circuits/eddsaposeidon.circom";
+include "poseidon.circom";
+include "eddsaposeidon.circom";
 
 /*
  * Identity Rotation Circuit

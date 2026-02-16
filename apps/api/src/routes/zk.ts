@@ -15,6 +15,8 @@ import {
   verifyIdentityRotationProof,
   isWithinRange,
   poseidonHash,
+  getZKStatus,
+  isZKReady,
 } from '../services/zk';
 import { db } from '../db';
 import { humintSources } from '../db/schema';
@@ -66,6 +68,7 @@ zk.post('/location/prove', async (c) => {
         proof: proof.proof,
         publicSignals: proof.publicSignals,
         commitment: proof.commitment,
+        mock: !isZKReady(),
         claim: {
           targetLat,
           targetLon,
@@ -91,16 +94,14 @@ zk.post('/location/verify', async (c) => {
       return c.json({ success: false, error: 'Missing proof or public signals' }, 400);
     }
     
-    // In production, load verification key from file
-    const verificationKey = {}; // Placeholder
-    
-    const isValid = await verifyLocationProof(proof, publicSignals, verificationKey);
+    const isValid = await verifyLocationProof(proof, publicSignals);
     
     return c.json({
       success: true,
       data: {
         valid: isValid,
         publicSignals,
+        mock: proof.mock || false,
       },
     });
   } catch (error) {
@@ -158,6 +159,7 @@ zk.post('/reputation/prove', async (c) => {
         publicSignals: proof.publicSignals,
         commitment: proof.commitment,
         publicKeyHash: proof.publicKeyHash,
+        mock: !isZKReady(),
         claim: {
           threshold,
           statement: `Source reputation is >= ${threshold}`,
@@ -181,8 +183,7 @@ zk.post('/reputation/verify', async (c) => {
       return c.json({ success: false, error: 'Missing proof or public signals' }, 400);
     }
     
-    const verificationKey = {}; // Placeholder
-    const isValid = await verifyReputationProof(proof, publicSignals, verificationKey);
+    const isValid = await verifyReputationProof(proof, publicSignals);
     
     return c.json({
       success: true,
@@ -190,6 +191,7 @@ zk.post('/reputation/verify', async (c) => {
         valid: isValid,
         threshold: parseInt(publicSignals[0]),
         publicKeyHash,
+        mock: proof.mock || false,
       },
     });
   } catch (error) {
@@ -244,6 +246,7 @@ zk.post('/identity/rotate', async (c) => {
         rotationNullifier: proof.rotationNullifier,
         reputationCommitment: proof.reputationCommitment,
         reputationToTransfer: oldSource.reputationScore,
+        mock: !isZKReady(),
         warning: 'Complete rotation by calling /identity/complete with this proof',
       },
     });
@@ -267,12 +270,9 @@ zk.post('/identity/complete', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
     
-    const verificationKey = {}; // Placeholder
-    
     const result = await verifyIdentityRotationProof(
       proof,
       publicSignals,
-      verificationKey,
       usedNullifiers
     );
     
@@ -339,13 +339,27 @@ zk.post('/hash', async (c) => {
 });
 
 /**
+ * Get ZK system status and info
+ */
+zk.get('/status', (c) => {
+  const status = getZKStatus();
+  
+  return c.json({
+    success: true,
+    data: status,
+  });
+});
+
+/**
  * Get ZK system info
  */
 zk.get('/info', (c) => {
+  const status = getZKStatus();
+  
   return c.json({
     success: true,
     data: {
-      version: '0.1.0',
+      version: '1.0.0',
       supportedProofs: [
         {
           type: 'location',
@@ -363,8 +377,9 @@ zk.get('/info', (c) => {
           endpoints: ['/zk/identity/rotate', '/zk/identity/complete'],
         },
       ],
-      circuitStatus: 'mock', // 'compiled' when circuits are ready
-      note: 'Circuits are in development. Proofs currently use mock values.',
+      circuitStatus: status.ready ? 'compiled' : 'mock',
+      circuits: status.circuits,
+      message: status.message,
     },
   });
 });

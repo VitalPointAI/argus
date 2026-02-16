@@ -12,6 +12,12 @@ import { buildPoseidon } from 'circomlibjs';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Build directory containing compiled circuits
+const BUILD_DIR = path.join(__dirname, 'build');
+
+// Check if circuits are compiled
+const CIRCUITS_COMPILED = fs.existsSync(path.join(BUILD_DIR, 'reputation_final.zkey'));
+
 // Initialize Poseidon hasher
 let poseidon: any;
 let F: any; // Finite field
@@ -25,12 +31,48 @@ async function initPoseidon() {
 }
 
 /**
+ * Load verification key for a circuit
+ */
+function loadVerificationKey(circuit: string): any {
+  const vkPath = path.join(BUILD_DIR, `${circuit}_verification_key.json`);
+  if (!fs.existsSync(vkPath)) {
+    throw new Error(`Verification key not found for ${circuit}. Run build-circuits.sh first.`);
+  }
+  return JSON.parse(fs.readFileSync(vkPath, 'utf-8'));
+}
+
+/**
  * Hash inputs using Poseidon (ZK-friendly hash)
  */
 export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
   const { poseidon, F } = await initPoseidon();
   const hash = poseidon(inputs);
   return F.toObject(hash);
+}
+
+/**
+ * Check if ZK circuits are compiled and ready
+ */
+export function isZKReady(): boolean {
+  return CIRCUITS_COMPILED;
+}
+
+/**
+ * Get ZK system status
+ */
+export function getZKStatus(): { ready: boolean; circuits: string[]; message: string } {
+  const circuits = ['reputation', 'location', 'identity-rotation'];
+  const compiled = circuits.filter(c => 
+    fs.existsSync(path.join(BUILD_DIR, `${c}_final.zkey`))
+  );
+  
+  return {
+    ready: compiled.length === circuits.length,
+    circuits: compiled,
+    message: compiled.length === circuits.length 
+      ? 'All ZK circuits compiled and ready'
+      : `${compiled.length}/${circuits.length} circuits compiled. Run build-circuits.sh to compile all.`
+  };
 }
 
 // ============================================
@@ -60,8 +102,6 @@ function toMicroCoords(degrees: number): bigint {
 
 /**
  * Convert km to squared micro-distance
- * 1 degree ≈ 111km at equator, so 1 micro-degree ≈ 0.000111km
- * For simplicity, we use a rough conversion factor
  */
 function kmToSquaredMicroDistance(km: number): bigint {
   const microDegreesPerKm = 1e6 / 111; // ~9009 micro-degrees per km
@@ -102,24 +142,34 @@ export async function generateLocationProof(
     salt: salt.toString(),
   };
   
-  // In production, load compiled circuit files
-  // For now, return a mock proof structure
-  const mockProof = {
-    protocol: 'groth16',
-    curve: 'bn128',
-    pi_a: ['0x...', '0x...', '1'],
-    pi_b: [['0x...', '0x...'], ['0x...', '0x...'], ['1', '0']],
-    pi_c: ['0x...', '0x...', '1'],
-  };
+  if (!CIRCUITS_COMPILED) {
+    // Return mock proof if circuits not compiled
+    console.warn('ZK circuits not compiled - returning mock proof');
+    return {
+      proof: { protocol: 'groth16', curve: 'bn128', mock: true },
+      publicSignals: [
+        targetLat.toString(),
+        targetLon.toString(),
+        maxDistanceSquared.toString(),
+        commitment.toString(),
+      ],
+      commitment: commitment.toString(),
+    };
+  }
+  
+  // Generate real proof
+  const wasmPath = path.join(BUILD_DIR, 'location_js', 'location.wasm');
+  const zkeyPath = path.join(BUILD_DIR, 'location_final.zkey');
+  
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    circuitInputs,
+    wasmPath,
+    zkeyPath
+  );
   
   return {
-    proof: mockProof,
-    publicSignals: [
-      targetLat.toString(),
-      targetLon.toString(),
-      maxDistanceSquared.toString(),
-      commitment.toString(),
-    ],
+    proof,
+    publicSignals,
     commitment: commitment.toString(),
   };
 }
@@ -129,15 +179,16 @@ export async function generateLocationProof(
  */
 export async function verifyLocationProof(
   proof: any,
-  publicSignals: string[],
-  verificationKey: any
+  publicSignals: string[]
 ): Promise<boolean> {
-  try {
-    // In production, use actual snarkjs verification
-    // return await snarkjs.groth16.verify(verificationKey, publicSignals, proof);
-    
-    // For now, return true (mock)
+  if (proof.mock) {
+    console.warn('Verifying mock proof - always returns true');
     return true;
+  }
+  
+  try {
+    const vk = loadVerificationKey('location');
+    return await snarkjs.groth16.verify(vk, publicSignals, proof);
   } catch (error) {
     console.error('Location proof verification failed:', error);
     return false;
@@ -190,22 +241,33 @@ export async function generateReputationProof(
     salt: salt.toString(),
   };
   
-  // Mock proof (production would use compiled circuit)
-  const mockProof = {
-    protocol: 'groth16',
-    curve: 'bn128',
-    pi_a: ['0x...', '0x...', '1'],
-    pi_b: [['0x...', '0x...'], ['0x...', '0x...'], ['1', '0']],
-    pi_c: ['0x...', '0x...', '1'],
-  };
+  if (!CIRCUITS_COMPILED) {
+    console.warn('ZK circuits not compiled - returning mock proof');
+    return {
+      proof: { protocol: 'groth16', curve: 'bn128', mock: true },
+      publicSignals: [
+        input.threshold.toString(),
+        sourceCommitment.toString(),
+        publicKeyHash.toString(),
+      ],
+      commitment: sourceCommitment.toString(),
+      publicKeyHash: publicKeyHash.toString(),
+    };
+  }
+  
+  // Generate real proof
+  const wasmPath = path.join(BUILD_DIR, 'reputation_js', 'reputation.wasm');
+  const zkeyPath = path.join(BUILD_DIR, 'reputation_final.zkey');
+  
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    circuitInputs,
+    wasmPath,
+    zkeyPath
+  );
   
   return {
-    proof: mockProof,
-    publicSignals: [
-      input.threshold.toString(),
-      sourceCommitment.toString(),
-      publicKeyHash.toString(),
-    ],
+    proof,
+    publicSignals,
     commitment: sourceCommitment.toString(),
     publicKeyHash: publicKeyHash.toString(),
   };
@@ -216,11 +278,16 @@ export async function generateReputationProof(
  */
 export async function verifyReputationProof(
   proof: any,
-  publicSignals: string[],
-  verificationKey: any
+  publicSignals: string[]
 ): Promise<boolean> {
+  if (proof.mock) {
+    console.warn('Verifying mock proof - always returns true');
+    return true;
+  }
+  
   try {
-    return true; // Mock - use snarkjs.groth16.verify in production
+    const vk = loadVerificationKey('reputation');
+    return await snarkjs.groth16.verify(vk, publicSignals, proof);
   } catch (error) {
     console.error('Reputation proof verification failed:', error);
     return false;
@@ -272,22 +339,45 @@ export async function generateIdentityRotationProof(
     rotationSalt
   ]));
   
-  // Mock proof
-  const mockProof = {
-    protocol: 'groth16',
-    curve: 'bn128',
-    pi_a: ['0x...', '0x...', '1'],
-    pi_b: [['0x...', '0x...'], ['0x...', '0x...'], ['1', '0']],
-    pi_c: ['0x...', '0x...', '1'],
+  const circuitInputs = {
+    newPublicKeyHash: newPublicKeyHash.toString(),
+    reputationCommitment: reputationCommitment.toString(),
+    rotationNullifier: rotationNullifier.toString(),
+    oldPublicKey: input.oldPublicKey.toString(),
+    oldPrivateKey: input.oldPrivateKey.toString(),
+    newPublicKey: input.newPublicKey.toString(),
+    reputationScore: input.reputationScore.toString(),
+    rotationSalt: rotationSalt.toString(),
   };
   
+  if (!CIRCUITS_COMPILED) {
+    console.warn('ZK circuits not compiled - returning mock proof');
+    return {
+      proof: { protocol: 'groth16', curve: 'bn128', mock: true },
+      publicSignals: [
+        newPublicKeyHash.toString(),
+        reputationCommitment.toString(),
+        rotationNullifier.toString(),
+      ],
+      newPublicKeyHash: newPublicKeyHash.toString(),
+      rotationNullifier: rotationNullifier.toString(),
+      reputationCommitment: reputationCommitment.toString(),
+    };
+  }
+  
+  // Generate real proof
+  const wasmPath = path.join(BUILD_DIR, 'identity-rotation_js', 'identity-rotation.wasm');
+  const zkeyPath = path.join(BUILD_DIR, 'identity-rotation_final.zkey');
+  
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    circuitInputs,
+    wasmPath,
+    zkeyPath
+  );
+  
   return {
-    proof: mockProof,
-    publicSignals: [
-      newPublicKeyHash.toString(),
-      reputationCommitment.toString(),
-      rotationNullifier.toString(),
-    ],
+    proof,
+    publicSignals,
     newPublicKeyHash: newPublicKeyHash.toString(),
     rotationNullifier: rotationNullifier.toString(),
     reputationCommitment: reputationCommitment.toString(),
@@ -300,7 +390,6 @@ export async function generateIdentityRotationProof(
 export async function verifyIdentityRotationProof(
   proof: any,
   publicSignals: string[],
-  verificationKey: any,
   usedNullifiers: Set<string>
 ): Promise<{ valid: boolean; reason?: string }> {
   const nullifier = publicSignals[2];
@@ -310,9 +399,14 @@ export async function verifyIdentityRotationProof(
     return { valid: false, reason: 'Nullifier already used - identity already rotated' };
   }
   
+  if (proof.mock) {
+    console.warn('Verifying mock proof - always returns true');
+    return { valid: true };
+  }
+  
   try {
-    // Verify the proof (mock for now)
-    const proofValid = true; // await snarkjs.groth16.verify(...)
+    const vk = loadVerificationKey('identity-rotation');
+    const proofValid = await snarkjs.groth16.verify(vk, publicSignals, proof);
     
     if (proofValid) {
       return { valid: true };
