@@ -5,7 +5,7 @@
  * Uses pre-configured studio speakers for voice cloning.
  */
 
-const XTTS_URL = process.env.XTTS_URL || 'http://3.99.226.201:5002';
+const XTTS_URL = process.env.XTTS_URL; // Required - no default (private server)
 const XTTS_API_KEY = process.env.XTTS_API_KEY;
 const DEFAULT_SPEAKER = process.env.XTTS_DEFAULT_SPEAKER || 'Craig Gutsy';
 
@@ -28,6 +28,11 @@ interface TTSOptions {
  * Fetch available speakers from XTTS server
  */
 async function getSpeakers(): Promise<Record<string, SpeakerData> | null> {
+  if (!XTTS_URL) {
+    console.warn('[XTTS] No XTTS_URL configured');
+    return null;
+  }
+
   // Return cached if fresh
   if (speakerCache && Date.now() - cacheTimestamp < CACHE_TTL) {
     return speakerCache;
