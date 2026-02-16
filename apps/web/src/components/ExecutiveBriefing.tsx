@@ -51,7 +51,7 @@ interface ExecutiveBriefingData {
   markdownContent: string;
 }
 
-function ConfidenceBadge({ score, articleId }: { score: number; articleId?: string }) {
+function ConfidenceBadge({ score, onVerify, articleUrl }: { score: number; onVerify?: (url: string) => void; articleUrl?: string }) {
   const display = getConfidenceDisplay(score);
 
   const badge = (
@@ -63,17 +63,17 @@ function ConfidenceBadge({ score, articleId }: { score: number; articleId?: stri
     </span>
   );
 
-  if (articleId) {
+  if (onVerify && articleUrl) {
     return (
-      <a href={`/article/${articleId}#verification`} className="hover:opacity-80 transition">
+      <button onClick={() => onVerify(articleUrl)} className="hover:opacity-80 transition">
         {badge}
-      </a>
+      </button>
     );
   }
   return badge;
 }
 
-function StoryCard({ story }: { story: Story }) {
+function StoryCard({ story, onVerify }: { story: Story; onVerify?: (url: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   
   const sigColors = {
@@ -88,6 +88,8 @@ function StoryCard({ story }: { story: Story }) {
     low: '⚪ Developing',
   };
 
+  const primaryArticle = story.articles[0];
+
   return (
     <article className={`mb-4 pl-4 border-l-4 rounded-r-lg ${sigColors[story.significance]} p-4`}>
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -96,7 +98,7 @@ function StoryCard({ story }: { story: Story }) {
         </h3>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-slate-500">{sigLabels[story.significance]}</span>
-          <ConfidenceBadge score={story.avgConfidence} articleId={story.articles[0]?.id} />
+          <ConfidenceBadge score={story.avgConfidence} onVerify={onVerify} articleUrl={primaryArticle?.url} />
         </div>
       </div>
       
@@ -132,18 +134,18 @@ function StoryCard({ story }: { story: Story }) {
             +{story.articles.length - 3} more
           </button>
         )}
-        <a
-          href={story.articles[0]?.verificationUrl}
+        <button
+          onClick={() => primaryArticle?.url && onVerify?.(primaryArticle.url)}
           className="ml-auto text-xs text-argus-600 dark:text-argus-400 hover:underline flex items-center gap-1"
         >
           🔍 Verify
-        </a>
+        </button>
       </div>
     </article>
   );
 }
 
-function SectionComponent({ section }: { section: Section }) {
+function SectionComponent({ section, onVerify }: { section: Section; onVerify?: (url: string) => void }) {
   return (
     <section className="mb-8">
       <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
@@ -155,7 +157,7 @@ function SectionComponent({ section }: { section: Section }) {
       </h2>
       
       {section.stories.map((story) => (
-        <StoryCard key={story.id} story={story} />
+        <StoryCard key={story.id} story={story} onVerify={onVerify} />
       ))}
     </section>
   );
@@ -523,7 +525,7 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
         {hasSections ? (
           // Render structured sections
           briefing.sections!.map((section) => (
-            <SectionComponent key={section.domainSlug} section={section} />
+            <SectionComponent key={section.domainSlug} section={section} onVerify={handleVerify} />
           ))
         ) : hasMarkdown ? (
           // Render markdown content

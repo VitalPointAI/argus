@@ -189,7 +189,7 @@ export default function VerifyModal({ url, isOpen, onClose }: VerifyModalProps) 
               )}
 
               {/* Bias Analysis */}
-              {result.biasAnalysis && (
+              {result.biasAnalysis && result.biasAnalysis.rating && (
                 <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-600">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-sm text-slate-700 dark:text-slate-200">Bias:</span>
@@ -197,7 +197,7 @@ export default function VerifyModal({ url, isOpen, onClose }: VerifyModalProps) 
                       {result.biasAnalysis.rating}
                     </span>
                   </div>
-                  {result.biasAnalysis.indicators.length > 0 && (
+                  {result.biasAnalysis.indicators && result.biasAnalysis.indicators.length > 0 && (
                     <ul className="text-xs text-slate-500 space-y-0.5">
                       {result.biasAnalysis.indicators.slice(0, 3).map((indicator, i) => (
                         <li key={i}>• {indicator}</li>
