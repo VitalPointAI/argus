@@ -117,27 +117,31 @@ app.get('/listings/:listId', async (c) => {
   try {
     const listId = c.req.param('listId');
 
-    const [listing] = await db
-      .select({
-        id: sourceLists.id,
-        name: sourceLists.name,
-        description: sourceLists.description,
-        marketplaceDescription: sql<string>`source_lists.marketplace_description`,
-        marketplaceImageCid: sql<string>`source_lists.marketplace_image_cid`,
-        domainId: sourceLists.domainId,
-        domainName: domains.name,
-        createdBy: sourceLists.userId,
-        creatorName: users.name,
-        totalSubscribers: sql<number>`COALESCE(source_lists.total_subscribers, 0)`,
-        avgRating: sql<number>`COALESCE(source_lists.avg_rating, 0)`,
-        ratingCount: sql<number>`COALESCE(source_lists.rating_count, 0)`,
-        itemCount: sourceLists.itemCount,
-        createdAt: sourceLists.createdAt,
-      })
-      .from(sourceLists)
-      .leftJoin(domains, eq(sourceLists.domainId, domains.id))
-      .leftJoin(users, eq(sourceLists.userId, users.id))
-      .where(eq(sourceLists.id, listId));
+    // Use raw SQL to avoid Drizzle select issues with nullable joins
+    const listingResult = await db.execute(sql`
+      SELECT 
+        sl.id,
+        sl.name,
+        COALESCE(sl.description, '') as description,
+        COALESCE(sl.marketplace_description, '') as "marketplaceDescription",
+        sl.marketplace_image_cid as "marketplaceImageCid",
+        sl.domain_id as "domainId",
+        d.name as "domainName",
+        sl.user_id as "createdBy",
+        u.name as "creatorName",
+        COALESCE(sl.total_subscribers, 0) as "totalSubscribers",
+        COALESCE(sl.avg_rating, 0)::float as "avgRating",
+        COALESCE(sl.rating_count, 0) as "ratingCount",
+        sl.item_count as "itemCount",
+        sl.created_at as "createdAt"
+      FROM source_lists sl
+      LEFT JOIN domains d ON sl.domain_id = d.id
+      LEFT JOIN users u ON sl.user_id = u.id
+      WHERE sl.id = ${listId}
+    `);
+    
+    const listingData = Array.isArray(listingResult) ? listingResult : (listingResult.rows || []);
+    const listing = listingData[0];
 
     if (!listing) {
       return c.json({ success: false, error: 'Listing not found' }, 404);
