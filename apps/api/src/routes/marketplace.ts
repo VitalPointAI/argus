@@ -126,7 +126,7 @@ app.get('/listings/:listId', async (c) => {
         marketplaceImageCid: sql<string>`source_lists.marketplace_image_cid`,
         domainId: sourceLists.domainId,
         domainName: domains.name,
-        createdBy: sourceLists.createdBy,
+        createdBy: sourceLists.userId,
         creatorName: users.name,
         totalSubscribers: sql<number>`COALESCE(source_lists.total_subscribers, 0)`,
         avgRating: sql<number>`COALESCE(source_lists.avg_rating, 0)`,
@@ -136,7 +136,7 @@ app.get('/listings/:listId', async (c) => {
       })
       .from(sourceLists)
       .leftJoin(domains, eq(sourceLists.domainId, domains.id))
-      .leftJoin(users, eq(sourceLists.createdBy, users.id))
+      .leftJoin(users, eq(sourceLists.userId, users.id))
       .where(eq(sourceLists.id, listId));
 
     if (!listing) {
@@ -200,7 +200,7 @@ app.get('/lists/:listId/packages', async (c) => {
       .from(sourceLists)
       .where(and(
         eq(sourceLists.id, listId),
-        eq(sourceLists.createdBy, userId)
+        eq(sourceLists.userId, userId)
       ));
 
     if (!list) {
@@ -243,7 +243,7 @@ app.post('/lists/:listId/packages', async (c) => {
       .from(sourceLists)
       .where(and(
         eq(sourceLists.id, listId),
-        eq(sourceLists.createdBy, userId)
+        eq(sourceLists.userId, userId)
       ));
 
     if (!list) {
@@ -508,7 +508,7 @@ app.get('/access/:listId', async (c) => {
       .from(sourceLists)
       .where(and(
         eq(sourceLists.id, listId),
-        eq(sourceLists.createdBy, userId)
+        eq(sourceLists.userId, userId)
       ));
 
     const hasAccess = !!subscription || !!list;
@@ -701,7 +701,7 @@ app.patch('/listings/:listId', async (c) => {
       .from(sourceLists)
       .where(and(
         eq(sourceLists.id, listId),
-        eq(sourceLists.createdBy, userId)
+        eq(sourceLists.userId, userId)
       ));
 
     if (!list) {
