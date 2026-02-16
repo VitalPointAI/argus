@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
@@ -34,6 +34,11 @@ export default function ZKProofsPage() {
   const [targetLat, setTargetLat] = useState('');
   const [targetLon, setTargetLon] = useState('');
   const [maxDistance, setMaxDistance] = useState('50');
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   
   // Reputation proof state
   const [publicKey, setPublicKey] = useState('');
@@ -50,6 +55,128 @@ export default function ZKProofsPage() {
       })
       .catch(err => console.error('Failed to fetch ZK status:', err));
   }, []);
+
+  // Request user's location
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser');
+      return;
+    }
+    
+    setLocationLoading(true);
+    setLocationError(null);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setActualLat(position.coords.latitude.toFixed(6));
+        setActualLon(position.coords.longitude.toFixed(6));
+        setLocationLoading(false);
+      },
+      (error) => {
+        setLocationLoading(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('Location permission denied. Please enable location access.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Location unavailable. Please try again.');
+            break;
+          case error.TIMEOUT:
+            setLocationError('Location request timed out. Please try again.');
+            break;
+          default:
+            setLocationError('Failed to get location.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Initialize Leaflet map for target location selection
+  useEffect(() => {
+    if (activeTab !== 'location') return;
+    
+    // Dynamically load Leaflet
+    const loadLeaflet = async () => {
+      if (typeof window === 'undefined') return;
+      
+      // Load Leaflet CSS
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+      
+      // Load Leaflet JS
+      if (!(window as any).L) {
+        await new Promise<void>((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          script.onload = () => resolve();
+          document.head.appendChild(script);
+        });
+      }
+      
+      const L = (window as any).L;
+      const container = document.getElementById('target-map');
+      if (!container || mapRef.current) return;
+      
+      // Initialize map centered on Europe/Middle East
+      const map = L.map('target-map').setView([45, 30], 3);
+      mapRef.current = map;
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      
+      // Add click handler
+      map.on('click', (e: any) => {
+        const { lat, lng } = e.latlng;
+        setTargetLat(lat.toFixed(6));
+        setTargetLon(lng.toFixed(6));
+        
+        // Update or create marker
+        if (markerRef.current) {
+          markerRef.current.setLatLng([lat, lng]);
+        } else {
+          markerRef.current = L.marker([lat, lng]).addTo(map);
+        }
+      });
+      
+      setMapLoaded(true);
+    };
+    
+    loadLeaflet();
+    
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+        setMapLoaded(false);
+      }
+    };
+  }, [activeTab]);
+
+  // Update marker when preset is clicked
+  useEffect(() => {
+    if (!mapRef.current || !targetLat || !targetLon) return;
+    const L = (window as any).L;
+    if (!L) return;
+    
+    const lat = parseFloat(targetLat);
+    const lon = parseFloat(targetLon);
+    
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lon]);
+    } else {
+      markerRef.current = L.marker([lat, lon]).addTo(mapRef.current);
+    }
+    
+    mapRef.current.setView([lat, lon], 6);
+  }, [targetLat, targetLon]);
 
   const generateLocationProof = async () => {
     setLoading(true);
@@ -316,57 +443,99 @@ export default function ZKProofsPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">Generate Location Proof</h3>
             <p className="text-sm text-slate-500 mb-4">
-              Prove you were within a certain distance of a location without revealing your exact coordinates.
+              Prove you are within a certain distance of a location without revealing your exact coordinates.
             </p>
             
             <div className="space-y-4">
+              {/* Your Location - Auto-detected */}
               <div>
-                <label className="block text-sm font-medium mb-1">Your Actual Location</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Latitude"
-                    value={actualLat}
-                    onChange={(e) => setActualLat(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Longitude"
-                    value={actualLon}
-                    onChange={(e) => setActualLon(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
-                  />
-                </div>
-                <button
-                  onClick={useCurrentLocation}
-                  className="mt-2 text-sm text-argus-600 hover:text-argus-700"
-                >
-                  📍 Use my current location
-                </button>
+                <label className="block text-sm font-medium mb-1">Your Location</label>
+                {actualLat && actualLon ? (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <span className="text-green-600">📍</span>
+                    <span className="text-sm text-green-700 dark:text-green-300">
+                      Location acquired (hidden for privacy)
+                    </span>
+                    <button
+                      onClick={() => { setActualLat(''); setActualLon(''); }}
+                      className="ml-auto text-xs text-green-600 hover:text-green-800"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                ) : locationError ? (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-700 dark:text-red-300">{locationError}</p>
+                    <button
+                      onClick={requestLocation}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : locationLoading ? (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <span className="animate-pulse">📍</span>
+                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                      Acquiring location...
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={requestLocation}
+                    className="w-full p-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-argus-500 hover:bg-argus-50 dark:hover:bg-argus-900/20 transition"
+                  >
+                    <span className="text-2xl">📍</span>
+                    <p className="text-sm font-medium mt-1">Click to share your location</p>
+                    <p className="text-xs text-slate-500">Required for proof generation</p>
+                  </button>
+                )}
               </div>
 
+              {/* Target Location - Map picker */}
               <div>
                 <label className="block text-sm font-medium mb-1">Target Location (to prove proximity to)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Target Latitude"
-                    value={targetLat}
-                    onChange={(e) => setTargetLat(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Target Longitude"
-                    value={targetLon}
-                    onChange={(e) => setTargetLon(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
-                  />
+                
+                {/* Quick location presets */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[
+                    { name: 'Kyiv', lat: '50.4501', lon: '30.5234' },
+                    { name: 'Moscow', lat: '55.7558', lon: '37.6173' },
+                    { name: 'Beirut', lat: '33.8938', lon: '35.5018' },
+                    { name: 'Tehran', lat: '35.6892', lon: '51.3890' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.name}
+                      onClick={() => { setTargetLat(preset.lat); setTargetLon(preset.lon); }}
+                      className={`px-2 py-1 text-xs rounded-full border transition ${
+                        targetLat === preset.lat && targetLon === preset.lon
+                          ? 'bg-argus-100 border-argus-500 text-argus-700'
+                          : 'border-slate-300 hover:border-argus-400'
+                      }`}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  Example: Kiev is approximately 50.4501, 30.5234
-                </p>
+
+                {/* Map container */}
+                <div 
+                  id="target-map" 
+                  className="h-48 bg-slate-100 dark:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-600 relative overflow-hidden"
+                >
+                  {/* Leaflet map will be mounted here */}
+                  {!mapLoaded && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <p className="text-sm text-slate-500">Loading map...</p>
+                    </div>
+                  )}
+                </div>
+                
+                {targetLat && targetLon && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Selected: {parseFloat(targetLat).toFixed(4)}, {parseFloat(targetLon).toFixed(4)}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -377,6 +546,9 @@ export default function ZKProofsPage() {
                   onChange={(e) => setMaxDistance(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Proof will verify you are within this distance of the target
+                </p>
               </div>
 
               <button
