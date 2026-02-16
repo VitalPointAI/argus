@@ -54,9 +54,11 @@ export default function LandingPage() {
         <div className="relative max-w-7xl mx-auto px-4 text-center">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-argus-500 to-purple-600 flex items-center justify-center text-5xl shadow-lg shadow-argus-500/30">
-              🦚
-            </div>
+            <img 
+              src="/logo.svg" 
+              alt="Argus" 
+              className="w-24 h-24 shadow-lg shadow-argus-500/30 rounded-full"
+            />
           </div>
 
           {/* Headline */}
@@ -314,7 +316,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🦚</span>
+              <img src="/logo.svg" alt="Argus" className="w-8 h-8" />
               <span className="text-lg font-bold text-white">Argus</span>
             </div>
             <div className="flex gap-6 text-slate-400 text-sm">
