@@ -12,7 +12,7 @@
 import { db, content, sources, domains, sourceDomains } from '../../db';
 import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 
-const NEARAI_API_KEY = process.env.NEARAI_API_KEY;
+const NEARAI_API_KEY = process.env.NEARAI_API_KEY || process.env.NEAR_AI_API_KEY;
 const ARGUS_BASE_URL = process.env.ARGUS_BASE_URL || 'https://argus.vitalpoint.ai';
 
 /**
@@ -244,24 +244,33 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
  */
 async function clusterIntoStories(articles: Article[], domain: string): Promise<StoryCluster[]> {
   if (!NEARAI_API_KEY || articles.length === 0) {
+    console.log(`[ClusterStories] Fallback mode - NEARAI_API_KEY: ${NEARAI_API_KEY ? 'set' : 'missing'}, articles: ${articles.length}`);
     // Fallback: treat each article as its own story
-    return articles.slice(0, 5).map((a, i) => ({
-      id: `story-${domain}-${i}`,
-      headline: a.title,
-      context: stripHtml(a.body).substring(0, 600) + '...',
-      latestUpdate: stripHtml(a.body).substring(0, 400),
-      significance: a.confidenceScore >= 75 ? 'high' : a.confidenceScore >= 60 ? 'medium' : 'low',
-      articles: [{
-        id: a.id,
-        title: a.title,
-        source: a.sourceName,
-        url: a.url,
-        confidenceScore: a.confidenceScore,
-        verificationUrl: `${ARGUS_BASE_URL}/article/${a.id}#verification`,
-      }],
-      avgConfidence: a.confidenceScore,
-      deepVerified: false,
-    }));
+    return articles.slice(0, 5).map((a, i) => {
+      const cleanBody = stripHtml(a.body);
+      // Split into sentences for better context/latest separation
+      const sentences = cleanBody.split(/[.!?]+/).filter(s => s.trim().length > 20);
+      const contextSentences = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
+      const latestSentences = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+      
+      return {
+        id: `story-${domain}-${i}`,
+        headline: a.title,
+        context: contextSentences ? contextSentences.substring(0, 600) + '.' : 'See full article for background context.',
+        latestUpdate: latestSentences ? latestSentences.substring(0, 400) + '.' : 'Check the source for the latest developments.',
+        significance: a.confidenceScore >= 75 ? 'high' : a.confidenceScore >= 60 ? 'medium' : 'low',
+        articles: [{
+          id: a.id,
+          title: a.title,
+          source: a.sourceName,
+          url: a.url,
+          confidenceScore: a.confidenceScore,
+          verificationUrl: `${ARGUS_BASE_URL}/article/${a.id}#verification`,
+        }],
+        avgConfidence: a.confidenceScore,
+        deepVerified: false,
+      };
+    });
   }
 
   const articleList = articles.slice(0, 15).map((a, i) => 
@@ -300,6 +309,8 @@ RULES:
 - Group related articles together
 - Only return valid JSON array`;
 
+  console.log(`[ClusterStories] Calling Near AI for ${domain} with ${articles.length} articles`);
+  
   try {
     const response = await fetch('https://cloud-api.near.ai/v1/chat/completions', {
       method: 'POST',
@@ -363,24 +374,31 @@ RULES:
     });
   } catch (e) {
     console.error('Story clustering failed:', e);
-    // Fallback
-    return articles.slice(0, 3).map((a, i) => ({
-      id: `story-${domain}-${i}`,
-      headline: a.title,
-      context: stripHtml(a.body).substring(0, 600) + '...',
-      latestUpdate: 'See full article for details.',
-      significance: 'medium' as const,
-      articles: [{
-        id: a.id,
-        title: a.title,
-        source: a.sourceName,
-        url: a.url,
-        confidenceScore: a.confidenceScore,
-        verificationUrl: `${ARGUS_BASE_URL}/article/${a.id}#verification`,
-      }],
-      avgConfidence: a.confidenceScore,
-      deepVerified: false,
-    }));
+    // Fallback with better context/latest separation
+    return articles.slice(0, 3).map((a, i) => {
+      const cleanBody = stripHtml(a.body);
+      const sentences = cleanBody.split(/[.!?]+/).filter(s => s.trim().length > 20);
+      const contextSentences = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
+      const latestSentences = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+      
+      return {
+        id: `story-${domain}-${i}`,
+        headline: a.title,
+        context: contextSentences ? contextSentences.substring(0, 600) + '.' : 'See full article for background context.',
+        latestUpdate: latestSentences ? latestSentences.substring(0, 400) + '.' : 'See full article for the latest details.',
+        significance: 'medium' as const,
+        articles: [{
+          id: a.id,
+          title: a.title,
+          source: a.sourceName,
+          url: a.url,
+          confidenceScore: a.confidenceScore,
+          verificationUrl: `${ARGUS_BASE_URL}/article/${a.id}#verification`,
+        }],
+        avgConfidence: a.confidenceScore,
+        deepVerified: false,
+      };
+    });
   }
 }
 
