@@ -187,14 +187,14 @@ Verification is:
 
 ## Roadmap
 
-### Current (v0.1)
-- ✅ Location attestation (mock proofs)
-- ✅ Reputation threshold (mock proofs)
-- ✅ Identity rotation (mock proofs)
+### Current (v1.0)
+- ✅ Location attestation (real Groth16 proofs)
+- ✅ Reputation threshold (real Groth16 proofs)
+- ✅ Identity rotation (real Groth16 proofs)
+- ✅ Compiled Circom circuits
 - ✅ API endpoints
 
-### Coming (v0.2)
-- ⏳ Compiled circuits (real proofs)
+### Coming (v1.1)
 - ⏳ Client-side proof generation SDK
 - ⏳ On-chain verification (NEAR)
 - ⏳ Time-bounded presence proofs
@@ -204,6 +204,42 @@ Verification is:
 - 📋 Media authenticity proofs
 - 📋 Aggregate proofs (batch verification)
 - 📋 Cross-source collaboration proofs
+
+## Security Considerations
+
+### Location Proof Limitations
+
+The cryptographic ZK proof itself is mathematically sound - you cannot forge a valid proof for a location you weren't at. However, the **input data** comes from the browser's Geolocation API, which has known limitations:
+
+#### What We Protect Against
+- ✅ **VPNs** - Do not affect location. Browser geolocation uses GPS/WiFi/cell towers, not IP address.
+- ✅ **Network-based attacks** - Location data comes from device sensors, not network.
+- ✅ **Server-side tampering** - Proofs are cryptographically verified.
+
+#### Known Spoofing Vectors
+- ⚠️ **Fake GPS apps** - Rooted Android or jailbroken iOS devices can run apps that feed false coordinates to the GPS API.
+- ⚠️ **Browser developer tools** - Users can override `navigator.geolocation` in dev tools (detectable but not preventable).
+- ⚠️ **Location spoofing extensions** - Chrome/Firefox extensions can intercept and modify location data.
+- ⚠️ **Emulators** - Android emulators allow setting arbitrary coordinates.
+
+#### Mitigations (Roadmap)
+
+| Mitigation | Status | Description |
+|------------|--------|-------------|
+| Device attestation | 📋 Planned | Use Android SafetyNet / iOS DeviceCheck to verify device integrity |
+| Sensor fusion | 📋 Planned | Cross-reference GPS with WiFi, cell towers, and barometric pressure |
+| Temporal patterns | 📋 Planned | Detect impossible travel (e.g., two proofs 1000km apart within minutes) |
+| Hardware security modules | 📋 Research | TEE-based location signing (Phala Network integration) |
+
+#### Risk Assessment
+
+For most HUMINT use cases, GPS spoofing is a **low practical risk** because:
+
+1. **Reputation system** - Consistently accurate intel builds reputation; false location claims eventually get caught through cross-verification.
+2. **Economic disincentives** - Sources earn based on verified accuracy. Spoofing damages long-term earning potential.
+3. **Network effects** - Multiple independent sources reporting from the same region creates natural verification.
+
+For **high-stakes scenarios** (e.g., legal evidence, financial decisions), additional verification layers are recommended until device attestation is implemented.
 
 ## FAQ
 
