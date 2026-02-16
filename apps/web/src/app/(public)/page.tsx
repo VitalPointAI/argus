@@ -88,6 +88,14 @@ export default function LandingPage() {
             >
               View Demo
             </Link>
+            <a
+              href="https://docs.argus.vitalpoint.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 bg-transparent hover:bg-slate-700/50 text-white font-semibold rounded-xl border border-slate-600 transition-all"
+            >
+              Learn More →
+            </a>
           </div>
 
           {/* Trust indicators */}
