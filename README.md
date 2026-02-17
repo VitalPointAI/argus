@@ -1,11 +1,29 @@
-# Argus
+<p align="center">
+  <img src="logo.svg" alt="Argus" width="120" height="120" />
+</p>
 
-**Strategic Intelligence Platform** — AI-powered briefings, verified sources, and decentralized intelligence.
+<h1 align="center">Argus</h1>
 
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
-[![Built on NEAR](https://img.shields.io/badge/Built%20on-NEAR-00C08B)](https://near.org)
+<p align="center">
+  <strong>Strategic Intelligence Platform</strong> — AI-powered briefings, verified sources, and decentralized intelligence.
+</p>
 
-> Own your intelligence. Verify your sources. Protect your analysts.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSL%201.1-blue.svg" alt="License: BSL 1.1" /></a>
+  <a href="https://near.org"><img src="https://img.shields.io/badge/Built%20on-NEAR-00C08B" alt="Built on NEAR" /></a>
+</p>
+
+<p align="center">
+  <em>Own your intelligence. Verify your sources. Protect your analysts.</em>
+</p>
+
+---
+
+> **Why "Argus"?** 
+> 
+> In Greek mythology, **Argus Panoptes** (Ἄργος Πανόπτης — "all-seeing") was a giant with a hundred eyes. While some slept, others stayed awake — nothing escaped his watch. Hera trusted him to guard her most valuable secrets.
+> 
+> We built Argus with the same philosophy: continuous vigilance across hundreds of sources, so you never miss what matters. Unlike the mythological giant, our Argus keeps *your* secrets instead of someone else's.
 
 ---
 
