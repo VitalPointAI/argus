@@ -200,6 +200,33 @@ Platform dies = data lost     IPFS persists independently
 
 Your NEAR account is your identity. Your IPFS content is yours forever. Even if Argus disappeared tomorrow, your Access Passes, reputation proofs, and published content would still exist — because they live on decentralized infrastructure, not our servers.
 
+### 🔮 Post-Quantum Cryptography
+
+Argus uses **ML-KEM-768** (FIPS 203) — the NIST-standardized post-quantum key encapsulation mechanism — to protect all sensitive user data.
+
+**Why it matters:** Today's encrypted data can be harvested now and decrypted later when quantum computers mature ("harvest now, decrypt later" attacks). Intelligence data is particularly valuable to adversaries willing to wait. We're not waiting for quantum computers to arrive before protecting your data.
+
+**Our implementation:**
+
+```
+User Data → ML-KEM-768 Encapsulation → AES-256-GCM Encryption → IPFS
+              (post-quantum safe)        (symmetric, fast)
+```
+
+| Component | Standard | Security Level |
+|-----------|----------|----------------|
+| Key Encapsulation | ML-KEM-768 (FIPS 203) | 192-bit post-quantum |
+| Symmetric Encryption | AES-256-GCM | 256-bit classical |
+| Key Derivation | SHA-256 | 256-bit |
+
+**What's protected:**
+- 🔐 HUMINT submission attachments
+- 📋 User preferences and settings (when exported)
+- 🎫 Access Pass encryption keys
+- 📄 Encrypted source list content
+
+This isn't security theater — it's production cryptography using NIST-standardized algorithms. Your data is protected against threats that don't exist yet.
+
 ## Getting Started
 
 ### Prerequisites
