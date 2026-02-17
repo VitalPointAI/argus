@@ -161,16 +161,18 @@ Consumer pays (any currency)
 
 This is real privacy infrastructure — not just a wrapper around an API. We run the node, manage the escrow pool, and ensure sources can receive payment without risking their safety.
 
-### 📂 IPFS & User-Owned Data
+### 📂 IPFS & User-Owned Data (Post-Quantum Encrypted)
 
 Argus is built on a principle: **your data belongs to you, not us.**
 
 We use **IPFS (InterPlanetary File System)** to store user-generated content in a decentralized, content-addressed way. When you upload something to Argus, it lives on IPFS — not in our database.
 
-**What's stored on IPFS (you own it):**
+**Post-Quantum Encryption:** All sensitive data stored on IPFS is encrypted using **ML-KEM-768 (FIPS 203)** — the NIST-standardized post-quantum key encapsulation mechanism, combined with AES-256-GCM symmetric encryption. This hybrid approach provides 192-bit security against both classical and quantum computer attacks. When practical quantum computers arrive, your encrypted data remains safe.
+
+**What's stored on IPFS (you own it, quantum-safe encrypted):**
 - 🖼️ Access Pass images and metadata
 - 📄 Source list descriptions and branding
-- 🔐 Encrypted HUMINT submission attachments
+- 🔐 Encrypted HUMINT submission attachments (ML-KEM-768 + AES-256-GCM)
 - 📋 Verification proof artifacts
 
 **What Argus holds (minimal, functional):**
