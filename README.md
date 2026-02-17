@@ -112,6 +112,29 @@ Argus is a strategic intelligence platform that helps analysts, researchers, and
 | **Frontend** | Next.js 14 + Tailwind CSS |
 | **Auth** | Passkeys (WebAuthn) + JWT |
 
+## Open Source Contributions
+
+### 📦 @vitalpoint/near-phantom-auth
+
+As part of building Argus, we developed and published a reusable authentication library for the NEAR ecosystem:
+
+**[`@vitalpoint/near-phantom-auth`](https://www.npmjs.com/package/@vitalpoint/near-phantom-auth)** — Passwordless authentication for NEAR using passkeys and MPC accounts.
+
+```bash
+npm install @vitalpoint/near-phantom-auth
+```
+
+**Features:**
+- 🔐 **Passkey Authentication** — WebAuthn-based login with no passwords
+- 🪪 **Implicit Accounts** — Auto-create NEAR accounts from passkey credentials  
+- 🔑 **MPC Key Derivation** — Derive NEAR keys from passkey signatures via NEAR's MPC network
+- 💰 **Treasury Funding** — Optional auto-funding for new accounts via registry contract
+- 🌐 **Mainnet Ready** — Works with `funding-registry.credz.near` treasury
+
+This package powers Argus's HUMINT registration flow, enabling anonymous sources to create accounts with just a biometric scan — no email, no phone, no identity trail.
+
+**Why we open-sourced it:** Passkey auth on NEAR shouldn't require reinventing the wheel. We built what we needed and shared it so other builders can ship faster.
+
 ## Getting Started
 
 ### Prerequisites
