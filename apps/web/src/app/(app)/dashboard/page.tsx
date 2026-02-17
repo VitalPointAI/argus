@@ -134,16 +134,7 @@ export default function Dashboard() {
     fetchData();
   }, [authLoading, user]);
   
-  // Show loading while auth is being verified or redirecting
-  if (authLoading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-argus-500"></div>
-      </div>
-    );
-  }
-
-  // Sort content based on selected option
+  // Sort content based on selected option - MUST be before any early returns
   const sortedContent = useMemo(() => {
     const items = [...content];
     switch (sortBy) {
@@ -161,6 +152,15 @@ export default function Dashboard() {
         return items;
     }
   }, [content, sortBy]);
+
+  // Show loading while auth is being verified or redirecting
+  if (authLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-argus-500"></div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
