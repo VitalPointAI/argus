@@ -84,7 +84,7 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -92,6 +92,9 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<SortOption>('date');
 
   useEffect(() => {
+    // Don't fetch data until auth is verified
+    if (authLoading) return;
+    
     async function fetchData() {
       try {
         // Use credentials: 'include' to send HttpOnly session cookie
@@ -120,7 +123,16 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [authLoading]);
+  
+  // Show loading while auth is being verified
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-argus-500"></div>
+      </div>
+    );
+  }
 
   // Sort content based on selected option
   const sortedContent = useMemo(() => {

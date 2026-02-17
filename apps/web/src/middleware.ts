@@ -12,10 +12,14 @@ const protectedRoutes = [
   '/domains',
   '/marketplace',
   '/zk',
+  '/verify',
+  '/predictions',
 ];
 
 // Routes that should redirect to dashboard if already logged in
-const authRoutes = ['/login', '/register'];
+// NOTE: We DON'T redirect /register to dashboard here - let the page handle it
+// This prevents stale cookies from blocking new user registration
+const authRoutes = ['/login'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -41,9 +45,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
   
-  // Has session + auth route = redirect to dashboard
-  // (but allow /register/source for HUMINT users to manage their account)
-  if (isAuthRoute && hasSession && !pathname.startsWith('/register/source')) {
+  // Has session + login page only = redirect to dashboard
+  // (User is already logged in, no need to show login)
+  if (isAuthRoute && hasSession) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
@@ -71,8 +75,10 @@ export const config = {
     '/marketplace/:path*',
     '/zk',
     '/zk/:path*',
+    '/verify',
+    '/verify/:path*',
+    '/predictions',
+    '/predictions/:path*',
     '/login',
-    '/register',
-    '/register/:path*',
   ],
 };
