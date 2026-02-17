@@ -21,9 +21,9 @@
 
 > **Why "Argus"?** 
 > 
-> In Greek mythology, **Argus Panoptes** (Ἄργος Πανόπτης — "all-seeing") was a giant with a hundred eyes. While some slept, others stayed awake — nothing escaped his watch. Hera trusted him to guard her most valuable secrets.
+> Named for the hundred-eyed guardian of Greek mythology, "Argus" has a long history in the intelligence community — it's been the codename for reconnaissance satellites, surveillance aircraft, and classified monitoring programs. The name means persistent watch and pattern recognition at scale.
 > 
-> We built Argus with the same philosophy: continuous vigilance across hundreds of sources, so you never miss what matters. Unlike the mythological giant, our Argus keeps *your* secrets instead of someone else's.
+> We're reclaiming it. Argus watches *for* you, not *at* you — open source, privacy-first, and entirely in your control.
 
 ---
 
