@@ -161,6 +161,43 @@ Consumer pays (any currency)
 
 This is real privacy infrastructure — not just a wrapper around an API. We run the node, manage the escrow pool, and ensure sources can receive payment without risking their safety.
 
+### 📂 IPFS & User-Owned Data
+
+Argus is built on a principle: **your data belongs to you, not us.**
+
+We use **IPFS (InterPlanetary File System)** to store user-generated content in a decentralized, content-addressed way. When you upload something to Argus, it lives on IPFS — not in our database.
+
+**What's stored on IPFS (you own it):**
+- 🖼️ Access Pass images and metadata
+- 📄 Source list descriptions and branding
+- 🔐 Encrypted HUMINT submission attachments
+- 📋 Verification proof artifacts
+
+**What Argus holds (minimal, functional):**
+- Account credentials (hashed passwords or passkey references)
+- User preferences (delivery times, domain filters)
+- Subscription/purchase records (who bought what)
+- Ingested public content (RSS feeds, public sources)
+
+**What we explicitly DON'T store:**
+- ❌ Your reading history or patterns
+- ❌ Search queries or research trails
+- ❌ Source identities (HUMINT uses anonymous passkeys)
+- ❌ Payment details for shielded transactions
+
+**How ownership works:**
+
+```
+Traditional Platform          Argus
+─────────────────────         ─────
+Your data → Their servers     Your data → IPFS (content-addressed)
+They control access           You control the keys
+They can delete/modify        Immutable once published
+Platform dies = data lost     IPFS persists independently
+```
+
+Your NEAR account is your identity. Your IPFS content is yours forever. Even if Argus disappeared tomorrow, your Access Passes, reputation proofs, and published content would still exist — because they live on decentralized infrastructure, not our servers.
+
 ## Getting Started
 
 ### Prerequisites
