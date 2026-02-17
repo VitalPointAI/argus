@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useParams } from 'next/navigation';
+import { AddSourceToListModal } from '@/components/AddSourceToListModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -40,6 +41,7 @@ export default function SourceListDetailPage() {
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [showAddSourceModal, setShowAddSourceModal] = useState(false);
 
   useEffect(() => {
     // Wait for auth to finish loading before making requests
@@ -136,12 +138,12 @@ export default function SourceListDetailPage() {
   };
 
   const removeItem = async (itemId: string) => {
-    if (!token || !list) return;
+    if (!list) return;
 
     try {
       const res = await fetch(`${API_URL}/api/sources/lists/${listId}/items/${itemId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
 
       const data = await res.json();
@@ -266,6 +268,12 @@ export default function SourceListDetailPage() {
           )}
           {list.isOwner && (
             <>
+              <button
+                onClick={() => setShowAddSourceModal(true)}
+                className="px-3 py-2 text-sm bg-argus-600 hover:bg-argus-700 text-white rounded-lg transition flex items-center gap-1"
+              >
+                + Add Sources
+              </button>
               <a
                 href={`/sources/lists/${listId}/packages`}
                 className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-1"
@@ -330,11 +338,28 @@ export default function SourceListDetailPage() {
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-12 text-center">
           <p className="text-slate-500 mb-4">This list is empty.</p>
           {list.isOwner && (
-            <p className="text-slate-400 text-sm">
-              Go to the <a href="/sources" className="text-argus-600 hover:underline">Sources page</a> to add sources to this list.
-            </p>
+            <button
+              onClick={() => setShowAddSourceModal(true)}
+              className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg text-sm"
+            >
+              + Add Sources
+            </button>
           )}
         </div>
+      )}
+
+      {/* Add Source Modal */}
+      {list.isOwner && (
+        <AddSourceToListModal
+          isOpen={showAddSourceModal}
+          onClose={() => setShowAddSourceModal(false)}
+          listId={list.id}
+          listName={list.name}
+          existingSourceIds={list.items.map(item => item.sourceId)}
+          onSuccess={() => {
+            fetchList(); // Refresh list to show new sources
+          }}
+        />
       )}
     </div>
   );
