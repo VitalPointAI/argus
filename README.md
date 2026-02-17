@@ -135,6 +135,32 @@ This package powers Argus's HUMINT registration flow, enabling anonymous sources
 
 **Why we open-sourced it:** Passkey auth on NEAR shouldn't require reinventing the wheel. We built what we needed and shared it so other builders can ship faster.
 
+### 🛡️ Zcash Shielded Payments Infrastructure
+
+Argus runs a **full Zcash node** to support private payments for human intelligence (HUMINT) contributions.
+
+**The problem:** When paying sources for sensitive intel, transparent blockchain payments create a dangerous paper trail. An adversary can see "someone received payment from Argus" and start investigating.
+
+**Our solution:** Zcash shielded transactions (z-addresses) hide the sender, receiver, and amount — making payments completely private.
+
+```
+Consumer pays (any currency)
+         ↓
+    Near Intents (swap to ZEC)
+         ↓
+    Argus shielded escrow pool
+         ↓
+    z→z payout to source (private)
+```
+
+**How it works:**
+- 💱 **Near Intents Integration** — Accept payment in any token, auto-convert to ZEC
+- 🔒 **Shielded Escrow** — Funds held in z-address pool until release conditions met
+- 👻 **Private Payouts** — z→z transfers reveal nothing on-chain
+- 🏴 **Source Protection** — Even if Argus is compromised, payment trail is invisible
+
+This is real privacy infrastructure — not just a wrapper around an API. We run the node, manage the escrow pool, and ensure sources can receive payment without risking their safety.
+
 ## Getting Started
 
 ### Prerequisites
