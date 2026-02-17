@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <em>Own your intelligence. Verify your sources. Protect your analysts.</em>
+  <em>Private intelligence. Protected sources. Verified truth.</em>
 </p>
 
 ---
