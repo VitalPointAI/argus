@@ -437,15 +437,14 @@ app.post('/subscribe', async (c) => {
       .set({ mintedCount: sql`minted_count + 1` })
       .where(eq(sourceListPackages.id, packageId));
 
-    // Update list subscriber count
-    await db
-      .update(sourceLists)
-      .set({ 
-        // @ts-ignore
-        total_subscribers: sql`COALESCE(total_subscribers, 0) + 1`,
-        total_revenue_usdc: sql`COALESCE(total_revenue_usdc, 0) + ${pkg.priceUsdc}`,
-      })
-      .where(eq(sourceLists.id, pkg.sourceListId));
+    // Update list subscriber count (using raw SQL since these columns aren't in Drizzle schema)
+    await db.execute(sql`
+      UPDATE source_lists 
+      SET 
+        total_subscribers = COALESCE(total_subscribers, 0) + 1,
+        total_revenue_usdc = COALESCE(total_revenue_usdc, 0) + ${pkg.priceUsdc}
+      WHERE id = ${pkg.sourceListId}
+    `);
 
     // Record earnings with dynamic platform fee
     const feePercent = await getMarketplaceFeePercent();
