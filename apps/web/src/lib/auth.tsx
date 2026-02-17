@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
 
 // User can be either a standard user (email) or HUMINT source (codename)
 interface StandardUser {
@@ -34,21 +33,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Routes that require a valid session
-const protectedRoutes = [
-  '/dashboard',
-  '/briefings',
-  '/sources',
-  '/search',
-  '/settings',
-  '/admin',
-  '/domains',
-  '/marketplace',
-  '/zk',
-  '/verify',
-  '/predictions',
-];
-
 // Get API base URL at runtime (not build time)
 function getApiBase(): string {
   // Check env var first
@@ -66,8 +50,6 @@ function getApiBase(): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   // Check auth status on mount (cookie sent automatically)
   useEffect(() => {
@@ -75,8 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = async () => {
-    let authenticated = false;
-    
     try {
       // Try standard auth first
       const standardRes = await fetch(`${getApiBase()}/api/auth/me`, {
@@ -86,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await standardRes.json();
         if (data.success && data.data) {
           setUser({ type: 'standard', ...data.data });
-          authenticated = true;
           setLoading(false);
           return;
         }
@@ -105,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             codename: data.codename,
             nearAccountId: data.nearAccountId,
           });
-          authenticated = true;
           setLoading(false);
           return;
         }
@@ -114,16 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Auth check failed:', error);
     } finally {
       setLoading(false);
-      
-      // If not authenticated and on a protected route, redirect to login
-      if (!authenticated) {
-        const isProtected = protectedRoutes.some(route => 
-          pathname === route || pathname.startsWith(`${route}/`)
-        );
-        if (isProtected) {
-          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
-        }
-      }
     }
   };
 

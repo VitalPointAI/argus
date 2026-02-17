@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { ConfidenceBadge } from '@/components/VerificationTrail';
 import { getConfidenceDisplay } from '@/lib/confidence';
@@ -85,15 +86,23 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>('date');
 
+  // Redirect to login if auth check completes and no user
   useEffect(() => {
-    // Don't fetch data until auth is verified
-    if (authLoading) return;
+    if (!authLoading && !user) {
+      router.push('/login?redirect=/dashboard');
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    // Don't fetch data until auth is verified and user exists
+    if (authLoading || !user) return;
     
     async function fetchData() {
       try {
@@ -123,10 +132,10 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, [authLoading]);
+  }, [authLoading, user]);
   
-  // Show loading while auth is being verified
-  if (authLoading) {
+  // Show loading while auth is being verified or redirecting
+  if (authLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-argus-500"></div>
