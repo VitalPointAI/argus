@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import SourceAssistant from '@/components/SourceAssistant';
+import { AddToListModal } from '@/components/AddToListModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -97,6 +98,9 @@ function SourceManagePage() {
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteListId, setDeleteListId] = useState<string | null>(null);
+  
+  // Add to list modal
+  const [addToListSource, setAddToListSource] = useState<{ id: string; name: string } | null>(null);
   
   // Fetch data
   useEffect(() => {
@@ -581,6 +585,7 @@ function SourceManagePage() {
                 toggleActive={toggleActive}
                 updateReliability={updateReliability}
                 setDeleteId={setDeleteId}
+                onAddToList={(source) => setAddToListSource({ id: source.id, name: source.name })}
               />
             </div>
           )}
@@ -609,6 +614,7 @@ function SourceManagePage() {
                 toggleActive={toggleActive}
                 updateReliability={updateReliability}
                 setDeleteId={setDeleteId}
+                onAddToList={(source) => setAddToListSource({ id: source.id, name: source.name })}
               />
             </div>
           )}
@@ -901,6 +907,18 @@ function SourceManagePage() {
           </div>
         </div>
       )}
+
+      {/* Add to List Modal */}
+      <AddToListModal
+        isOpen={addToListSource !== null}
+        onClose={() => setAddToListSource(null)}
+        sourceId={addToListSource?.id || ''}
+        sourceName={addToListSource?.name || ''}
+        onSuccess={() => {
+          showSuccess('Source added to list!');
+          fetchData(); // Refresh to update list counts
+        }}
+      />
     </div>
   );
 }
@@ -911,13 +929,15 @@ function SourceTable({
   getDomainName, 
   toggleActive, 
   updateReliability, 
-  setDeleteId 
+  setDeleteId,
+  onAddToList,
 }: {
   sources: Source[];
   getDomainName: (id: string | null) => string;
   toggleActive: (source: Source) => void;
   updateReliability: (source: Source, score: number) => void;
   setDeleteId: (id: string) => void;
+  onAddToList: (source: Source) => void;
 }) {
   return (
     <>
@@ -952,12 +972,20 @@ function SourceTable({
                 score={source.reliabilityScore}
                 onChange={(score) => updateReliability(source, score)}
               />
-              <button
-                onClick={() => setDeleteId(source.id)}
-                className="text-red-600 hover:text-red-800 text-sm"
-              >
-                Delete
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => onAddToList(source)}
+                  className="text-argus-600 hover:text-argus-800 text-sm"
+                >
+                  + List
+                </button>
+                <button
+                  onClick={() => setDeleteId(source.id)}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -1010,12 +1038,20 @@ function SourceTable({
                   />
                 </td>
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => setDeleteId(source.id)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => onAddToList(source)}
+                      className="text-argus-600 hover:text-argus-800 text-sm"
+                    >
+                      + List
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(source.id)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
