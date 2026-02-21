@@ -48,6 +48,8 @@ export default function HumintFeedPage() {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [unlockingPost, setUnlockingPost] = useState<string | null>(null);
   const [isSource, setIsSource] = useState<boolean | null>(null);
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
 
   // Check if HUMINT user needs to complete registration
   useEffect(() => {
@@ -181,6 +183,43 @@ export default function HumintFeedPage() {
       case 'silver': return 'bg-gray-400/20 text-gray-300 border-gray-400/30';
       case 'bronze': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       default: return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    }
+  }
+
+  function handleReply(postId: string, sourceCodename: string) {
+    // Navigate to compose with reply context
+    router.push(`/humint/compose?replyTo=${postId}&source=${sourceCodename}`);
+  }
+
+  function handleSave(postId: string) {
+    setSavedPosts(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  }
+
+  async function handleShare(postId: string) {
+    const url = `${window.location.origin}/humint/post/${postId}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Intel from Argus',
+          url: url,
+        });
+      } catch (err) {
+        // User cancelled or error
+      }
+    } else {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(url);
+      setCopiedPostId(postId);
+      setTimeout(() => setCopiedPostId(null), 2000);
     }
   }
 
@@ -357,23 +396,34 @@ export default function HumintFeedPage() {
                     
                     {/* Actions */}
                     <div className="flex items-center gap-6 mt-3 text-gray-500">
-                      <button className="flex items-center gap-2 hover:text-emerald-400 transition-colors group">
+                      <button 
+                        onClick={() => handleReply(post.id, post.source.codename)}
+                        className="flex items-center gap-2 hover:text-emerald-400 transition-colors group"
+                      >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
                         <span className="text-sm group-hover:text-emerald-400">Reply</span>
                       </button>
-                      <button className="flex items-center gap-2 hover:text-emerald-400 transition-colors group">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <button 
+                        onClick={() => handleSave(post.id)}
+                        className={`flex items-center gap-2 transition-colors group ${savedPosts.has(post.id) ? 'text-red-400' : 'hover:text-red-400'}`}
+                      >
+                        <svg className="w-5 h-5" fill={savedPosts.has(post.id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        <span className="text-sm group-hover:text-emerald-400">Save</span>
+                        <span className="text-sm">{savedPosts.has(post.id) ? 'Saved' : 'Save'}</span>
                       </button>
-                      <button className="flex items-center gap-2 hover:text-emerald-400 transition-colors group">
+                      <button 
+                        onClick={() => handleShare(post.id)}
+                        className="flex items-center gap-2 hover:text-emerald-400 transition-colors group"
+                      >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                         </svg>
-                        <span className="text-sm group-hover:text-emerald-400">Share</span>
+                        <span className="text-sm group-hover:text-emerald-400">
+                          {copiedPostId === post.id ? 'Copied!' : 'Share'}
+                        </span>
                       </button>
                     </div>
                   </div>
