@@ -218,7 +218,7 @@ export default function CreatePostPage() {
           {/* Avatar */}
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-lg">
-              {user?.name?.[0] || '?'}
+              {(user?.type === 'humint' ? user.codename : user?.name)?.[0] || '?'}
             </span>
           </div>
 

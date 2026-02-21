@@ -11,6 +11,7 @@
   "dependencies": {
     "@vitalpoint/near-phantom-auth": "^0.2.10",
     "exif-js": "^2.3.0",
+    "lucide-react": "^0.575.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
