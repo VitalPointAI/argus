@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 
@@ -38,7 +39,8 @@ interface Source {
 }
 
 export default function HumintFeedPage() {
-  const { user } = useAuth();
+  const { user, isHumint, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,22 +49,50 @@ export default function HumintFeedPage() {
   const [unlockingPost, setUnlockingPost] = useState<string | null>(null);
   const [isSource, setIsSource] = useState<boolean | null>(null);
 
+  // Check if HUMINT user needs to complete registration
+  useEffect(() => {
+    console.log('[Feed] Auth state:', { authLoading, isHumint, user });
+    
+    if (authLoading) return; // Wait for auth to load
+    
+    async function checkSourceRegistration() {
+      console.log('[Feed] Checking source registration, isHumint:', isHumint);
+      
+      if (!isHumint) {
+        // Not logged in with passkey, just load feed normally
+        console.log('[Feed] Not HUMINT user, skipping redirect');
+        setIsSource(false);
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/humint-feed/sources/me', {
+          credentials: 'include',
+        });
+        
+        console.log('[Feed] Source check response:', res.status);
+        
+        if (res.ok) {
+          setIsSource(true);
+        } else {
+          // HUMINT user but not registered as source - redirect to registration
+          console.log('[Feed] HUMINT user not registered, redirecting...');
+          setIsSource(false);
+          router.push('/humint/sources/new');
+        }
+      } catch (err) {
+        console.error('[Feed] Source check error:', err);
+        setIsSource(false);
+      }
+    }
+    
+    checkSourceRegistration();
+  }, [authLoading, isHumint, router]);
+
   useEffect(() => {
     loadFeed();
     loadSources();
-    checkIfSource();
   }, [selectedSource]);
-
-  async function checkIfSource() {
-    try {
-      const res = await fetch('/api/humint-feed/sources/me', {
-        credentials: 'include',
-      });
-      setIsSource(res.ok);
-    } catch {
-      setIsSource(false);
-    }
-  }
 
   async function loadFeed() {
     try {
@@ -156,6 +186,10 @@ export default function HumintFeedPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      {/* Debug Banner - REMOVE AFTER TESTING */}
+      <div className="bg-yellow-500 text-black p-2 text-xs">
+        Debug: authLoading={String(authLoading)} | isHumint={String(isHumint)} | isSource={String(isSource)} | user={user ? user.type : 'null'}
+      </div>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-800">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
