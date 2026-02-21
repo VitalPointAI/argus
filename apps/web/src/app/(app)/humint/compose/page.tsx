@@ -69,17 +69,19 @@ function ComposeContent() {
 
   async function generateLocationProofFromBrowser() {
     if (!navigator.geolocation) {
-      setError('Geolocation not supported');
+      setError('Geolocation not supported by this browser');
       return;
     }
 
     setLocationProof(p => ({ ...p, generating: true }));
+    setError(null);
     
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
+          enableHighAccuracy: false, // Faster, coarse location is fine for 50km proof
+          timeout: 30000, // 30 seconds - more forgiving on mobile
+          maximumAge: 60000, // Accept cached position up to 1 minute old
         });
       });
 
@@ -109,7 +111,18 @@ function ComposeContent() {
         data: data.proof,
       });
     } catch (err: any) {
-      setError(err.message || 'Location proof failed');
+      // Better error messages for geolocation failures
+      let errorMsg = 'Location proof failed';
+      if (err.code === 1) {
+        errorMsg = 'Location access denied. Please allow location access and try again.';
+      } else if (err.code === 2) {
+        errorMsg = 'Unable to determine location. Make sure location services are enabled.';
+      } else if (err.code === 3) {
+        errorMsg = 'Location request timed out. Try again in a moment.';
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
       setLocationProof(p => ({ ...p, generating: false }));
     }
   }
