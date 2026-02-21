@@ -56,6 +56,18 @@ export default function HumintFeedPage() {
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/humint/feed', label: 'Intel', active: true },
+    { href: '/briefings', label: 'Briefings' },
+    { href: '/sources', label: 'Sources' },
+    { href: '/search', label: 'Search' },
+    { href: '/marketplace', label: 'Marketplace' },
+    { href: '/bounties', label: 'Bounties' },
+    { href: '/settings', label: 'Settings' },
+  ];
 
   // Check if HUMINT user needs to complete registration
   useEffect(() => {
@@ -272,10 +284,64 @@ export default function HumintFeedPage() {
 
   return (
     <div className="fixed inset-0 bg-black text-white overflow-auto">
-      {/* Header - X style */}
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-neutral-800">
+      {/* Slide-out Menu */}
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setMenuOpen(false)} />
+          <div className="fixed left-0 top-0 bottom-0 w-64 bg-neutral-900 z-50 p-4">
+            <div className="flex items-center justify-between mb-6">
+              <Link href="/dashboard" className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-sky-500 flex items-center justify-center">
+                  <span className="text-lg">👁</span>
+                </div>
+                <span className="font-bold text-lg">Argus</span>
+              </Link>
+              <button onClick={() => setMenuOpen(false)} className="p-2 hover:bg-neutral-800 rounded-full">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <nav className="space-y-1">
+              {navLinks.map(link => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={`block px-3 py-2.5 rounded-lg transition-colors ${
+                    link.active ? 'bg-neutral-800 font-bold' : 'hover:bg-neutral-800'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="absolute bottom-4 left-4 right-4">
+              <button 
+                onClick={() => { 
+                  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+                    .then(() => window.location.href = '/');
+                }}
+                className="w-full px-3 py-2.5 text-red-400 hover:bg-neutral-800 rounded-lg transition-colors text-left"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-neutral-800">
         <div className="px-4 h-[53px] flex items-center justify-between">
-          <h1 className="text-xl font-bold">Intel</h1>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setMenuOpen(true)} className="p-2 -ml-2 hover:bg-neutral-800 rounded-full transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-bold">Intel</h1>
+          </div>
           {isSource && (
             <Link 
               href="/humint/compose"
