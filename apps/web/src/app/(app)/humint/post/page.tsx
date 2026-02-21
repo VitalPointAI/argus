@@ -45,8 +45,13 @@ export default function CreatePostPage() {
       publicKey: 'mock-pubkey',
     });
     
+    // Use nearAccountId for HUMINT users, otherwise fall back to user id
+    const accountId = (user?.type === 'humint' && user.nearAccountId) 
+      ? user.nearAccountId 
+      : (user?.id || 'test.near');
+    
     const newKeys = await initHumintCrypto(
-      user?.nearAccountId || 'test.near',
+      accountId,
       mockSignMessage
     );
     setKeys(newKeys);

@@ -26,10 +26,6 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             
-            # Stop PM2 if running (migrated to Docker)
-            pm2 stop all 2>/dev/null || true
-            pm2 delete all 2>/dev/null || true
-            
             # Build and deploy with Docker Compose
             docker compose down || true
             docker compose build --no-cache
