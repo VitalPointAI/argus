@@ -1,1 +1,0 @@
-/home/agent/openclaw/projects/strategic-scanner/contracts/humint-feed/target/wasm32-unknown-unknown/release/humint_feed.wasm: /home/agent/openclaw/projects/strategic-scanner/contracts/humint-feed/src/lib.rs

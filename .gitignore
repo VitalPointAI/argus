@@ -33,3 +33,6 @@ coverage/
 drizzle/
 .claude/
 .planning/
+-e 
+# Rust build artifacts
+contracts/*/target/
