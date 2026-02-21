@@ -862,3 +862,65 @@ export const sourceListReviews = pgTable('source_list_reviews', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+// ==========================================
+// HUMINT FEED SYSTEM
+// ==========================================
+
+// Encrypted posts (content on IPFS, metadata here)
+export const humintPosts = pgTable('humint_posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: varchar('post_id', { length: 100 }).notNull().unique(),
+  sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
+  sourceHash: varchar('source_hash', { length: 64 }).notNull(), // SHA256 of codename
+  contentCid: varchar('content_cid', { length: 100 }).notNull(), // IPFS CID of encrypted content
+  contentHash: varchar('content_hash', { length: 64 }).notNull(), // SHA256 of plaintext (integrity)
+  contentKeyWrapped: text('content_key_wrapped'), // Encrypted content key (base64)
+  iv: varchar('iv', { length: 32 }), // Encryption IV (hex)
+  tier: varchar('tier', { length: 20 }).notNull().default('free'), // "free", "bronze", "silver", "gold"
+  epoch: varchar('epoch', { length: 10 }).notNull(), // "2026-02"
+  mediaCids: text('media_cids').array().default([]), // Array of IPFS CIDs for encrypted media
+  mediaCount: integer('media_count').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// Per-post access grants (for exceptions)
+export const humintPostGrants = pgTable('humint_post_grants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: varchar('post_id', { length: 100 }).notNull().references(() => humintPosts.postId, { onDelete: 'cascade' }),
+  granteeId: uuid('grantee_id').references(() => users.id), // Optional user ID
+  granteePubkey: varchar('grantee_pubkey', { length: 128 }).notNull(), // ML-KEM or X25519 pubkey
+  encryptedContentKey: text('encrypted_content_key').notNull(), // Content key wrapped for grantee
+  grantedBy: uuid('granted_by').notNull().references(() => humintSources.id),
+  grantedAt: timestamp('granted_at', { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+}, (table) => ({
+  uniqueGrant: unique().on(table.postId, table.granteePubkey),
+}));
+
+// Feed subscriptions (tier-based access)
+export const humintFeedSubscriptions = pgTable('humint_feed_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  subscriberId: uuid('subscriber_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sourceHash: varchar('source_hash', { length: 64 }).notNull(), // SHA256 of source codename
+  tier: varchar('tier', { length: 20 }).notNull(), // "bronze", "silver", "gold"
+  nftTokenId: varchar('nft_token_id', { length: 100 }), // NEAR NFT token ID (if applicable)
+  priceUsdc: decimal('price_usdc', { precision: 12, scale: 2 }),
+  startsAt: timestamp('starts_at', { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  status: varchar('status', { length: 20 }).default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  uniqueSub: unique().on(table.subscriberId, table.sourceHash, table.tier),
+}));
+
+// Post exclusions (revoked access)
+export const humintPostExclusions = pgTable('humint_post_exclusions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: varchar('post_id', { length: 100 }).notNull().references(() => humintPosts.postId, { onDelete: 'cascade' }),
+  excludedPubkey: varchar('excluded_pubkey', { length: 128 }).notNull(),
+  reason: text('reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  uniqueExclusion: unique().on(table.postId, table.excludedPubkey),
+}));
