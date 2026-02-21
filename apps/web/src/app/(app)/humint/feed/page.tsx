@@ -287,7 +287,7 @@ export default function HumintFeedPage() {
         </div>
       </header>
 
-      <div className="max-w-[600px] mx-auto border-x border-neutral-800 min-h-screen">
+      <div className="w-full min-h-[calc(100vh-53px)]">
         {/* Tabs */}
         <div className="flex border-b border-neutral-800">
           <button className="flex-1 py-4 text-center hover:bg-white/[0.03] transition-colors relative">
