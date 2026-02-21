@@ -271,114 +271,74 @@ export default function HumintFeedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-800">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Intel Feed</h1>
-          {isSource === false && (
-            <Link 
-              href="/humint/sources/new"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-full text-sm font-medium transition-colors"
-            >
-              Become a Source
-            </Link>
-          )}
+    <div className="min-h-screen bg-black text-white">
+      {/* Header - X style */}
+      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-neutral-800">
+        <div className="max-w-[600px] mx-auto px-4 h-[53px] flex items-center justify-between">
+          <h1 className="text-xl font-bold">Intel</h1>
           {isSource && (
             <Link 
               href="/humint/compose"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-full text-sm font-medium transition-colors"
+              className="px-4 py-1.5 bg-white text-black rounded-full text-sm font-bold hover:bg-neutral-200 transition-colors"
             >
-              Post Intel
+              Post
             </Link>
           )}
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto">
-        {/* Source Filter */}
-        <div className="px-4 py-3 border-b border-gray-800 overflow-x-auto">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSelectedSource(null)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                !selectedSource 
-                  ? 'bg-white text-gray-900' 
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              All Sources
-            </button>
-            {sources.slice(0, 5).map(source => (
-              <button
-                key={source.id}
-                onClick={() => setSelectedSource(source.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  selectedSource === source.id
-                    ? 'bg-white text-gray-900'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                {source.codename}
-              </button>
-            ))}
-          </div>
+      <div className="max-w-[600px] mx-auto border-x border-neutral-800 min-h-screen">
+        {/* Tabs */}
+        <div className="flex border-b border-neutral-800">
+          <button className="flex-1 py-4 text-center hover:bg-white/[0.03] transition-colors relative">
+            <span className="font-bold text-[15px]">For you</span>
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-sky-500 rounded-full"></div>
+          </button>
+          <button className="flex-1 py-4 text-center text-neutral-500 hover:bg-white/[0.03] transition-colors">
+            <span className="font-medium text-[15px]">Following</span>
+          </button>
         </div>
 
         {/* Feed */}
-        <div className="divide-y divide-gray-800">
+        <div>
           {loading ? (
-            <div className="py-12 text-center text-gray-500">
-              <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto"></div>
-              <p className="mt-3">Loading intel...</p>
+            <div className="py-8 flex justify-center">
+              <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : posts.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="text-6xl mb-4">🔐</div>
-              <h2 className="text-xl font-semibold mb-2">No Intel Yet</h2>
-              <p className="text-gray-400 mb-6">
-                Subscribe to sources to see their intel here.
+            <div className="py-16 px-8 text-center">
+              <h2 className="text-[31px] font-extrabold mb-2">Welcome to Intel</h2>
+              <p className="text-neutral-500 text-[15px]">
+                When sources you follow post intel, it will show up here.
               </p>
-              <Link 
-                href="/humint/discover"
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-full font-medium transition-colors"
-              >
-                Discover Sources
-              </Link>
             </div>
           ) : (
             posts.map(post => (
-              <article key={post.id} className="px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-pointer border-b border-gray-800">
+              <article key={post.id} className="px-4 py-3 border-b border-neutral-800 hover:bg-white/[0.03] transition-colors">
                 <div className="flex gap-3">
                   {/* Avatar */}
                   <Link href={`/humint/sources/${post.source.id}`} className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-sm font-bold hover:opacity-90 transition-opacity">
+                    <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-sm font-bold hover:brightness-90 transition">
                       {post.source.codename.charAt(0).toUpperCase()}
                     </div>
                   </Link>
                   
                   <div className="flex-1 min-w-0">
-                    {/* Header row */}
-                    <div className="flex items-center gap-1 text-[15px]">
-                      <Link href={`/humint/sources/${post.source.id}`} className="font-bold hover:underline truncate">
+                    {/* Header */}
+                    <div className="flex items-center gap-1 text-[15px] leading-5">
+                      <Link href={`/humint/sources/${post.source.id}`} className="font-bold hover:underline">
                         {post.source.codename}
                       </Link>
-                      <span className="text-gray-500 truncate">@{post.source.id}</span>
-                      <span className="text-gray-500">·</span>
-                      <span className="text-gray-500 hover:underline">{formatTime(post.createdAt)}</span>
-                      {post.tier !== 'Free' && (
-                        <span className="ml-1 px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/20 text-emerald-400">
-                          {post.tier}
-                        </span>
-                      )}
-                      {/* More menu */}
+                      <span className="text-neutral-500">@{post.source.id.slice(0, 8)}</span>
+                      <span className="text-neutral-500">·</span>
+                      <time className="text-neutral-500 hover:underline">{formatTime(post.createdAt)}</time>
                       {post.isOwner && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDelete(post.id); }}
-                          className="ml-auto p-1.5 -m-1.5 rounded-full hover:bg-red-500/10 hover:text-red-400 text-gray-500 transition-colors"
+                          className="ml-auto p-2 -m-2 rounded-full hover:bg-sky-500/10 text-neutral-500 hover:text-sky-500 transition-colors"
                         >
-                          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M3 12c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2zm9 2c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm7 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/>
                           </svg>
                         </button>
                       )}
@@ -386,57 +346,51 @@ export default function HumintFeedPage() {
                     
                     {/* Content */}
                     {post.locked ? (
-                      <div className="mt-2 p-3 bg-gray-800/50 rounded-2xl border border-gray-700/50">
-                        <div className="flex items-center gap-3">
-                          <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          <span className="text-gray-400 text-sm flex-1">Subscribe to unlock</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); unlockPost(post.id); }}
-                            className="px-3 py-1 bg-white text-black rounded-full text-sm font-bold hover:bg-gray-200 transition-colors"
-                          >
-                            Subscribe
-                          </button>
-                        </div>
+                      <div className="mt-3 py-6 text-center border border-neutral-800 rounded-2xl">
+                        <svg className="w-8 h-8 text-neutral-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <p className="text-neutral-500 text-sm mb-3">Premium content</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); unlockPost(post.id); }}
+                          className="px-4 py-1.5 bg-white text-black rounded-full text-sm font-bold hover:bg-neutral-200 transition-colors"
+                        >
+                          Subscribe
+                        </button>
                       </div>
                     ) : (
-                      <div className="mt-1">
-                        <p className="text-[15px] text-white leading-normal whitespace-pre-wrap break-words">
+                      <>
+                        <p className="mt-0.5 text-[15px] leading-[20px] whitespace-pre-wrap break-words">
                           {post.content?.text}
                         </p>
                         {post.content?.mediaUrl && (
-                          <div className="mt-3 rounded-2xl overflow-hidden border border-gray-700">
-                            <img 
-                              src={post.content.mediaUrl} 
-                              alt=""
-                              className="w-full"
-                            />
+                          <div className="mt-3 rounded-2xl overflow-hidden border border-neutral-800">
+                            <img src={post.content.mediaUrl} alt="" className="w-full" />
                           </div>
                         )}
-                      </div>
+                      </>
                     )}
                     
-                    {/* X-style action bar */}
-                    <div className="flex items-center justify-between mt-3 max-w-[425px] -ml-2">
+                    {/* Actions */}
+                    <div className="flex items-center mt-3 -ml-2 max-w-md justify-between">
                       {/* Reply */}
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleReply(post.id, post.source.codename); }}
-                        className="group flex items-center"
+                        className="group flex items-center gap-0.5 text-neutral-500"
                       >
-                        <div className="p-2 rounded-full group-hover:bg-sky-500/10 transition-colors">
-                          <svg className="w-[18px] h-[18px] text-gray-500 group-hover:text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        <div className="p-2 rounded-full group-hover:bg-sky-500/10 group-hover:text-sky-400 transition-colors">
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01z"/>
                           </svg>
                         </div>
-                        {post.replyCount > 0 && <span className="text-[13px] text-gray-500 group-hover:text-sky-500 -ml-1">{post.replyCount}</span>}
+                        {post.replyCount > 0 && <span className="text-[13px] group-hover:text-sky-400">{post.replyCount}</span>}
                       </button>
                       
-                      {/* Repost placeholder */}
-                      <button className="group flex items-center">
-                        <div className="p-2 rounded-full group-hover:bg-green-500/10 transition-colors">
-                          <svg className="w-[18px] h-[18px] text-gray-500 group-hover:text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      {/* Repost */}
+                      <button className="group flex items-center gap-0.5 text-neutral-500">
+                        <div className="p-2 rounded-full group-hover:bg-green-500/10 group-hover:text-green-400 transition-colors">
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2h6v2h-6c-2.21 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 20.12l-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2h-6V4h6c2.21 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14z"/>
                           </svg>
                         </div>
                       </button>
@@ -444,39 +398,38 @@ export default function HumintFeedPage() {
                       {/* Like */}
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleLike(post.id, post.liked); }}
-                        disabled={likingPostId === post.id}
-                        className="group flex items-center"
+                        className={`group flex items-center gap-0.5 ${post.liked ? 'text-pink-600' : 'text-neutral-500'}`}
                       >
-                        <div className={`p-2 rounded-full transition-colors ${post.liked ? 'text-pink-600' : 'group-hover:bg-pink-500/10'}`}>
-                          <svg className={`w-[18px] h-[18px] ${post.liked ? 'text-pink-600 fill-current' : 'text-gray-500 group-hover:text-pink-600'}`} viewBox="0 0 24 24" stroke="currentColor" fill={post.liked ? 'currentColor' : 'none'}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        <div className={`p-2 rounded-full transition-colors ${post.liked ? '' : 'group-hover:bg-pink-500/10 group-hover:text-pink-600'}`}>
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill={post.liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.41-4.86-.514-6.67.887-1.79 2.647-2.91 4.601-3.01 1.651-.09 3.368.56 4.798 2.01 1.429-1.45 3.146-2.1 4.796-2.01 1.954.1 3.714 1.22 4.601 3.01.896 1.81.846 4.17-.514 6.67z"/>
                           </svg>
                         </div>
-                        {post.likeCount > 0 && <span className={`text-[13px] -ml-1 ${post.liked ? 'text-pink-600' : 'text-gray-500 group-hover:text-pink-600'}`}>{post.likeCount}</span>}
+                        {post.likeCount > 0 && <span className="text-[13px]">{post.likeCount}</span>}
                       </button>
                       
-                      {/* Views placeholder */}
-                      <button className="group flex items-center">
-                        <div className="p-2 rounded-full group-hover:bg-sky-500/10 transition-colors">
-                          <svg className="w-[18px] h-[18px] text-gray-500 group-hover:text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      {/* Views */}
+                      <button className="group flex items-center gap-0.5 text-neutral-500">
+                        <div className="p-2 rounded-full group-hover:bg-sky-500/10 group-hover:text-sky-400 transition-colors">
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M8.75 21V3h2v18h-2zM18.75 21V8.5h2V21h-2zM13.75 21v-6h2v6h-2zM3.75 21v-3h2v3h-2z"/>
                           </svg>
                         </div>
                       </button>
                       
                       {/* Bookmark & Share */}
-                      <div className="flex items-center">
-                        <button className="group p-2 rounded-full hover:bg-sky-500/10 transition-colors">
-                          <svg className="w-[18px] h-[18px] text-gray-500 group-hover:text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      <div className="flex">
+                        <button className="group p-2 rounded-full text-neutral-500 hover:bg-sky-500/10 hover:text-sky-400 transition-colors">
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z"/>
                           </svg>
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleShare(post.id); }}
-                          className="group p-2 rounded-full hover:bg-sky-500/10 transition-colors"
+                          className={`group p-2 rounded-full transition-colors ${copiedPostId === post.id ? 'text-green-400' : 'text-neutral-500 hover:bg-sky-500/10 hover:text-sky-400'}`}
                         >
-                          <svg className={`w-[18px] h-[18px] ${copiedPostId === post.id ? 'text-green-500' : 'text-gray-500 group-hover:text-sky-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                            <path d="M12 2.59l5.7 5.7-1.41 1.42L13 6.41V16h-2V6.41l-3.3 3.3-1.41-1.42L12 2.59zM21 15l-.02 3.51c0 1.38-1.12 2.49-2.5 2.49H5.5C4.11 21 3 19.88 3 18.5V15h2v3.5c0 .28.22.5.5.5h12.98c.28 0 .5-.22.5-.5L19 15h2z"/>
                           </svg>
                         </button>
                       </div>
@@ -489,14 +442,15 @@ export default function HumintFeedPage() {
         </div>
       </div>
 
-      {/* Floating Compose Button (for sources only) */}
+      {/* Floating Compose Button - X style */}
       {isSource && (
         <Link
           href="/humint/compose"
-          className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-sky-500 hover:bg-sky-600 rounded-full shadow-lg flex items-center justify-center transition-colors"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23 3c-6.62-.1-10.38 2.421-13.05 6.03C7.29 12.61 6 17.331 6 22h2c0-1.007.07-2.012.19-3H12c4.1 0 7.48-3.082 7.94-7.054C22.79 10.147 23.17 6.359 23 3zm-7 8h-1.5v2H16c.63-.016 1.2-.08 1.72-.188C16.95 15.24 14.68 17 12 17H8.55c.57-2.512 1.57-4.851 3-6.78 2.16-2.912 5.29-4.911 9.45-5.187C20.95 8.079 19.9 11 16 11zM4 9V6H1V4h3V1h2v3h3v2H6v3H4z"/>
+          </svg>
           </svg>
         </Link>
       )}
