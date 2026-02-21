@@ -186,10 +186,6 @@ export default function HumintFeedPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Debug Banner - REMOVE AFTER TESTING */}
-      <div className="bg-yellow-500 text-black p-2 text-xs">
-        Debug: authLoading={String(authLoading)} | isHumint={String(isHumint)} | isSource={String(isSource)} | user={user ? user.type : 'null'}
-      </div>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-800">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">

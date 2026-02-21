@@ -399,11 +399,8 @@ app.get('/feed', async (c) => {
   const offset = parseInt(c.req.query('offset') || '0');
 
   try {
-    // Get posts with source info
+    // Get posts
     const posts = await db.query.humintSubmissions.findMany({
-      with: {
-        source: true,
-      },
       limit,
       offset,
       orderBy: [desc(humintSubmissions.submittedAt)],
@@ -412,7 +409,10 @@ app.get('/feed', async (c) => {
     // Check access for each post
     const enrichedPosts = await Promise.all(
       posts.map(async (post) => {
-        const source = post.source as any;
+        // Get source info separately (no relations defined)
+        const source = await db.query.humintSources.findFirst({
+          where: eq(humintSources.id, post.sourceId),
+        }) as any;
         let hasAccess = (post.tier || 0) === 0; // Free posts always accessible
 
         // Check if user has subscription
@@ -470,16 +470,16 @@ app.get('/posts/:id', async (c) => {
   try {
     const post = await db.query.humintSubmissions.findFirst({
       where: eq(humintSubmissions.id, postId),
-      with: {
-        source: true,
-      },
     });
 
     if (!post) {
       return c.json({ error: 'Post not found' }, 404);
     }
 
-    const source = post.source as any;
+    // Get source separately (no relations defined)
+    const source = await db.query.humintSources.findFirst({
+      where: eq(humintSources.id, post.sourceId),
+    }) as any;
     let hasAccess = (post.tier || 0) === 0;
 
     // Check subscription
@@ -643,14 +643,21 @@ app.get('/subscriptions', async (c) => {
 
   const subscriptions = await db.query.sourceSubscriptions.findMany({
     where: eq(sourceSubscriptions.subscriberId, userId),
-    with: {
-      source: true,
-    },
     orderBy: [desc(sourceSubscriptions.createdAt)],
   });
 
+  // Get sources for each subscription
+  const enrichedSubs = await Promise.all(
+    subscriptions.map(async (sub) => {
+      const source = await db.query.humintSources.findFirst({
+        where: eq(humintSources.id, sub.sourceId),
+      }) as any;
+      return { ...sub, source };
+    })
+  );
+
   return c.json({
-    subscriptions: subscriptions.map(sub => {
+    subscriptions: enrichedSubs.map(sub => {
       const source = sub.source as any;
       return {
         id: sub.id,
