@@ -14,11 +14,12 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../db';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import { 
   humintSources, 
   humintSubmissions, 
   sourceSubscriptions,
+  humintLikes,
   users 
 } from '../db/schema';
 import { sha256 } from '@noble/hashes/sha256';
@@ -238,6 +239,7 @@ app.post(
     content: z.string().min(1).max(50000),
     tier: z.number().int().min(0).max(3).default(0),
     title: z.string().max(200).optional(),
+    parentId: z.string().uuid().optional(), // For replies/threads
     // Optional ZK proofs
     zkProofs: z.array(z.object({
       type: z.enum(['location', 'reputation', 'identity']),
@@ -269,7 +271,7 @@ app.post(
       return c.json({ error: 'You must register as a source first' }, 403);
     }
 
-    const { content, tier, title, zkProofs, locationProof } = c.req.valid('json');
+    const { content, tier, title, parentId, zkProofs, locationProof } = c.req.valid('json');
 
     try {
       // Generate content hash
@@ -350,6 +352,7 @@ app.post(
       // Store in DB
       const [post] = await db.insert(humintSubmissions).values({
         sourceId: source.id,
+        parentId: parentId || null, // For threading
         title: title || content.slice(0, 100),
         body: content,
         contentHash,
@@ -362,6 +365,13 @@ app.post(
         hasReputationProof,
         hasIdentityProof,
       }).returning();
+
+      // If this is a reply, increment parent's reply count
+      if (parentId) {
+        await db.update(humintSubmissions)
+          .set({ replyCount: sql`reply_count + 1` })
+          .where(eq(humintSubmissions.id, parentId));
+      }
 
       // Update source post count
       await db.update(humintSources)
@@ -427,6 +437,24 @@ app.get('/feed', async (c) => {
           hasAccess = !!(subscription && (subscription.tier || 0) >= (post.tier || 0));
         }
 
+        // Check if user liked this post
+        let liked = false;
+        if (userId) {
+          const like = await db.query.humintLikes.findFirst({
+            where: and(
+              eq(humintLikes.postId, post.id),
+              eq(humintLikes.userId, userId)
+            ),
+          });
+          liked = !!like;
+        }
+
+        // Check if user owns this post
+        const userSource = userId ? await db.query.humintSources.findFirst({
+          where: eq(humintSources.userId, userId),
+        }) : null;
+        const isOwner = userSource && post.sourceId === userSource.id;
+
         return {
           id: post.id,
           source: {
@@ -437,6 +465,12 @@ app.get('/feed', async (c) => {
           createdAt: post.submittedAt,
           locked: !hasAccess,
           canUnlock: !hasAccess && (post.tier || 0) > 0,
+          // Engagement
+          likeCount: post.likeCount || 0,
+          replyCount: post.replyCount || 0,
+          liked,
+          isOwner,
+          parentId: post.parentId,
           // Only include content if accessible
           content: hasAccess ? {
             type: 'text',
@@ -887,6 +921,216 @@ app.post(
     }
   }
 );
+
+// ==========================================
+// LIKES
+// ==========================================
+
+/**
+ * Like a post
+ * POST /api/humint-feed/posts/:id/like
+ */
+app.post('/posts/:id/like', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const postId = c.req.param('id');
+
+  try {
+    // Check if already liked
+    const existing = await db.query.humintLikes.findFirst({
+      where: and(
+        eq(humintLikes.postId, postId),
+        eq(humintLikes.userId, userId)
+      ),
+    });
+
+    if (existing) {
+      return c.json({ error: 'Already liked' }, 400);
+    }
+
+    // Add like
+    await db.insert(humintLikes).values({
+      postId,
+      userId,
+    });
+
+    // Increment like count
+    await db.update(humintSubmissions)
+      .set({ likeCount: sql`like_count + 1` })
+      .where(eq(humintSubmissions.id, postId));
+
+    return c.json({ success: true, liked: true });
+  } catch (error: any) {
+    console.error('Like error:', error);
+    return c.json({ error: error.message || 'Failed to like' }, 500);
+  }
+});
+
+/**
+ * Unlike a post
+ * DELETE /api/humint-feed/posts/:id/like
+ */
+app.delete('/posts/:id/like', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const postId = c.req.param('id');
+
+  try {
+    // Remove like
+    const result = await db.delete(humintLikes)
+      .where(and(
+        eq(humintLikes.postId, postId),
+        eq(humintLikes.userId, userId)
+      ))
+      .returning();
+
+    if (result.length === 0) {
+      return c.json({ error: 'Not liked' }, 400);
+    }
+
+    // Decrement like count
+    await db.update(humintSubmissions)
+      .set({ likeCount: sql`GREATEST(like_count - 1, 0)` })
+      .where(eq(humintSubmissions.id, postId));
+
+    return c.json({ success: true, liked: false });
+  } catch (error: any) {
+    console.error('Unlike error:', error);
+    return c.json({ error: error.message || 'Failed to unlike' }, 500);
+  }
+});
+
+// ==========================================
+// DELETE POST
+// ==========================================
+
+/**
+ * Delete a post (only own posts)
+ * DELETE /api/humint-feed/posts/:id
+ */
+app.delete('/posts/:id', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const postId = c.req.param('id');
+
+  try {
+    // Get the post
+    const post = await db.query.humintSubmissions.findFirst({
+      where: eq(humintSubmissions.id, postId),
+    });
+
+    if (!post) {
+      return c.json({ error: 'Post not found' }, 404);
+    }
+
+    // Get user's source profile
+    const source = await db.query.humintSources.findFirst({
+      where: eq(humintSources.userId, userId),
+    });
+
+    // Check ownership
+    if (!source || post.sourceId !== source.id) {
+      return c.json({ error: 'Not authorized to delete this post' }, 403);
+    }
+
+    // If this is a reply, decrement parent's reply count
+    if (post.parentId) {
+      await db.update(humintSubmissions)
+        .set({ replyCount: sql`GREATEST(reply_count - 1, 0)` })
+        .where(eq(humintSubmissions.id, post.parentId));
+    }
+
+    // Delete the post (cascades to likes)
+    await db.delete(humintSubmissions)
+      .where(eq(humintSubmissions.id, postId));
+
+    // Decrement source post count
+    await db.update(humintSources)
+      .set({ totalSubmissions: sql`GREATEST(total_submissions - 1, 0)` })
+      .where(eq(humintSources.id, source.id));
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    return c.json({ error: error.message || 'Failed to delete' }, 500);
+  }
+});
+
+// ==========================================
+// REPLIES
+// ==========================================
+
+/**
+ * Get replies to a post
+ * GET /api/humint-feed/posts/:id/replies
+ */
+app.get('/posts/:id/replies', async (c) => {
+  const userId = await getUserId(c);
+  const postId = c.req.param('id');
+  const limit = parseInt(c.req.query('limit') || '20');
+  const offset = parseInt(c.req.query('offset') || '0');
+
+  try {
+    // Get replies to this post
+    const replies = await db.query.humintSubmissions.findMany({
+      where: eq(humintSubmissions.parentId, postId),
+      limit,
+      offset,
+      orderBy: [desc(humintSubmissions.submittedAt)],
+    });
+
+    // Enrich with source info and like status
+    const enrichedReplies = await Promise.all(
+      replies.map(async (reply) => {
+        const source = await db.query.humintSources.findFirst({
+          where: eq(humintSources.id, reply.sourceId),
+        }) as any;
+
+        // Check if user liked this reply
+        let liked = false;
+        if (userId) {
+          const like = await db.query.humintLikes.findFirst({
+            where: and(
+              eq(humintLikes.postId, reply.id),
+              eq(humintLikes.userId, userId)
+            ),
+          });
+          liked = !!like;
+        }
+
+        return {
+          id: reply.id,
+          source: {
+            id: source?.codenameHash?.slice(0, 12),
+            codename: source?.codename,
+          },
+          content: {
+            type: 'text',
+            text: reply.body,
+          },
+          likeCount: reply.likeCount || 0,
+          replyCount: reply.replyCount || 0,
+          liked,
+          createdAt: reply.submittedAt,
+        };
+      })
+    );
+
+    return c.json({ replies: enrichedReplies });
+  } catch (error: any) {
+    console.error('Replies error:', error);
+    return c.json({ error: error.message || 'Failed to load replies' }, 500);
+  }
+});
 
 export const humintFeedRoutes = app;
 export default app;

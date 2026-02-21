@@ -15,6 +15,11 @@ interface Post {
   createdAt: string;
   locked: boolean;
   canUnlock: boolean;
+  likeCount: number;
+  replyCount: number;
+  liked: boolean;
+  isOwner: boolean;
+  parentId?: string;
   content?: {
     type: string;
     text?: string;
@@ -48,8 +53,9 @@ export default function HumintFeedPage() {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [unlockingPost, setUnlockingPost] = useState<string | null>(null);
   const [isSource, setIsSource] = useState<boolean | null>(null);
-  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  const [likingPostId, setLikingPostId] = useState<string | null>(null);
 
   // Check if HUMINT user needs to complete registration
   useEffect(() => {
@@ -191,16 +197,57 @@ export default function HumintFeedPage() {
     router.push(`/humint/compose?replyTo=${postId}&source=${sourceCodename}`);
   }
 
-  function handleSave(postId: string) {
-    setSavedPosts(prev => {
-      const next = new Set(prev);
-      if (next.has(postId)) {
-        next.delete(postId);
-      } else {
-        next.add(postId);
+  async function handleLike(postId: string, currentlyLiked: boolean) {
+    setLikingPostId(postId);
+    try {
+      const res = await fetch(`/api/humint-feed/posts/${postId}/like`, {
+        method: currentlyLiked ? 'DELETE' : 'POST',
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        // Update local state
+        setPosts(prev => prev.map(p => 
+          p.id === postId 
+            ? { 
+                ...p, 
+                liked: !currentlyLiked, 
+                likeCount: currentlyLiked ? p.likeCount - 1 : p.likeCount + 1 
+              } 
+            : p
+        ));
       }
-      return next;
-    });
+    } catch (err) {
+      console.error('Like error:', err);
+    } finally {
+      setLikingPostId(null);
+    }
+  }
+
+  async function handleDelete(postId: string) {
+    if (!confirm('Are you sure you want to delete this post?')) {
+      return;
+    }
+
+    setDeletingPostId(postId);
+    try {
+      const res = await fetch(`/api/humint-feed/posts/${postId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        // Remove from local state
+        setPosts(prev => prev.filter(p => p.id !== postId));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+    } finally {
+      setDeletingPostId(null);
+    }
   }
 
   async function handleShare(postId: string) {
@@ -396,6 +443,7 @@ export default function HumintFeedPage() {
                     
                     {/* Actions */}
                     <div className="flex items-center gap-6 mt-3 text-gray-500">
+                      {/* Reply */}
                       <button 
                         onClick={() => handleReply(post.id, post.source.codename)}
                         className="flex items-center gap-2 hover:text-emerald-400 transition-colors group"
@@ -403,17 +451,26 @@ export default function HumintFeedPage() {
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        <span className="text-sm group-hover:text-emerald-400">Reply</span>
+                        <span className="text-sm group-hover:text-emerald-400">
+                          {post.replyCount > 0 ? post.replyCount : 'Reply'}
+                        </span>
                       </button>
+                      
+                      {/* Like */}
                       <button 
-                        onClick={() => handleSave(post.id)}
-                        className={`flex items-center gap-2 transition-colors group ${savedPosts.has(post.id) ? 'text-red-400' : 'hover:text-red-400'}`}
+                        onClick={() => handleLike(post.id, post.liked)}
+                        disabled={likingPostId === post.id}
+                        className={`flex items-center gap-2 transition-colors group ${post.liked ? 'text-red-400' : 'hover:text-red-400'}`}
                       >
-                        <svg className="w-5 h-5" fill={savedPosts.has(post.id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5" fill={post.liked ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        <span className="text-sm">{savedPosts.has(post.id) ? 'Saved' : 'Save'}</span>
+                        <span className="text-sm">
+                          {post.likeCount > 0 ? post.likeCount : ''}
+                        </span>
                       </button>
+                      
+                      {/* Share */}
                       <button 
                         onClick={() => handleShare(post.id)}
                         className="flex items-center gap-2 hover:text-emerald-400 transition-colors group"
@@ -425,6 +482,22 @@ export default function HumintFeedPage() {
                           {copiedPostId === post.id ? 'Copied!' : 'Share'}
                         </span>
                       </button>
+                      
+                      {/* Delete (own posts only) */}
+                      {post.isOwner && (
+                        <button 
+                          onClick={() => handleDelete(post.id)}
+                          disabled={deletingPostId === post.id}
+                          className="flex items-center gap-2 hover:text-red-400 transition-colors group ml-auto"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span className="text-sm group-hover:text-red-400">
+                            {deletingPostId === post.id ? '...' : 'Delete'}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

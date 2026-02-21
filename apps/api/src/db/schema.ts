@@ -359,6 +359,13 @@ export const humintSubmissions = pgTable('humint_submissions', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
   
+  // Threading
+  parentId: uuid('parent_id'), // References another humintSubmissions.id for replies
+  
+  // Engagement
+  likeCount: integer('like_count').notNull().default(0),
+  replyCount: integer('reply_count').notNull().default(0),
+  
   // Feed system fields
   contentCid: varchar('content_cid', { length: 100 }), // IPFS CID of encrypted content
   epoch: varchar('epoch', { length: 10 }), // "2026-02"
@@ -406,6 +413,17 @@ export const submissionRatings = pgTable('submission_ratings', {
   comment: text('comment'),
   ratedAt: timestamp('rated_at').notNull().defaultNow(),
 });
+
+// Likes on posts
+export const humintLikes = pgTable('humint_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id').notNull().references(() => humintSubmissions.id, { onDelete: 'cascade' }),
+  odename: varchar('user_codename', { length: 100 }), // For HUMINT users (identified by codename hash)
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }), // For regular users
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  uniqueLike: unique().on(table.postId, table.userId),
+}));
 
 // Source subscriptions (direct to source)
 export const sourceSubscriptions = pgTable('source_subscriptions', {
