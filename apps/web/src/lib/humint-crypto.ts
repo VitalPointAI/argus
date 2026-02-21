@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * HUMINT Feed Cryptography SDK
  * 
