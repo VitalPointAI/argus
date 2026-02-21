@@ -44,6 +44,7 @@ export default function NavBar() {
   // Primary navigation - core features
   const primaryLinks = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/humint/feed', label: 'Intel' },
     { href: '/briefings', label: 'Briefings' },
     { href: '/sources', label: 'Sources' },
     { href: '/search', label: 'Search' },
