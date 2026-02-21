@@ -8,7 +8,9 @@ import {
   uuid,
   varchar,
   real,
-  pgEnum
+  pgEnum,
+  unique,
+  decimal
 } from 'drizzle-orm/pg-core';
 
 // ============ Enums ============
@@ -275,9 +277,13 @@ export const apiKeyRateLimits = pgTable('api_key_rate_limits', {
 // Anonymous HUMINT sources
 export const humintSources = pgTable('humint_sources', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }), // Link to user account
   codename: text('codename').notNull().unique(),
+  codenameHash: varchar('codename_hash', { length: 64 }).unique(), // SHA256 for on-chain reference
   publicKey: text('public_key').notNull().unique(),
+  privateKeyEncrypted: text('private_key_encrypted'), // Encrypted with user's master key
   nearAccountId: text('near_account_id').unique(), // NEAR account from Phantom Auth MPC
+  tiers: jsonb('tiers').default('[]'), // Subscription tier configs
   
   // Profile
   bio: text('bio'),
@@ -353,6 +359,11 @@ export const humintSubmissions = pgTable('humint_submissions', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
   
+  // Feed system fields
+  contentCid: varchar('content_cid', { length: 100 }), // IPFS CID of encrypted content
+  epoch: varchar('epoch', { length: 10 }), // "2026-02"
+  tier: integer('tier').default(0), // 0=free, 1=bronze, 2=silver, 3=gold
+  
   // Content
   title: text('title').notNull(),
   body: text('body').notNull(),
@@ -368,6 +379,12 @@ export const humintSubmissions = pgTable('humint_submissions', {
   // Cryptographic proof
   contentHash: text('content_hash').notNull(),
   signature: text('signature').notNull(),
+  
+  // ZK Proofs attached to submission
+  zkProofs: jsonb('zk_proofs').default('[]'), // Array of {type, proof, publicSignals, metadata}
+  hasLocationProof: boolean('has_location_proof').default(false),
+  hasReputationProof: boolean('has_reputation_proof').default(false),
+  hasIdentityProof: boolean('has_identity_proof').default(false),
   
   // Verification (crowd-sourced)
   verificationStatus: text('verification_status').notNull().default('unverified'),
@@ -393,10 +410,13 @@ export const submissionRatings = pgTable('submission_ratings', {
 // Source subscriptions (direct to source)
 export const sourceSubscriptions = pgTable('source_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }), // New: simplified user ref
   sourceId: uuid('source_id').notNull().references(() => humintSources.id, { onDelete: 'cascade' }),
   subscriberId: uuid('subscriber_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tier: integer('tier').default(1), // 0=free, 1=bronze, 2=silver, 3=gold
+  nftTokenId: varchar('nft_token_id', { length: 100 }), // NEAR NFT access pass token ID
   startsAt: timestamp('starts_at').notNull().defaultNow(),
-  expiresAt: timestamp('expires_at').notNull(),
+  expiresAt: timestamp('expires_at'),
   amountPaidUsdc: real('amount_paid_usdc'),
   paymentTxHash: text('payment_tx_hash'),
   status: text('status').notNull().default('pending'), // 'pending', 'active', 'expired', 'cancelled', 'revoked'
