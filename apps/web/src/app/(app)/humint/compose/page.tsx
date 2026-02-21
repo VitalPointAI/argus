@@ -205,7 +205,11 @@ function ComposeContent() {
     }
   }
 
-  const tierNames = ['Free', 'Bronze', 'Silver', 'Gold'];
+  // Use source's custom packages, with Free (public) as first option
+  const packages = [
+    { id: 'free', name: 'Free', priceUsdc: 0 },
+    ...(source?.tiers || [])
+  ];
 
   if (sourceLoading) {
     return (
@@ -265,27 +269,21 @@ function ComposeContent() {
           </div>
 
           <div className="flex-1 min-w-0">
-            {/* Tier Selector */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm text-gray-400">Visible to:</span>
-              <div className="flex gap-1">
-                {tierNames.map((name, i) => (
+            {/* Package Selector */}
+            <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2 -mx-1 px-1">
+              <span className="text-sm text-gray-400 flex-shrink-0">Visible to:</span>
+              <div className="flex gap-1 flex-shrink-0">
+                {packages.map((pkg, i) => (
                   <button
-                    key={name}
+                    key={pkg.id || pkg.name}
                     onClick={() => setTier(i)}
-                    className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                    className={`px-3 py-1 text-sm rounded-full transition-colors whitespace-nowrap flex-shrink-0 ${
                       tier === i
-                        ? i === 0 
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : i === 1
-                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                          : i === 2
-                          ? 'bg-gray-400/20 text-gray-300 border border-gray-400/30'
-                          : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     }`}
                   >
-                    {name}{i > 0 ? '+' : ''}
+                    {pkg.name}{pkg.priceUsdc > 0 ? ` ($${pkg.priceUsdc})` : ''}
                   </button>
                 ))}
               </div>
