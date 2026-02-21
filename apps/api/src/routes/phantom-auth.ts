@@ -184,8 +184,8 @@ phantomRoutes.post('/register/finish', async (c) => {
  * POST /phantom/login/start
  * Start passkey authentication
  * 
- * When no codename provided, we fetch ALL passkeys and include them in allowCredentials.
- * This works around the residentKey:"preferred" issue where passkeys may not be discoverable.
+ * Uses discoverable credentials (resident keys) - passkeys must be created with
+ * residentKey:"required" to work without specifying allowCredentials.
  */
 phantomRoutes.post('/login/start', async (c) => {
   if (!checkPhantomInitialized()) { return c.json({ error: 'Phantom Auth not initialized' }, 503); }
@@ -205,29 +205,6 @@ phantomRoutes.post('/login/start', async (c) => {
     }
 
     const { challengeId, options } = await auth.passkeyManager.startAuthentication(userId);
-
-    // If no specific user, query ALL passkeys and include them in allowCredentials
-    // This forces the browser to show the passkey picker even if they're not discoverable
-    if (!codename && !options.allowCredentials) {
-      try {
-        // Direct DB query since package doesn't expose getAllPasskeys
-        const { Pool } = await import('pg');
-        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-        const result = await pool.query('SELECT credential_id, transports FROM anon_passkeys');
-        await pool.end();
-        
-        if (result.rows && result.rows.length > 0) {
-          options.allowCredentials = result.rows.map((p: any) => ({
-            id: p.credential_id,
-            type: 'public-key',
-            transports: p.transports || ['internal', 'hybrid'],
-          }));
-          console.log('[PhantomAuth] Including', result.rows.length, 'passkeys in allowCredentials');
-        }
-      } catch (e) {
-        console.warn('[PhantomAuth] Could not fetch all passkeys:', e);
-      }
-    }
 
     return c.json({ challengeId, options });
   } catch (error) {

@@ -45,11 +45,24 @@ export default function HumintFeedPage() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [unlockingPost, setUnlockingPost] = useState<string | null>(null);
+  const [isSource, setIsSource] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadFeed();
     loadSources();
+    checkIfSource();
   }, [selectedSource]);
+
+  async function checkIfSource() {
+    try {
+      const res = await fetch('/api/humint-feed/sources/me', {
+        credentials: 'include',
+      });
+      setIsSource(res.ok);
+    } catch {
+      setIsSource(false);
+    }
+  }
 
   async function loadFeed() {
     try {
@@ -147,12 +160,22 @@ export default function HumintFeedPage() {
       <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-800">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-bold">Intel Feed</h1>
-          <Link 
-            href="/humint/sources/new"
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-full text-sm font-medium transition-colors"
-          >
-            Become a Source
-          </Link>
+          {isSource === false && (
+            <Link 
+              href="/humint/sources/new"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-full text-sm font-medium transition-colors"
+            >
+              Become a Source
+            </Link>
+          )}
+          {isSource && (
+            <Link 
+              href="/humint/compose"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-full text-sm font-medium transition-colors"
+            >
+              Post Intel
+            </Link>
+          )}
         </div>
       </header>
 
@@ -331,15 +354,17 @@ export default function HumintFeedPage() {
         </div>
       </div>
 
-      {/* Floating Compose Button (for sources) */}
-      <Link
-        href="/humint/compose"
-        className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-lg flex items-center justify-center transition-colors"
-      >
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </Link>
+      {/* Floating Compose Button (for sources only) */}
+      {isSource && (
+        <Link
+          href="/humint/compose"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-lg flex items-center justify-center transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </Link>
+      )}
     </div>
   );
 }
