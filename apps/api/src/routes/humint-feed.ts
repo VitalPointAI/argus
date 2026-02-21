@@ -33,6 +33,7 @@ import {
   getZKStatus
 } from '../services/zk';
 import { getPaymentQuote, getPaymentStatus } from '../services/payments/one-click';
+import { getPhantomUser } from './phantom-auth';
 
 // Platform treasury for receiving payments
 const PLATFORM_TREASURY = process.env.PLATFORM_TREASURY_ADDRESS || 'argus-intel.near';
@@ -50,10 +51,21 @@ const pendingHumintPayments = new Map<string, {
 
 const app = new Hono();
 
-// Helper to get userId from context
-function getUserId(c: any): string | null {
+// Helper to get userId from context (checks both standard auth and phantom auth)
+async function getUserId(c: any): Promise<string | null> {
+  // Check standard auth first
   const user = c.get('user');
-  return user?.id || null;
+  if (user?.id) {
+    return user.id;
+  }
+  
+  // Check phantom auth (passkey login)
+  const phantomUser = await getPhantomUser(c);
+  if (phantomUser?.id) {
+    return phantomUser.id;
+  }
+  
+  return null;
 }
 
 // ==========================================
@@ -78,7 +90,7 @@ app.post(
     })).optional(),
   })),
   async (c) => {
-    const userId = getUserId(c);
+    const userId = await getUserId(c);
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401);
     }
@@ -151,7 +163,7 @@ app.post(
  * GET /api/humint-feed/sources/me
  */
 app.get('/sources/me', async (c) => {
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
   if (!userId) {
     return c.json({ error: 'Authentication required' }, 401);
   }
@@ -243,7 +255,7 @@ app.post(
     }).optional(),
   })),
   async (c) => {
-    const userId = getUserId(c);
+    const userId = await getUserId(c);
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401);
     }
@@ -381,7 +393,7 @@ app.post(
  * GET /api/humint-feed/feed
  */
 app.get('/feed', async (c) => {
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
   const sourceId = c.req.query('source');
   const limit = parseInt(c.req.query('limit') || '20');
   const offset = parseInt(c.req.query('offset') || '0');
@@ -452,7 +464,7 @@ app.get('/feed', async (c) => {
  * GET /api/humint-feed/posts/:id
  */
 app.get('/posts/:id', async (c) => {
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
   const postId = c.req.param('id');
 
   try {
@@ -525,7 +537,7 @@ app.post(
     packageId: z.string(), // Package ID chosen by subscriber
   })),
   async (c) => {
-    const userId = getUserId(c);
+    const userId = await getUserId(c);
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401);
     }
@@ -624,7 +636,7 @@ app.post(
  * GET /api/humint-feed/subscriptions
  */
 app.get('/subscriptions', async (c) => {
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
   if (!userId) {
     return c.json({ error: 'Authentication required' }, 401);
   }
@@ -736,7 +748,7 @@ app.post(
     maxDistanceKm: z.number().min(1).max(1000),
   })),
   async (c) => {
-    const userId = getUserId(c);
+    const userId = await getUserId(c);
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401);
     }
@@ -780,7 +792,7 @@ app.post(
     threshold: z.number().min(0).max(100),
   })),
   async (c) => {
-    const userId = getUserId(c);
+    const userId = await getUserId(c);
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401);
     }
