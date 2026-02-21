@@ -488,7 +488,7 @@ function ComposeContent() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-400">•</span>
-              <span>Premium intel (Bronze+) is encrypted and only visible to subscribers</span>
+              <span>Paid intel is encrypted and only visible to subscribers of your packages</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-400">•</span>
