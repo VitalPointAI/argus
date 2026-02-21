@@ -271,10 +271,10 @@ export default function HumintFeedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="fixed inset-0 bg-black text-white overflow-auto">
       {/* Header - X style */}
       <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-neutral-800">
-        <div className="max-w-[600px] mx-auto px-4 h-[53px] flex items-center justify-between">
+        <div className="px-4 h-[53px] flex items-center justify-between">
           <h1 className="text-xl font-bold">Intel</h1>
           {isSource && (
             <Link 
