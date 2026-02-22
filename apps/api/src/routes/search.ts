@@ -4,10 +4,83 @@ import { eq, desc, sql } from 'drizzle-orm';
 
 export const searchRoutes = new Hono();
 
+// Get available topics for filtering
+searchRoutes.get('/topics', async (c) => {
+  try {
+    // Get all unique topics from articles
+    const result = await db.execute(sql`
+      SELECT DISTINCT jsonb_array_elements_text(topics) as topic
+      FROM content
+      WHERE topics != '[]'::jsonb
+      ORDER BY topic
+    `);
+    
+    const rows = Array.isArray(result) ? result : (result as any).rows || [];
+    const topics = rows.map((r: any) => r.topic);
+    
+    return c.json({
+      success: true,
+      data: { topics },
+    });
+  } catch (error) {
+    console.error('Topics error:', error);
+    return c.json({ success: false, error: 'Failed to get topics' }, 500);
+  }
+});
+
+// Get articles by topic
+searchRoutes.get('/by-topic/:topic', async (c) => {
+  const topic = c.req.param('topic');
+  const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
+  const offset = parseInt(c.req.query('offset') || '0');
+  const hoursBack = parseInt(c.req.query('hours') || '72');
+  
+  try {
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+    
+    const results = await db.execute(sql`
+      SELECT 
+        c.id,
+        c.title,
+        c.summary,
+        c.topics,
+        c.url,
+        c.published_at,
+        c.confidence_score,
+        s.name as source_name,
+        d.name as domain_name,
+        d.slug as domain_slug
+      FROM content c
+      LEFT JOIN sources s ON c.source_id = s.id
+      LEFT JOIN domains d ON s.domain_id = d.id
+      WHERE c.topics @> ${JSON.stringify([topic])}::jsonb
+        AND c.fetched_at >= ${since}
+      ORDER BY c.published_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `);
+    
+    const rows = Array.isArray(results) ? results : (results as any).rows || [];
+    
+    return c.json({
+      success: true,
+      data: {
+        topic,
+        articles: rows,
+        pagination: { limit, offset },
+      },
+    });
+  } catch (error) {
+    console.error('By-topic error:', error);
+    return c.json({ success: false, error: 'Failed to get articles by topic' }, 500);
+  }
+});
+
 // Full-text search for articles
 searchRoutes.get('/', async (c) => {
   const query = c.req.query('q');
-  const domainSlug = c.req.query('domain');
+  const domainSlug = c.req.query('domain'); // Source region/perspective
+  const topic = c.req.query('topic'); // What the article is about
   const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
   const offset = parseInt(c.req.query('offset') || '0');
 
@@ -31,6 +104,8 @@ searchRoutes.get('/', async (c) => {
       SELECT 
         c.id,
         c.title,
+        c.summary,
+        c.topics,
         c.url,
         c.published_at,
         c.confidence_score,
@@ -45,6 +120,7 @@ searchRoutes.get('/', async (c) => {
       LEFT JOIN domains d ON s.domain_id = d.id
       WHERE c.search_vector @@ to_tsquery('english', ${searchQuery})
       ${domainSlug ? sql`AND d.slug = ${domainSlug}` : sql``}
+      ${topic ? sql`AND c.topics @> ${JSON.stringify([topic])}::jsonb` : sql``}
       ORDER BY rank DESC, c.confidence_score DESC
       LIMIT ${limit}
       OFFSET ${offset}

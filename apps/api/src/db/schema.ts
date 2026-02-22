@@ -128,7 +128,9 @@ export const userDomains = pgTable('user_domains', {
 export const content = pgTable('content', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
-  domainId: uuid('domain_id').references(() => domains.id), // classified domain
+  domainId: uuid('domain_id').references(() => domains.id), // classified domain (source perspective)
+  topics: jsonb('topics').notNull().default('[]'), // article topics - what it's about
+  summary: text('summary'), // AI-generated summary
   externalId: text('external_id').notNull(),
   title: text('title').notNull(),
   body: text('body').notNull(),

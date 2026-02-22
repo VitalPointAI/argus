@@ -2,6 +2,7 @@ import Parser from 'rss-parser';
 import { db, sources, content, domains } from '../../db';
 import { eq } from 'drizzle-orm';
 import { extractArticle, type RateLimitConfig } from '../extraction/article';
+import { classifyArticleTopics } from '../intelligence/topic-classifier';
 
 // Domain keyword mappings for classification
 const DOMAIN_KEYWORDS: Record<string, string[]> = {
@@ -171,8 +172,19 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
       // Fetch full content if configured
       const articleBody = await getArticleContent(item, config);
       
-      // Classify article into a domain
+      // Classify article into a domain (source perspective)
       const domainId = await classifyArticleDomain(item.title, articleBody);
+      
+      // Classify article topics (what it's about) using LLM
+      let topics: string[] = [];
+      let summary: string | null = null;
+      try {
+        const topicResult = await classifyArticleTopics(item.title, articleBody);
+        topics = topicResult.topics;
+        summary = topicResult.summary;
+      } catch (err) {
+        console.warn(`[RSS] Topic classification failed for ${item.title}:`, err);
+      }
 
       await db.insert(content).values({
         sourceId: source.id,
@@ -186,6 +198,8 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
         // Use source reliability score as base confidence
         confidenceScore: source.reliabilityScore || 50,
         domainId,
+        topics,
+        summary,
       }).onConflictDoNothing();
       
       ingested++;
