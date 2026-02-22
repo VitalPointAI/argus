@@ -219,11 +219,12 @@ export async function generatePropagandaBriefing(options: {
   hoursBack?: number;
   maxTopics?: number;
   regions?: Region[]; // Optional: compare only specific regions
+  specificTopic?: string; // Optional: analyze a specific topic
 }): Promise<PropagandaBriefing> {
   const hoursBack = options.hoursBack || 48;
   const maxTopics = options.maxTopics || 5;
   
-  console.log(`[Propaganda] Generating briefing for last ${hoursBack}h...`);
+  console.log(`[Propaganda] Generating briefing for last ${hoursBack}h${options.specificTopic ? ` focusing on: ${options.specificTopic}` : ''}...`);
   
   // Get articles grouped by topic and region
   const topicRegionMap = await getArticlesByTopicAndRegion(hoursBack);
@@ -256,8 +257,31 @@ export async function generatePropagandaBriefing(options: {
     return b.articles - a.articles;
   });
   
-  // Analyze top topics
-  const topicsToAnalyze = topicsWithDiversity.slice(0, maxTopics);
+  // If specific topic requested, prioritize it
+  let topicsToAnalyze: Array<{ topic: string; regions: number; articles: number }>;
+  
+  if (options.specificTopic) {
+    // Find matching topic (case-insensitive partial match)
+    const searchTerm = options.specificTopic.toLowerCase();
+    const matchingTopics = topicsWithDiversity.filter(t => 
+      t.topic.toLowerCase().includes(searchTerm) || 
+      searchTerm.includes(t.topic.toLowerCase())
+    );
+    
+    if (matchingTopics.length > 0) {
+      // Use matching topics, fill with others if needed
+      topicsToAnalyze = [
+        ...matchingTopics.slice(0, maxTopics),
+        ...topicsWithDiversity.filter(t => !matchingTopics.includes(t)).slice(0, Math.max(0, maxTopics - matchingTopics.length))
+      ].slice(0, maxTopics);
+    } else {
+      // No match found, use default selection
+      console.log(`[Propaganda] No articles found for topic: ${options.specificTopic}, using random selection`);
+      topicsToAnalyze = topicsWithDiversity.slice(0, maxTopics);
+    }
+  } else {
+    topicsToAnalyze = topicsWithDiversity.slice(0, maxTopics);
+  }
   const analyses: TopicAnalysis[] = [];
   
   for (const { topic } of topicsToAnalyze) {
@@ -298,7 +322,7 @@ export async function generatePropagandaBriefing(options: {
 export async function compareRegions(
   region1: Region,
   region2: Region,
-  options: { hoursBack?: number; maxTopics?: number } = {}
+  options: { hoursBack?: number; maxTopics?: number; specificTopic?: string } = {}
 ): Promise<PropagandaBriefing> {
   return generatePropagandaBriefing({
     ...options,

@@ -62,6 +62,7 @@ export default function PropagandaBriefingPage() {
   // Options
   const [hoursBack, setHoursBack] = useState(48);
   const [maxTopics, setMaxTopics] = useState(5);
+  const [specificTopic, setSpecificTopic] = useState('');
   const [compareMode, setCompareMode] = useState(false);
   const [region1, setRegion1] = useState('');
   const [region2, setRegion2] = useState('');
@@ -90,8 +91,8 @@ export default function PropagandaBriefingPage() {
         : `${API_URL}/api/briefings/propaganda`;
       
       const body = compareMode
-        ? { region1, region2, hoursBack, maxTopics }
-        : { hoursBack, maxTopics };
+        ? { region1, region2, hoursBack, maxTopics, topic: specificTopic || undefined }
+        : { hoursBack, maxTopics, topic: specificTopic || undefined };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -164,11 +165,24 @@ export default function PropagandaBriefingPage() {
               value={maxTopics}
               onChange={(e) => setMaxTopics(parseInt(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+              disabled={!!specificTopic}
             >
-              <option value={3}>3 topics</option>
-              <option value={5}>5 topics</option>
-              <option value={10}>10 topics</option>
+              <option value={3}>3 random topics</option>
+              <option value={5}>5 random topics</option>
+              <option value={10}>10 random topics</option>
             </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Or Specific Topic</label>
+            <input
+              type="text"
+              value={specificTopic}
+              onChange={(e) => setSpecificTopic(e.target.value)}
+              placeholder="e.g., China, Taiwan, Ukraine..."
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+            />
+            <p className="text-xs text-slate-500 mt-1">Leave empty for random selection</p>
           </div>
           
           <div className="lg:col-span-2">

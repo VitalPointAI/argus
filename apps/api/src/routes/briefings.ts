@@ -547,15 +547,17 @@ briefingsRoutes.post('/propaganda', async (c) => {
     hoursBack = 48, 
     maxTopics = 5,
     regions, // Optional: array of region IDs to compare
+    topic, // Optional: specific topic to analyze
   } = body;
 
   try {
-    console.log(`[Propaganda] Generating divergence analysis...`);
+    console.log(`[Propaganda] Generating divergence analysis${topic ? ` for topic: ${topic}` : ''}...`);
     
     const briefing = await generatePropagandaBriefing({
       hoursBack,
       maxTopics,
       regions: regions as Region[] | undefined,
+      specificTopic: topic,
     });
 
     return c.json({ 
@@ -579,6 +581,7 @@ briefingsRoutes.post('/propaganda/compare', async (c) => {
     region2,
     hoursBack = 48, 
     maxTopics = 5,
+    topic, // Optional: specific topic to analyze
   } = body;
 
   if (!region1 || !region2) {
@@ -589,12 +592,12 @@ briefingsRoutes.post('/propaganda/compare', async (c) => {
   }
 
   try {
-    console.log(`[Propaganda] Comparing ${region1} vs ${region2}...`);
+    console.log(`[Propaganda] Comparing ${region1} vs ${region2}${topic ? ` on topic: ${topic}` : ''}...`);
     
     const briefing = await compareRegions(
       region1 as Region, 
       region2 as Region, 
-      { hoursBack, maxTopics }
+      { hoursBack, maxTopics, specificTopic: topic }
     );
 
     return c.json({ 
