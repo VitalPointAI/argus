@@ -94,6 +94,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [content, setContent] = useState<ContentItem[]>([]);
+  const [showAllTopics, setShowAllTopics] = useState(false);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,11 +330,19 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xl">📰</span>
               <h3 className="font-semibold text-lg">Subject</h3>
+              {topics.length > 20 && (
+                <button
+                  onClick={() => setShowAllTopics(true)}
+                  className="ml-auto text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400"
+                >
+                  View all ({topics.length})
+                </button>
+              )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
               Filter by what the article is about (topic)
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 onClick={() => { setSelectedTopic(''); setLoading(true); }}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
@@ -344,7 +353,7 @@ export default function Dashboard() {
               >
                 📋 All Subjects
               </button>
-              {topics.slice(0, 11).map((topic) => (
+              {topics.slice(0, 19).map((topic) => (
                 <button
                   key={topic}
                   onClick={() => { setSelectedTopic(topic); setLoading(true); }}
@@ -357,6 +366,14 @@ export default function Dashboard() {
                   {topic}
                 </button>
               ))}
+              {topics.length > 19 && (
+                <button
+                  onClick={() => setShowAllTopics(true)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium transition bg-slate-100 dark:bg-slate-700 text-purple-600 dark:text-purple-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+                >
+                  + {topics.length - 19} more...
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -433,6 +450,44 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* All Topics Modal */}
+      {showAllTopics && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <h2 className="text-lg font-bold">📰 All Subjects ({topics.length})</h2>
+              <button
+                onClick={() => setShowAllTopics(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {topics.map((topic) => (
+                  <button
+                    key={topic}
+                    onClick={() => { 
+                      setSelectedTopic(topic); 
+                      setShowAllTopics(false);
+                      setLoading(true); 
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
+                      selectedTopic === topic
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500' 
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

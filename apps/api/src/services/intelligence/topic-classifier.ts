@@ -10,7 +10,8 @@ const NEAR_AI_MODEL = process.env.NEAR_AI_MODEL || 'deepseek-ai/DeepSeek-V3.1';
 // Predefined topics that map to our domain structure
 const KNOWN_TOPICS = [
   'China', 'Russia', 'Ukraine', 'Taiwan', 'North Korea', 'Iran', 'Israel', 'Gaza',
-  'Middle East', 'Europe', 'Asia Pacific', 'Africa', 'Latin America',
+  'Middle East', 'Europe', 'Indo-Pacific', 'South China Sea', 'Asia Pacific', 'Africa', 'Latin America',
+  'Japan', 'Philippines', 'Australia', 'India',
   'Defense', 'Military', 'Nuclear', 'Cyber Security', 'Intelligence',
   'AI', 'Technology', 'Semiconductors', 'Space',
   'Energy', 'Oil & Gas', 'Climate', 'Environment',
@@ -101,11 +102,18 @@ function fallbackClassify(title: string, body: string): TopicResult {
   
   // Simple keyword matching
   const keywordMap: Record<string, string[]> = {
-    'China': ['china', 'beijing', 'chinese', 'xi jinping'],
+    'China': ['china', 'beijing', 'chinese', 'xi jinping', 'pla', 'ccp'],
     'Russia': ['russia', 'russian', 'moscow', 'putin', 'kremlin'],
     'Ukraine': ['ukraine', 'ukrainian', 'kyiv', 'zelensky'],
-    'Taiwan': ['taiwan', 'taipei', 'taiwanese'],
+    'Taiwan': ['taiwan', 'taipei', 'taiwanese', 'tsmc'],
+    'Indo-Pacific': ['indo-pacific', 'indopacific', 'pacific ocean', 'aukus', 'quad alliance'],
+    'South China Sea': ['south china sea', 'spratly', 'paracel', 'nine-dash'],
+    'Japan': ['japan', 'japanese', 'tokyo', 'kishida'],
+    'Philippines': ['philippines', 'philippine', 'manila', 'marcos jr'],
+    'Australia': ['australia', 'australian', 'canberra'],
+    'India': ['india', 'indian', 'delhi', 'modi'],
     'Defense': ['military', 'defense', 'army', 'navy', 'pentagon', 'troops'],
+    'Nuclear': ['nuclear', 'nuke', 'atomic', 'warhead', 'icbm'],
     'Cyber Security': ['cyber', 'hack', 'ransomware', 'malware'],
     'AI': ['artificial intelligence', ' ai ', 'machine learning', 'chatgpt'],
     'Energy': ['oil', 'gas', 'energy', 'opec', 'petroleum'],
