@@ -1,6 +1,5 @@
 'use client';
 
-// @ts-expect-error - react-leaflet types issue with Next.js
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression } from 'leaflet';
@@ -77,7 +76,6 @@ export default function LeafletMap({ data, onLocationClick }: LeafletMapProps) {
   const center: LatLngExpression = [30, 10];
   
   return (
-    // @ts-expect-error - react-leaflet MapContainer props typing issue
     <MapContainer
       center={center}
       zoom={2}
@@ -98,7 +96,6 @@ export default function LeafletMap({ data, onLocationClick }: LeafletMapProps) {
         const markerCenter: LatLngExpression = [point.lat, point.lng];
         
         return (
-          // @ts-expect-error - react-leaflet CircleMarker props typing issue
           <CircleMarker
             key={point.code}
             center={markerCenter}
