@@ -349,9 +349,52 @@ briefingsRoutes.post('/executive', async (c) => {
     maxArticles = 100,
     includeTTS = false,
     useAllSources = false, // bypass source list filter
+    // Custom filter parameters (from dashboard filter URL)
+    topics, // comma-separated topics (OR)
+    excludeTopics, // comma-separated topics to exclude
+    domains: filterDomains, // comma-separated domain slugs (OR)
+    excludeDomains, // comma-separated domains to exclude
+    topicQuery, // free-text search
+    filterUrl, // full filter URL to parse
   } = body;
 
   try {
+    // Parse filter URL if provided
+    let parsedFilters: {
+      topics?: string[];
+      excludeTopics?: string[];
+      domains?: string[];
+      excludeDomains?: string[];
+      topicQuery?: string;
+    } = {};
+    
+    if (filterUrl) {
+      try {
+        const url = new URL(filterUrl);
+        const params = url.searchParams;
+        if (params.get('topics')) parsedFilters.topics = params.get('topics')!.split(',').map(t => t.trim());
+        if (params.get('excludeTopics')) parsedFilters.excludeTopics = params.get('excludeTopics')!.split(',').map(t => t.trim());
+        if (params.get('domains')) parsedFilters.domains = params.get('domains')!.split(',').map(t => t.trim());
+        if (params.get('excludeDomains')) parsedFilters.excludeDomains = params.get('excludeDomains')!.split(',').map(t => t.trim());
+        if (params.get('topicQuery')) parsedFilters.topicQuery = params.get('topicQuery')!;
+      } catch (e) {
+        console.warn('[Briefing] Failed to parse filter URL:', filterUrl);
+      }
+    }
+    
+    // Merge explicit params with parsed URL params (explicit takes precedence)
+    const finalFilters = {
+      topics: topics?.split(',').map((t: string) => t.trim()) || parsedFilters.topics,
+      excludeTopics: excludeTopics?.split(',').map((t: string) => t.trim()) || parsedFilters.excludeTopics,
+      domains: filterDomains?.split(',').map((t: string) => t.trim()) || parsedFilters.domains,
+      excludeDomains: excludeDomains?.split(',').map((t: string) => t.trim()) || parsedFilters.excludeDomains,
+      topicQuery: topicQuery || parsedFilters.topicQuery,
+    };
+    
+    const hasCustomFilters = finalFilters.topics || finalFilters.excludeTopics || 
+                             finalFilters.domains || finalFilters.excludeDomains || 
+                             finalFilters.topicQuery;
+
     // Get full user with preferences if authenticated
     let user: { id: string; preferences?: Record<string, unknown> } | null = null;
     if (sessionUser) {
@@ -361,16 +404,18 @@ briefingsRoutes.post('/executive', async (c) => {
       user = fullUser || sessionUser;
     }
     
-    // Get active source IDs from user's source list
-    const activeSourceIds = useAllSources ? null : await getActiveSourceIds(user);
+    // Get active source IDs from user's source list (skip if custom filters provided)
+    const activeSourceIds = (useAllSources || hasCustomFilters) ? null : await getActiveSourceIds(user);
     
-    // Get user's selected domains from preferences
+    // Get user's selected domains from preferences (skip if custom filters provided)
     const prefs = (user?.preferences || {}) as { domains?: { selected?: string[] } };
-    const selectedDomainIds = prefs.domains?.selected;
+    const selectedDomainIds = hasCustomFilters ? undefined : prefs.domains?.selected;
     
     console.log(`[Briefing] Generating executive ${type} briefing...`);
     console.log(`[Briefing] Options: hoursBack=${hoursBack}, minConfidence=${minConfidence}, maxArticles=${maxArticles}`);
-    if (activeSourceIds) {
+    if (hasCustomFilters) {
+      console.log(`[Briefing] Using custom filters:`, finalFilters);
+    } else if (activeSourceIds) {
       console.log(`[Briefing] Filtering by ${activeSourceIds.length} sources from user's active source list`);
     }
     if (selectedDomainIds && selectedDomainIds.length > 0) {
@@ -385,6 +430,12 @@ briefingsRoutes.post('/executive', async (c) => {
       includeTTS,
       sourceIds: activeSourceIds || undefined,
       domainIds: selectedDomainIds && selectedDomainIds.length > 0 ? selectedDomainIds : undefined,
+      // Custom filter support
+      topics: finalFilters.topics,
+      excludeTopics: finalFilters.excludeTopics,
+      domainSlugs: finalFilters.domains,
+      excludeDomainSlugs: finalFilters.excludeDomains,
+      topicQuery: finalFilters.topicQuery,
     });
 
     console.log(`[Briefing] Generated: ${briefing.summary?.totalStories || 0} stories, ${briefing.summary?.totalArticles || 0} articles`);

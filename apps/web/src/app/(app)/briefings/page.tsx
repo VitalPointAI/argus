@@ -48,6 +48,8 @@ export default function BriefingsPage() {
   const [executiveLoading, setExecutiveLoading] = useState(false);
   const [executiveError, setExecutiveError] = useState<string | null>(null);
   const [generateFormat, setGenerateFormat] = useState<'executive' | 'summary'>('executive');
+  const [customFilterUrl, setCustomFilterUrl] = useState('');
+  const [useCustomFilters, setUseCustomFilters] = useState(false);
 
   // Fetch current saved executive briefing
   const fetchCurrentExecutive = async () => {
@@ -100,16 +102,23 @@ export default function BriefingsPage() {
     const timeoutId = setTimeout(() => controller.abort(), 120000);
     
     try {
+      const requestBody: Record<string, unknown> = {
+        type: 'morning',
+        hoursBack: 14,
+        includeTTS: false,
+        format: format,
+      };
+      
+      // Add custom filter URL if provided
+      if (useCustomFilters && customFilterUrl.trim()) {
+        requestBody.filterUrl = customFilterUrl.trim();
+      }
+      
       const res = await fetch(`${API_URL}/api/briefings/executive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          type: 'morning',
-          hoursBack: 14,
-          includeTTS: false,
-          format: format,
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
       
@@ -242,6 +251,72 @@ export default function BriefingsPage() {
             Propaganda Analysis
           </a>
         </div>
+      </div>
+      
+      {/* Custom Filter Input */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useCustomFilters}
+              onChange={(e) => setUseCustomFilters(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm font-medium">Use custom filters</span>
+          </label>
+          <span className="text-xs text-slate-500">
+            Generate briefing from a filtered RSS feed instead of your source list
+          </span>
+        </div>
+        
+        {useCustomFilters && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Filter URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customFilterUrl}
+                  onChange={(e) => setCustomFilterUrl(e.target.value)}
+                  placeholder="Paste RSS filter URL from dashboard (e.g., https://argus.vitalpoint.ai/api/rss/filter?topics=China,Indo-Pacific)"
+                  className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm"
+                />
+                <a
+                  href="/dashboard"
+                  target="_blank"
+                  className="px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600"
+                >
+                  📋 Create Filter
+                </a>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Go to Dashboard → Set filters → Click "📡 RSS" → Copy URL
+              </p>
+            </div>
+            
+            {customFilterUrl && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm">
+                <span className="font-medium">Filter Preview:</span>{' '}
+                {(() => {
+                  try {
+                    const url = new URL(customFilterUrl);
+                    const params = url.searchParams;
+                    const parts = [];
+                    if (params.get('topics')) parts.push(`Topics: ${params.get('topics')}`);
+                    if (params.get('excludeTopics')) parts.push(`Exclude: ${params.get('excludeTopics')}`);
+                    if (params.get('domains')) parts.push(`Sources: ${params.get('domains')}`);
+                    if (params.get('excludeDomains')) parts.push(`Exclude sources: ${params.get('excludeDomains')}`);
+                    if (params.get('topicQuery')) parts.push(`Search: "${params.get('topicQuery')}"`);
+                    return parts.length > 0 ? parts.join(' • ') : 'No filters detected';
+                  } catch {
+                    return 'Invalid URL';
+                  }
+                })()}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Platform Stats */}

@@ -116,6 +116,12 @@ interface BriefingOptions {
   domainIds?: string[]; // Domain IDs to filter by (from user preferences)
   sourceIds?: string[]; // Source IDs to filter by (from active source list)
   includeTTS?: boolean;
+  // Custom filter parameters (from dashboard filters)
+  topics?: string[]; // Topic names to include (OR logic)
+  excludeTopics?: string[]; // Topic names to exclude
+  domainSlugs?: string[]; // Domain slugs to include (source perspective)
+  excludeDomainSlugs?: string[]; // Domain slugs to exclude
+  topicQuery?: string; // Free-text search in articles
 }
 
 /**
@@ -159,6 +165,44 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
   if (options.domainIds && options.domainIds.length > 0) {
     console.log(`[FetchArticles] Filtering by ${options.domainIds.length} article domains`);
     conditions.push(inArray(content.domainId, options.domainIds));
+  }
+  
+  // Custom filter: topics (include - OR logic)
+  if (options.topics && options.topics.length > 0) {
+    console.log(`[FetchArticles] Filtering by topics: ${options.topics.join(', ')}`);
+    const topicConditions = options.topics.map(t => 
+      sql`${content.topics} @> ${JSON.stringify([t])}::jsonb`
+    );
+    conditions.push(sql`(${sql.join(topicConditions, sql` OR `)})`);
+  }
+  
+  // Custom filter: excludeTopics (NOT logic)
+  if (options.excludeTopics && options.excludeTopics.length > 0) {
+    console.log(`[FetchArticles] Excluding topics: ${options.excludeTopics.join(', ')}`);
+    for (const t of options.excludeTopics) {
+      conditions.push(sql`NOT (${content.topics} @> ${JSON.stringify([t])}::jsonb)`);
+    }
+  }
+  
+  // Custom filter: domainSlugs (source perspective - OR logic)
+  if (options.domainSlugs && options.domainSlugs.length > 0) {
+    console.log(`[FetchArticles] Filtering by source domains: ${options.domainSlugs.join(', ')}`);
+    conditions.push(inArray(domains.slug, options.domainSlugs));
+  }
+  
+  // Custom filter: excludeDomainSlugs (NOT logic)
+  if (options.excludeDomainSlugs && options.excludeDomainSlugs.length > 0) {
+    console.log(`[FetchArticles] Excluding source domains: ${options.excludeDomainSlugs.join(', ')}`);
+    conditions.push(sql`${domains.slug} NOT IN (${sql.join(options.excludeDomainSlugs.map(s => sql`${s}`), sql`, `)})`);
+  }
+  
+  // Custom filter: topicQuery (free-text search)
+  if (options.topicQuery) {
+    console.log(`[FetchArticles] Searching for: ${options.topicQuery}`);
+    const searchTerms = options.topicQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const term of searchTerms) {
+      conditions.push(sql`(LOWER(${content.title}) LIKE ${'%' + term + '%'} OR LOWER(${content.body}) LIKE ${'%' + term + '%'})`);
+    }
   }
   
   try {
