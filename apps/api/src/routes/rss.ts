@@ -302,3 +302,154 @@ rssRoutes.get('/briefings.atom', async (c) => {
     return c.json({ success: false, error: 'Failed to generate Atom feed' }, 500);
   }
 });
+
+/**
+ * Custom filter RSS feed
+ * Supports all the same filters as /api/v1/intelligence:
+ * - topics: comma-separated topics (OR logic)
+ * - excludeTopics: comma-separated topics to exclude
+ * - domains: comma-separated domain slugs (OR logic)
+ * - excludeDomains: comma-separated domains to exclude
+ * - topicQuery: free-text search in articles
+ * - minConfidence: minimum confidence score (default 50)
+ */
+rssRoutes.get('/filter', async (c) => {
+  try {
+    const topicsParam = c.req.query('topics');
+    const excludeTopicsParam = c.req.query('excludeTopics');
+    const domainsParam = c.req.query('domains');
+    const excludeDomainsParam = c.req.query('excludeDomains');
+    const topicQuery = c.req.query('topicQuery');
+    const minConfidence = parseInt(c.req.query('minConfidence') || '50');
+    const limit = Math.min(parseInt(c.req.query('limit') || '50'), 100);
+
+    // Build conditions
+    const conditions: any[] = [gte(content.confidenceScore, minConfidence)];
+    
+    // Last 7 days by default for RSS
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    conditions.push(gte(content.fetchedAt, since));
+
+    // Multiple topics (OR logic)
+    if (topicsParam) {
+      const topicList = topicsParam.split(',').map(t => t.trim()).filter(Boolean);
+      if (topicList.length > 0) {
+        const topicConditions = topicList.map(t => 
+          sql`${content.topics} @> ${JSON.stringify([t])}::jsonb`
+        );
+        conditions.push(sql`(${sql.join(topicConditions, sql` OR `)})`);
+      }
+    }
+
+    // Exclude topics
+    if (excludeTopicsParam) {
+      const excludeList = excludeTopicsParam.split(',').map(t => t.trim()).filter(Boolean);
+      for (const t of excludeList) {
+        conditions.push(sql`NOT (${content.topics} @> ${JSON.stringify([t])}::jsonb)`);
+      }
+    }
+
+    // Multiple domains (OR logic)
+    if (domainsParam) {
+      const domainList = domainsParam.split(',').map(s => s.trim()).filter(Boolean);
+      if (domainList.length > 0) {
+        conditions.push(inArray(domains.slug, domainList));
+      }
+    }
+
+    // Exclude domains
+    if (excludeDomainsParam) {
+      const excludeList = excludeDomainsParam.split(',').map(s => s.trim()).filter(Boolean);
+      if (excludeList.length > 0) {
+        conditions.push(sql`${domains.slug} NOT IN (${sql.join(excludeList.map(s => sql`${s}`), sql`, `)})`);
+      }
+    }
+
+    // Free-text search
+    if (topicQuery) {
+      const searchTerms = topicQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      for (const term of searchTerms) {
+        conditions.push(sql`(LOWER(${content.title}) LIKE ${'%' + term + '%'} OR LOWER(${content.body}) LIKE ${'%' + term + '%'})`);
+      }
+    }
+
+    // Fetch articles
+    const articles = await db.select({
+      id: content.id,
+      title: content.title,
+      summary: content.summary,
+      url: content.url,
+      topics: content.topics,
+      publishedAt: content.publishedAt,
+      fetchedAt: content.fetchedAt,
+      sourceName: sources.name,
+      domainName: domains.name,
+    })
+      .from(content)
+      .leftJoin(sources, eq(content.sourceId, sources.id))
+      .leftJoin(domains, eq(sources.domainId, domains.id))
+      .where(and(...conditions))
+      .orderBy(desc(content.publishedAt))
+      .limit(limit);
+
+    // Build feed title from filters
+    const titleParts: string[] = ['Argus Intelligence'];
+    if (topicsParam) titleParts.push(`Topics: ${topicsParam}`);
+    if (domainsParam) titleParts.push(`Sources: ${domainsParam}`);
+    if (excludeTopicsParam) titleParts.push(`Excluding: ${excludeTopicsParam}`);
+    if (topicQuery) titleParts.push(`Search: "${topicQuery}"`);
+    const feedTitle = titleParts.join(' | ');
+
+    const baseUrl = 'https://argus.vitalpoint.ai';
+    const now = new Date();
+    const feedUrl = `${baseUrl}/api/rss/filter?${c.req.url.split('?')[1] || ''}`;
+
+    // Build RSS items
+    const items = articles.map(article => {
+      const pubDate = article.publishedAt 
+        ? formatRssDate(new Date(article.publishedAt)) 
+        : formatRssDate(new Date(article.fetchedAt || now));
+      
+      const title = escapeXml(article.title || 'Untitled');
+      const topics = (article.topics as string[]) || [];
+      const topicsStr = topics.length > 0 ? `[${topics.join(', ')}] ` : '';
+      const description = article.summary 
+        ? escapeXml(`${topicsStr}${article.summary}`)
+        : escapeXml(`${topicsStr}Source: ${article.sourceName || 'Unknown'}`);
+
+      return `
+    <item>
+      <title>${title}</title>
+      <link>${escapeXml(article.url || `${baseUrl}/dashboard`)}</link>
+      <guid isPermaLink="false">argus:${article.id}</guid>
+      <pubDate>${pubDate}</pubDate>
+      <description>${description}</description>
+      <source url="${baseUrl}">${escapeXml(article.sourceName || 'Unknown')}</source>
+      ${topics.map(t => `<category>${escapeXml(t)}</category>`).join('\n      ')}
+    </item>`;
+    }).join('');
+
+    const rss = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>${escapeXml(feedTitle)}</title>
+    <link>${baseUrl}/dashboard</link>
+    <description>Custom filtered intelligence feed from Argus</description>
+    <language>en-us</language>
+    <lastBuildDate>${formatRssDate(now)}</lastBuildDate>
+    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml"/>
+    <ttl>15</ttl>${items}
+  </channel>
+</rss>`;
+
+    return new Response(rss, {
+      headers: {
+        'Content-Type': 'application/rss+xml; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      },
+    });
+  } catch (error) {
+    console.error('Custom filter RSS feed error:', error);
+    return c.json({ success: false, error: 'Failed to generate RSS feed' }, 500);
+  }
+});

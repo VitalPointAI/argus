@@ -111,6 +111,57 @@ export default function Dashboard() {
   const [selectedDomains, setSelectedDomains] = useState<Set<string>>(new Set());
   const [excludedDomains, setExcludedDomains] = useState<Set<string>>(new Set());
   const [customTopicQuery, setCustomTopicQuery] = useState('');
+  
+  // RSS feed URL
+  const [showRssUrl, setShowRssUrl] = useState(false);
+  const [rssCopied, setRssCopied] = useState(false);
+  
+  // Generate RSS URL based on current filters
+  const getRssUrl = () => {
+    const params = new URLSearchParams();
+    
+    if (advancedMode) {
+      if (selectedTopics.size > 0) {
+        params.set('topics', Array.from(selectedTopics).join(','));
+      }
+      if (excludedTopics.size > 0) {
+        params.set('excludeTopics', Array.from(excludedTopics).join(','));
+      }
+      if (selectedDomains.size > 0) {
+        params.set('domains', Array.from(selectedDomains).join(','));
+      }
+      if (excludedDomains.size > 0) {
+        params.set('excludeDomains', Array.from(excludedDomains).join(','));
+      }
+      if (customTopicQuery.trim()) {
+        params.set('topicQuery', customTopicQuery.trim());
+      }
+    } else {
+      if (selectedTopic) {
+        params.set('topics', selectedTopic);
+      }
+      if (selectedDomain) {
+        params.set('domains', selectedDomain);
+      }
+    }
+    
+    const queryString = params.toString();
+    return `${API_URL}/api/rss/filter${queryString ? '?' + queryString : ''}`;
+  };
+  
+  const hasActiveFilters = advancedMode 
+    ? (selectedTopics.size > 0 || excludedTopics.size > 0 || selectedDomains.size > 0 || excludedDomains.size > 0 || customTopicQuery.trim())
+    : (selectedDomain || selectedTopic);
+  
+  const copyRssUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(getRssUrl());
+      setRssCopied(true);
+      setTimeout(() => setRssCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   // Redirect to login if auth check completes and no user
   useEffect(() => {
@@ -489,22 +540,60 @@ export default function Dashboard() {
             {/* Active Filter Summary */}
             {(selectedTopics.size > 0 || excludedTopics.size > 0 || selectedDomains.size > 0 || excludedDomains.size > 0 || customTopicQuery) && (
               <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                <div className="text-sm">
-                  <span className="font-medium">Active Query:</span>{' '}
-                  {customTopicQuery && <span className="text-purple-600">"{customTopicQuery}"</span>}
-                  {selectedTopics.size > 0 && (
-                    <span className="text-green-600"> topics({Array.from(selectedTopics).join(' OR ')})</span>
-                  )}
-                  {excludedTopics.size > 0 && (
-                    <span className="text-red-600"> NOT({Array.from(excludedTopics).join(', ')})</span>
-                  )}
-                  {selectedDomains.size > 0 && (
-                    <span className="text-blue-600"> from({Array.from(selectedDomains).join(' OR ')})</span>
-                  )}
-                  {excludedDomains.size > 0 && (
-                    <span className="text-red-600"> NOT from({Array.from(excludedDomains).join(', ')})</span>
-                  )}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="text-sm">
+                    <span className="font-medium">Active Query:</span>{' '}
+                    {customTopicQuery && <span className="text-purple-600">"{customTopicQuery}"</span>}
+                    {selectedTopics.size > 0 && (
+                      <span className="text-green-600"> topics({Array.from(selectedTopics).join(' OR ')})</span>
+                    )}
+                    {excludedTopics.size > 0 && (
+                      <span className="text-red-600"> NOT({Array.from(excludedTopics).join(', ')})</span>
+                    )}
+                    {selectedDomains.size > 0 && (
+                      <span className="text-blue-600"> from({Array.from(selectedDomains).join(' OR ')})</span>
+                    )}
+                    {excludedDomains.size > 0 && (
+                      <span className="text-red-600"> NOT from({Array.from(excludedDomains).join(', ')})</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowRssUrl(!showRssUrl)}
+                    className="px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium hover:bg-orange-200 dark:hover:bg-orange-800 transition flex items-center gap-1"
+                  >
+                    📡 RSS Feed
+                  </button>
                 </div>
+                
+                {/* RSS URL Reveal */}
+                {showRssUrl && (
+                  <div className="mt-3 p-3 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-600">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-medium">RSS Feed URL</span>
+                      <button
+                        onClick={copyRssUrl}
+                        className={`px-2 py-1 rounded text-xs font-medium transition ${
+                          rssCopied 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                        }`}
+                      >
+                        {rssCopied ? '✓ Copied!' : '📋 Copy'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      readOnly
+                      value={getRssUrl()}
+                      className="w-full px-2 py-1.5 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      Use this URL in Microsoft Teams, Slack, or any RSS reader to get live updates matching your filters.
+                    </p>
+                  </div>
+                )}
+                
                 <button
                   onClick={() => {
                     setSelectedTopics(new Set());
@@ -512,6 +601,7 @@ export default function Dashboard() {
                     setSelectedDomains(new Set());
                     setExcludedDomains(new Set());
                     setCustomTopicQuery('');
+                    setShowRssUrl(false);
                     setLoading(true);
                   }}
                   className="mt-2 text-xs text-red-500 hover:text-red-600"
@@ -620,25 +710,64 @@ export default function Dashboard() {
         
           {/* Current Filter Summary - Simple Mode */}
           {(selectedDomain || selectedTopic) && (
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="text-sm">
-                <span className="text-slate-500">Showing: </span>
-                <span className="font-medium">
-                  {selectedDomain && selectedTopic ? (
-                    <>{domains.find(d => d.slug === selectedDomain)?.name} sources reporting on {selectedTopic}</>
-                  ) : selectedDomain ? (
-                    <>All articles from {domains.find(d => d.slug === selectedDomain)?.name} sources</>
-                  ) : (
-                    <>All sources reporting on {selectedTopic}</>
-                  )}
-                </span>
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm">
+                  <span className="text-slate-500">Showing: </span>
+                  <span className="font-medium">
+                    {selectedDomain && selectedTopic ? (
+                      <>{domains.find(d => d.slug === selectedDomain)?.name} sources reporting on {selectedTopic}</>
+                    ) : selectedDomain ? (
+                      <>All articles from {domains.find(d => d.slug === selectedDomain)?.name} sources</>
+                    ) : (
+                      <>All sources reporting on {selectedTopic}</>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowRssUrl(!showRssUrl)}
+                    className="px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium hover:bg-orange-200 dark:hover:bg-orange-800 transition flex items-center gap-1"
+                  >
+                    📡 RSS
+                  </button>
+                  <button
+                    onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setShowRssUrl(false); setLoading(true); }}
+                    className="text-sm text-red-500 hover:text-red-600 px-3 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setLoading(true); }}
-                className="text-sm text-red-500 hover:text-red-600 px-3 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                ✕ Clear filters
-              </button>
+              
+              {/* RSS URL Reveal - Simple Mode */}
+              {showRssUrl && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-medium">RSS Feed URL</span>
+                    <button
+                      onClick={copyRssUrl}
+                      className={`px-2 py-1 rounded text-xs font-medium transition ${
+                        rssCopied 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                      }`}
+                    >
+                      {rssCopied ? '✓ Copied!' : '📋 Copy'}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    value={getRssUrl()}
+                    className="w-full px-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Use this URL in Microsoft Teams, Slack, or any RSS reader.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </>
