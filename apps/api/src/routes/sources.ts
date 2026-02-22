@@ -666,12 +666,13 @@ sourcesRoutes.patch('/lists/:listId', async (c) => {
   }
   
   const body = await c.req.json().catch(() => ({}));
-  const { name, description, isPublic } = body;
+  const { name, description, isPublic, rssEnabled } = body;
   
   const updateData: Record<string, any> = {};
   if (name !== undefined) updateData.name = name;
   if (description !== undefined) updateData.description = description;
   if (isPublic !== undefined) updateData.isPublic = isPublic;
+  if (rssEnabled !== undefined) updateData.rssEnabled = rssEnabled;
   
   if (Object.keys(updateData).length === 0) {
     return c.json({ success: false, error: 'No fields to update' }, 400);

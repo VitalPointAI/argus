@@ -95,6 +95,7 @@ export const sourceLists = pgTable('source_lists', {
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description').notNull().default(''),
   isPublic: boolean('is_public').notNull().default(false),
+  rssEnabled: boolean('rss_enabled').notNull().default(false),
   cloneCount: integer('clone_count').notNull().default(0),
   ratingSum: integer('rating_sum').notNull().default(0),
   ratingCount: integer('rating_count').notNull().default(0),
