@@ -38,6 +38,7 @@ import analyticsRoutes from './routes/analytics';
 import { payments as paymentsRoutes } from './routes/payments';
 import uploadRoutes from './routes/upload';
 import { searchRoutes } from './routes/search';
+import { rssRoutes } from './routes/rss';
 // TODO: Fix near-api-js ESM/CJS compatibility with Node 22
 // import nearRegistryRoutes from './routes/near-registry';
 import { initPhantomAuth } from './services/auth/phantom-auth';
@@ -93,6 +94,7 @@ app.route('/api/analytics', analyticsRoutes); // Platform analytics and leaderbo
 app.route('/api/payments', paymentsRoutes); // 1Click payment flow for subscriptions
 app.route('/api/upload', uploadRoutes); // Image upload to IPFS
 app.route('/api/search', searchRoutes); // Full-text article search
+app.route('/api/rss', rssRoutes); // RSS feeds for briefings (Teams integration)
 // app.route('/api/near', nearRegistryRoutes); // On-chain proof verification via NEAR (disabled: near-api-js ESM issue)
 
 // Root
