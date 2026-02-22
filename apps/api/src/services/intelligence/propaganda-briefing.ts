@@ -13,8 +13,9 @@ import {
   DIVERGENCE_LABELS 
 } from './regional-mapping';
 
-const NEAR_AI_BASE = 'https://api.near.ai/v1';
-const NEAR_AI_MODEL = process.env.NEAR_AI_MODEL || 'fireworks::accounts/fireworks/models/deepseek-v3';
+// NEAR AI Cloud API - https://docs.near.ai/cloud/guides/openai-compatibility
+const NEAR_AI_BASE = 'https://cloud-api.near.ai/v1';
+const NEAR_AI_MODEL = process.env.NEAR_AI_MODEL || 'deepseek-ai/DeepSeek-V3.1';
 
 interface RegionalPerspective {
   region: Region;
