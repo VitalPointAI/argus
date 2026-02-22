@@ -1,10 +1,25 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { ConfidenceBadge } from '@/components/VerificationTrail';
 import { getConfidenceDisplay } from '@/lib/confidence';
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  
+  return debouncedValue;
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -162,6 +177,21 @@ export default function Dashboard() {
       console.error('Failed to copy:', err);
     }
   };
+  
+  // Create a serialized filter state for debouncing
+  const filterState = useMemo(() => JSON.stringify({
+    advancedMode,
+    selectedTopics: Array.from(selectedTopics),
+    excludedTopics: Array.from(excludedTopics),
+    selectedDomains: Array.from(selectedDomains),
+    excludedDomains: Array.from(excludedDomains),
+    customTopicQuery,
+    selectedDomain,
+    selectedTopic,
+  }), [advancedMode, selectedTopics, excludedTopics, selectedDomains, excludedDomains, customTopicQuery, selectedDomain, selectedTopic]);
+  
+  // Debounce filter changes by 400ms
+  const debouncedFilterState = useDebounce(filterState, 400);
 
   // Redirect to login if auth check completes and no user
   useEffect(() => {
@@ -174,35 +204,39 @@ export default function Dashboard() {
     // Don't fetch data until auth is verified and user exists
     if (authLoading || !user) return;
     
+    // Parse debounced filters
+    const filters = JSON.parse(debouncedFilterState);
+    setLoading(true);
+    
     async function fetchData() {
       try {
-        // Build content URL with filters
+        // Build content URL with filters (using debounced values)
         let contentUrl = `${API_URL}/api/v1/intelligence?limit=30&minConfidence=40`;
         
-        if (advancedMode) {
+        if (filters.advancedMode) {
           // Advanced mode: multiple topics/domains with include/exclude
-          if (selectedTopics.size > 0) {
-            contentUrl += `&topics=${encodeURIComponent(Array.from(selectedTopics).join(','))}`;
+          if (filters.selectedTopics.length > 0) {
+            contentUrl += `&topics=${encodeURIComponent(filters.selectedTopics.join(','))}`;
           }
-          if (excludedTopics.size > 0) {
-            contentUrl += `&excludeTopics=${encodeURIComponent(Array.from(excludedTopics).join(','))}`;
+          if (filters.excludedTopics.length > 0) {
+            contentUrl += `&excludeTopics=${encodeURIComponent(filters.excludedTopics.join(','))}`;
           }
-          if (selectedDomains.size > 0) {
-            contentUrl += `&domains=${encodeURIComponent(Array.from(selectedDomains).join(','))}`;
+          if (filters.selectedDomains.length > 0) {
+            contentUrl += `&domains=${encodeURIComponent(filters.selectedDomains.join(','))}`;
           }
-          if (excludedDomains.size > 0) {
-            contentUrl += `&excludeDomains=${encodeURIComponent(Array.from(excludedDomains).join(','))}`;
+          if (filters.excludedDomains.length > 0) {
+            contentUrl += `&excludeDomains=${encodeURIComponent(filters.excludedDomains.join(','))}`;
           }
-          if (customTopicQuery.trim()) {
-            contentUrl += `&topicQuery=${encodeURIComponent(customTopicQuery.trim())}`;
+          if (filters.customTopicQuery?.trim()) {
+            contentUrl += `&topicQuery=${encodeURIComponent(filters.customTopicQuery.trim())}`;
           }
         } else {
           // Simple mode: single topic/domain
-          if (selectedDomain) {
-            contentUrl += `&domain=${selectedDomain}`;
+          if (filters.selectedDomain) {
+            contentUrl += `&domain=${filters.selectedDomain}`;
           }
-          if (selectedTopic) {
-            contentUrl += `&topic=${encodeURIComponent(selectedTopic)}`;
+          if (filters.selectedTopic) {
+            contentUrl += `&topic=${encodeURIComponent(filters.selectedTopic)}`;
           }
         }
 
@@ -237,14 +271,7 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user, selectedDomain, selectedTopic, advancedMode, 
-      // Convert sets to strings for dependency comparison
-      Array.from(selectedTopics).join(','),
-      Array.from(excludedTopics).join(','),
-      Array.from(selectedDomains).join(','),
-      Array.from(excludedDomains).join(','),
-      customTopicQuery]);
+  }, [authLoading, user, debouncedFilterState]);
   
   // Sort content based on selected option - MUST be before any early returns
   const sortedContent = useMemo(() => {
@@ -411,7 +438,7 @@ export default function Dashboard() {
                 type="text"
                 value={customTopicQuery}
                 onChange={(e) => setCustomTopicQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && setLoading(true)}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 placeholder="Enter keywords to search in articles... (press Enter)"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
               />
@@ -431,7 +458,6 @@ export default function Dashboard() {
                       if (newSet.has(topic)) newSet.delete(topic);
                       else newSet.add(topic);
                       setSelectedTopics(newSet);
-                      setLoading(true);
                     }}
                     className={`px-2 py-1 rounded text-xs font-medium transition ${
                       selectedTopics.has(topic)
@@ -467,7 +493,6 @@ export default function Dashboard() {
                       if (newSet.has(topic)) newSet.delete(topic);
                       else newSet.add(topic);
                       setExcludedTopics(newSet);
-                      setLoading(true);
                     }}
                     className={`px-2 py-1 rounded text-xs font-medium transition ${
                       excludedTopics.has(topic)
@@ -495,7 +520,6 @@ export default function Dashboard() {
                       if (newSet.has(domain.slug)) newSet.delete(domain.slug);
                       else newSet.add(domain.slug);
                       setSelectedDomains(newSet);
-                      setLoading(true);
                     }}
                     className={`px-2 py-1 rounded text-xs font-medium transition ${
                       selectedDomains.has(domain.slug)
@@ -523,7 +547,6 @@ export default function Dashboard() {
                       if (newSet.has(domain.slug)) newSet.delete(domain.slug);
                       else newSet.add(domain.slug);
                       setExcludedDomains(newSet);
-                      setLoading(true);
                     }}
                     className={`px-2 py-1 rounded text-xs font-medium transition ${
                       excludedDomains.has(domain.slug)
@@ -602,7 +625,6 @@ export default function Dashboard() {
                     setExcludedDomains(new Set());
                     setCustomTopicQuery('');
                     setShowRssUrl(false);
-                    setLoading(true);
                   }}
                   className="mt-2 text-xs text-red-500 hover:text-red-600"
                 >
@@ -626,7 +648,7 @@ export default function Dashboard() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <button
-                  onClick={() => { setSelectedDomain(''); setLoading(true); }}
+                  onClick={() => setSelectedDomain('')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                     !selectedDomain 
                       ? 'bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 ring-2 ring-argus-500' 
@@ -638,7 +660,7 @@ export default function Dashboard() {
                 {domains.slice(0, 11).map((domain: Domain) => (
                   <button
                     key={domain.id}
-                    onClick={() => { setSelectedDomain(domain.slug); setLoading(true); }}
+                    onClick={() => setSelectedDomain(domain.slug)}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
                       selectedDomain === domain.slug
                         ? 'bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 ring-2 ring-argus-500' 
@@ -674,7 +696,7 @@ export default function Dashboard() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
-                onClick={() => { setSelectedTopic(''); setLoading(true); }}
+                onClick={() => setSelectedTopic('')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                   !selectedTopic 
                     ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500' 
@@ -686,7 +708,7 @@ export default function Dashboard() {
               {topics.slice(0, 19).map((topic) => (
                 <button
                   key={topic}
-                  onClick={() => { setSelectedTopic(topic); setLoading(true); }}
+                  onClick={() => setSelectedTopic(topic)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
                     selectedTopic === topic
                       ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500' 
@@ -732,7 +754,7 @@ export default function Dashboard() {
                     📡 RSS
                   </button>
                   <button
-                    onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setShowRssUrl(false); setLoading(true); }}
+                    onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setShowRssUrl(false); }}
                     className="text-sm text-red-500 hover:text-red-600 px-3 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     ✕ Clear
@@ -843,7 +865,6 @@ export default function Dashboard() {
                     onClick={() => { 
                       setSelectedTopic(topic); 
                       setShowAllTopics(false);
-                      setLoading(true); 
                     }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
                       selectedTopic === topic
