@@ -168,10 +168,37 @@ export const articleClaims = pgTable('article_claims', {
   extractedAt: timestamp('extracted_at').notNull().defaultNow(),
 });
 
+// ============ Briefing Profiles ============
+// Saved briefing configurations with filters, schedules, and history
+export const briefingProfiles = pgTable('briefing_profiles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  
+  // Filter configuration (mirrors dashboard RSS filters)
+  filterConfig: jsonb('filter_config').notNull().default('{}'),
+  // { topics, excludeTopics, domains, excludeDomains, topicQuery, sourceListId }
+  
+  // Generation settings
+  settings: jsonb('settings').notNull().default('{}'),
+  // { format, hoursBack, minConfidence, maxArticles, includeTTS }
+  
+  // Delivery schedule
+  schedule: jsonb('schedule').notNull().default('{}'),
+  // { enabled, times, timezone, days, channels }
+  
+  lastGeneratedAt: timestamp('last_generated_at'),
+  generationCount: integer('generation_count').notNull().default(0),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // ============ Briefings ============
 export const briefings = pgTable('briefings', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  profileId: uuid('profile_id').references(() => briefingProfiles.id, { onDelete: 'set null' }),
   type: briefingTypeEnum('type').notNull(),
   title: text('title'),  // Executive briefing title
   content: text('content'), // Full markdown content
