@@ -90,7 +90,8 @@ apiV1Routes.get('/', (c) => {
  */
 apiV1Routes.get('/intelligence', async (c) => {
   const since = c.req.query('since'); // ISO timestamp
-  const domainSlug = c.req.query('domain'); // domain slug
+  const domainSlug = c.req.query('domain'); // domain slug (source perspective)
+  const topic = c.req.query('topic'); // article topic (what it's about)
   const minConfidence = parseInt(c.req.query('minConfidence') || '50');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
   const offset = parseInt(c.req.query('offset') || '0');
@@ -106,6 +107,11 @@ apiV1Routes.get('/intelligence', async (c) => {
 
   if (since) {
     conditions.push(gte(content.fetchedAt, new Date(since)));
+  }
+
+  // Topic filter (what the article is about) - always apply if provided
+  if (topic) {
+    conditions.push(sql`${content.topics} @> ${JSON.stringify([topic])}::jsonb`);
   }
 
   // Filter by active source list if user has one (takes precedence over domain filter)
@@ -125,6 +131,8 @@ apiV1Routes.get('/intelligence', async (c) => {
     .select({
       id: content.id,
       title: content.title,
+      summary: content.summary,
+      topics: content.topics,
       body: content.body,
       url: content.url,
       author: content.author,
