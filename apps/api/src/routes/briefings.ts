@@ -21,6 +21,8 @@ async function getActiveSourceIds(user: { id: string; preferences?: Record<strin
 import { generateBriefing, createBriefing } from '../services/intelligence/briefing';
 import { generateLLMBriefing, generateFactCheckedBriefing } from '../services/intelligence/llm-briefing';
 import { generateExecutiveBriefing } from '../services/intelligence/executive-briefing';
+import { generatePropagandaBriefing, compareRegions } from '../services/intelligence/propaganda-briefing';
+import { Region, REGION_LABELS } from '../services/intelligence/regional-mapping';
 import { generateBriefingAudio, getStatus as getTTSStatus, getVoices } from '../services/tts/index.js';
 
 export const briefingsRoutes = new Hono();
@@ -526,6 +528,86 @@ briefingsRoutes.post('/review', async (c) => {
       actions: processed,
     }
   });
+});
+
+// Get available regions for propaganda analysis
+briefingsRoutes.get('/propaganda/regions', async (c) => {
+  return c.json({
+    success: true,
+    data: {
+      regions: Object.entries(REGION_LABELS).map(([id, label]) => ({ id, label })),
+    },
+  });
+});
+
+// Generate propaganda/divergence analysis briefing
+briefingsRoutes.post('/propaganda', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    hoursBack = 48, 
+    maxTopics = 5,
+    regions, // Optional: array of region IDs to compare
+  } = body;
+
+  try {
+    console.log(`[Propaganda] Generating divergence analysis...`);
+    
+    const briefing = await generatePropagandaBriefing({
+      hoursBack,
+      maxTopics,
+      regions: regions as Region[] | undefined,
+    });
+
+    return c.json({ 
+      success: true, 
+      data: briefing,
+    });
+  } catch (error) {
+    console.error('Propaganda briefing error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
+
+// Compare two specific regions
+briefingsRoutes.post('/propaganda/compare', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { 
+    region1, 
+    region2,
+    hoursBack = 48, 
+    maxTopics = 5,
+  } = body;
+
+  if (!region1 || !region2) {
+    return c.json({ 
+      success: false, 
+      error: 'region1 and region2 are required' 
+    }, 400);
+  }
+
+  try {
+    console.log(`[Propaganda] Comparing ${region1} vs ${region2}...`);
+    
+    const briefing = await compareRegions(
+      region1 as Region, 
+      region2 as Region, 
+      { hoursBack, maxTopics }
+    );
+
+    return c.json({ 
+      success: true, 
+      data: briefing,
+    });
+  } catch (error) {
+    console.error('Region comparison error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
 });
 
 // Generate a briefing preview (without saving)

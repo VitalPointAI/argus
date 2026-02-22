@@ -209,7 +209,7 @@ export default function BriefingsPage() {
         </div>
         
         {/* Generate Buttons */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => generateExecutiveBriefing('summary')}
             disabled={executiveLoading}
@@ -220,7 +220,7 @@ export default function BriefingsPage() {
             ) : (
               <span>📝</span>
             )}
-            Generate Summary
+            Summary
           </button>
           <button
             onClick={() => generateExecutiveBriefing('executive')}
@@ -232,8 +232,15 @@ export default function BriefingsPage() {
             ) : (
               <span>📊</span>
             )}
-            Generate Executive
+            Executive
           </button>
+          <a
+            href="/briefings/propaganda"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center gap-2"
+          >
+            <span>🔍</span>
+            Propaganda Analysis
+          </a>
         </div>
       </div>
 
