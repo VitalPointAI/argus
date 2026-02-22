@@ -90,8 +90,13 @@ apiV1Routes.get('/', (c) => {
  */
 apiV1Routes.get('/intelligence', async (c) => {
   const since = c.req.query('since'); // ISO timestamp
-  const domainSlug = c.req.query('domain'); // domain slug (source perspective)
-  const topic = c.req.query('topic'); // article topic (what it's about)
+  const domainSlug = c.req.query('domain'); // domain slug (source perspective) - single
+  const domainSlugs = c.req.query('domains'); // comma-separated domain slugs (OR logic)
+  const excludeDomains = c.req.query('excludeDomains'); // comma-separated domains to exclude
+  const topic = c.req.query('topic'); // article topic (what it's about) - single
+  const topics = c.req.query('topics'); // comma-separated topics (OR logic)
+  const excludeTopics = c.req.query('excludeTopics'); // comma-separated topics to exclude
+  const topicQuery = c.req.query('topicQuery'); // free-text topic search (matches in article text)
   const minConfidence = parseInt(c.req.query('minConfidence') || '50');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
   const offset = parseInt(c.req.query('offset') || '0');
@@ -109,9 +114,37 @@ apiV1Routes.get('/intelligence', async (c) => {
     conditions.push(gte(content.fetchedAt, new Date(since)));
   }
 
-  // Topic filter (what the article is about) - always apply if provided
+  // Topic filters (what the article is about)
+  // Single topic (legacy support)
   if (topic) {
     conditions.push(sql`${content.topics} @> ${JSON.stringify([topic])}::jsonb`);
+  }
+  
+  // Multiple topics (OR logic) - article must have ANY of these topics
+  if (topics) {
+    const topicList = topics.split(',').map(t => t.trim()).filter(Boolean);
+    if (topicList.length > 0) {
+      const topicConditions = topicList.map(t => 
+        sql`${content.topics} @> ${JSON.stringify([t])}::jsonb`
+      );
+      conditions.push(sql`(${sql.join(topicConditions, sql` OR `)})`);
+    }
+  }
+  
+  // Exclude topics (NOT logic) - article must NOT have ANY of these topics
+  if (excludeTopics) {
+    const excludeList = excludeTopics.split(',').map(t => t.trim()).filter(Boolean);
+    for (const t of excludeList) {
+      conditions.push(sql`NOT (${content.topics} @> ${JSON.stringify([t])}::jsonb)`);
+    }
+  }
+  
+  // Free-text topic query - search in title/body
+  if (topicQuery) {
+    const searchTerms = topicQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const term of searchTerms) {
+      conditions.push(sql`(LOWER(${content.title}) LIKE ${'%' + term + '%'} OR LOWER(${content.body}) LIKE ${'%' + term + '%'})`);
+    }
   }
 
   // Filter by active source list if user has one (takes precedence over domain filter)
@@ -119,11 +152,26 @@ apiV1Routes.get('/intelligence', async (c) => {
     conditions.push(inArray(content.sourceId, activeSourceIds));
     // Source list overrides domain preferences - the list IS the filter
   } else {
-    // Domain filter: only apply if no source list is active
-    if (domainSlug) {
+    // Domain filters (source perspective)
+    // Multiple domains (OR logic)
+    if (domainSlugs) {
+      const slugList = domainSlugs.split(',').map(s => s.trim()).filter(Boolean);
+      if (slugList.length > 0) {
+        conditions.push(inArray(domains.slug, slugList));
+      }
+    } else if (domainSlug) {
+      // Single domain (legacy support)
       conditions.push(eq(domains.slug, domainSlug));
     } else if (userDomainIds && userDomainIds.length > 0) {
       conditions.push(inArray(sources.domainId, userDomainIds));
+    }
+  }
+  
+  // Exclude domains (NOT logic) - always applies
+  if (excludeDomains) {
+    const excludeList = excludeDomains.split(',').map(s => s.trim()).filter(Boolean);
+    if (excludeList.length > 0) {
+      conditions.push(sql`${domains.slug} NOT IN (${sql.join(excludeList.map(s => sql`${s}`), sql`, `)})`);
     }
   }
 

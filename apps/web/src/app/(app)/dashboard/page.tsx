@@ -99,8 +99,18 @@ export default function Dashboard() {
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>('date');
+  
+  // Simple filter mode (legacy)
   const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
+  
+  // Advanced filter mode
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
+  const [excludedTopics, setExcludedTopics] = useState<Set<string>>(new Set());
+  const [selectedDomains, setSelectedDomains] = useState<Set<string>>(new Set());
+  const [excludedDomains, setExcludedDomains] = useState<Set<string>>(new Set());
+  const [customTopicQuery, setCustomTopicQuery] = useState('');
 
   // Redirect to login if auth check completes and no user
   useEffect(() => {
@@ -117,11 +127,32 @@ export default function Dashboard() {
       try {
         // Build content URL with filters
         let contentUrl = `${API_URL}/api/v1/intelligence?limit=30&minConfidence=40`;
-        if (selectedDomain) {
-          contentUrl += `&domain=${selectedDomain}`;
-        }
-        if (selectedTopic) {
-          contentUrl += `&topic=${encodeURIComponent(selectedTopic)}`;
+        
+        if (advancedMode) {
+          // Advanced mode: multiple topics/domains with include/exclude
+          if (selectedTopics.size > 0) {
+            contentUrl += `&topics=${encodeURIComponent(Array.from(selectedTopics).join(','))}`;
+          }
+          if (excludedTopics.size > 0) {
+            contentUrl += `&excludeTopics=${encodeURIComponent(Array.from(excludedTopics).join(','))}`;
+          }
+          if (selectedDomains.size > 0) {
+            contentUrl += `&domains=${encodeURIComponent(Array.from(selectedDomains).join(','))}`;
+          }
+          if (excludedDomains.size > 0) {
+            contentUrl += `&excludeDomains=${encodeURIComponent(Array.from(excludedDomains).join(','))}`;
+          }
+          if (customTopicQuery.trim()) {
+            contentUrl += `&topicQuery=${encodeURIComponent(customTopicQuery.trim())}`;
+          }
+        } else {
+          // Simple mode: single topic/domain
+          if (selectedDomain) {
+            contentUrl += `&domain=${selectedDomain}`;
+          }
+          if (selectedTopic) {
+            contentUrl += `&topic=${encodeURIComponent(selectedTopic)}`;
+          }
         }
 
         // Use credentials: 'include' to send HttpOnly session cookie
@@ -155,7 +186,14 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, [authLoading, user, selectedDomain, selectedTopic]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, selectedDomain, selectedTopic, advancedMode, 
+      // Convert sets to strings for dependency comparison
+      Array.from(selectedTopics).join(','),
+      Array.from(excludedTopics).join(','),
+      Array.from(selectedDomains).join(','),
+      Array.from(excludedDomains).join(','),
+      customTopicQuery]);
   
   // Sort content based on selected option - MUST be before any early returns
   const sortedContent = useMemo(() => {
@@ -284,42 +322,244 @@ export default function Dashboard() {
 
       {/* Filter Intelligence Panel */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-        <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-          {/* Source Filter */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">📡</span>
-              <h3 className="font-semibold text-lg">Source</h3>
+        {/* Mode Toggle */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Filter Intelligence</h2>
+          <button
+            onClick={() => {
+              setAdvancedMode(!advancedMode);
+              // Clear filters when switching modes
+              if (!advancedMode) {
+                setSelectedDomain('');
+                setSelectedTopic('');
+              } else {
+                setSelectedTopics(new Set());
+                setExcludedTopics(new Set());
+                setSelectedDomains(new Set());
+                setExcludedDomains(new Set());
+                setCustomTopicQuery('');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              advancedMode
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            {advancedMode ? '🔧 Advanced Mode' : '⚡ Simple Mode'}
+          </button>
+        </div>
+
+        {advancedMode ? (
+          /* Advanced Filter Mode */
+          <div className="space-y-6">
+            {/* Custom Topic Query */}
+            <div>
+              <label className="block text-sm font-medium mb-2">🔍 Custom Topic Search</label>
+              <input
+                type="text"
+                value={customTopicQuery}
+                onChange={(e) => setCustomTopicQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && setLoading(true)}
+                placeholder="Enter keywords to search in articles... (press Enter)"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+              />
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-              Filter by where the news comes from (perspective)
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                onClick={() => { setSelectedDomain(''); setLoading(true); }}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  !selectedDomain 
-                    ? 'bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 ring-2 ring-argus-500' 
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
-              >
-                🌍 All Sources
-              </button>
-              {domains.slice(0, 11).map((domain: Domain) => (
+            
+            {/* Include Topics */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                ✅ Include Topics <span className="text-slate-500 font-normal">(OR - match ANY)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {topics.slice(0, 20).map((topic) => (
+                  <button
+                    key={topic}
+                    onClick={() => {
+                      const newSet = new Set(selectedTopics);
+                      if (newSet.has(topic)) newSet.delete(topic);
+                      else newSet.add(topic);
+                      setSelectedTopics(newSet);
+                      setLoading(true);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-medium transition ${
+                      selectedTopics.has(topic)
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 ring-1 ring-green-500'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {selectedTopics.has(topic) ? '✓ ' : ''}{topic}
+                  </button>
+                ))}
+                {topics.length > 20 && (
+                  <button
+                    onClick={() => setShowAllTopics(true)}
+                    className="px-2 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-purple-600"
+                  >
+                    +{topics.length - 20} more
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {/* Exclude Topics */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                ❌ Exclude Topics <span className="text-slate-500 font-normal">(NOT - hide ALL matching)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {topics.slice(0, 20).map((topic) => (
+                  <button
+                    key={topic}
+                    onClick={() => {
+                      const newSet = new Set(excludedTopics);
+                      if (newSet.has(topic)) newSet.delete(topic);
+                      else newSet.add(topic);
+                      setExcludedTopics(newSet);
+                      setLoading(true);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-medium transition ${
+                      excludedTopics.has(topic)
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 ring-1 ring-red-500'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {excludedTopics.has(topic) ? '✗ ' : ''}{topic}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Include Sources */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                📡 Include Sources <span className="text-slate-500 font-normal">(OR - from ANY)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {domains.map((domain: Domain) => (
+                  <button
+                    key={domain.id}
+                    onClick={() => {
+                      const newSet = new Set(selectedDomains);
+                      if (newSet.has(domain.slug)) newSet.delete(domain.slug);
+                      else newSet.add(domain.slug);
+                      setSelectedDomains(newSet);
+                      setLoading(true);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-medium transition ${
+                      selectedDomains.has(domain.slug)
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {selectedDomains.has(domain.slug) ? '✓ ' : ''}{domain.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Exclude Sources */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                🚫 Exclude Sources <span className="text-slate-500 font-normal">(NOT - hide from these)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {domains.map((domain: Domain) => (
+                  <button
+                    key={domain.id}
+                    onClick={() => {
+                      const newSet = new Set(excludedDomains);
+                      if (newSet.has(domain.slug)) newSet.delete(domain.slug);
+                      else newSet.add(domain.slug);
+                      setExcludedDomains(newSet);
+                      setLoading(true);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-medium transition ${
+                      excludedDomains.has(domain.slug)
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 ring-1 ring-red-500'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {excludedDomains.has(domain.slug) ? '✗ ' : ''}{domain.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Active Filter Summary */}
+            {(selectedTopics.size > 0 || excludedTopics.size > 0 || selectedDomains.size > 0 || excludedDomains.size > 0 || customTopicQuery) && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                <div className="text-sm">
+                  <span className="font-medium">Active Query:</span>{' '}
+                  {customTopicQuery && <span className="text-purple-600">"{customTopicQuery}"</span>}
+                  {selectedTopics.size > 0 && (
+                    <span className="text-green-600"> topics({Array.from(selectedTopics).join(' OR ')})</span>
+                  )}
+                  {excludedTopics.size > 0 && (
+                    <span className="text-red-600"> NOT({Array.from(excludedTopics).join(', ')})</span>
+                  )}
+                  {selectedDomains.size > 0 && (
+                    <span className="text-blue-600"> from({Array.from(selectedDomains).join(' OR ')})</span>
+                  )}
+                  {excludedDomains.size > 0 && (
+                    <span className="text-red-600"> NOT from({Array.from(excludedDomains).join(', ')})</span>
+                  )}
+                </div>
                 <button
-                  key={domain.id}
-                  onClick={() => { setSelectedDomain(domain.slug); setLoading(true); }}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
-                    selectedDomain === domain.slug
+                  onClick={() => {
+                    setSelectedTopics(new Set());
+                    setExcludedTopics(new Set());
+                    setSelectedDomains(new Set());
+                    setExcludedDomains(new Set());
+                    setCustomTopicQuery('');
+                    setLoading(true);
+                  }}
+                  className="mt-2 text-xs text-red-500 hover:text-red-600"
+                >
+                  ✕ Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Simple Filter Mode */
+          <>
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            {/* Source Filter */}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">📡</span>
+                <h3 className="font-semibold text-lg">Source</h3>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                Filter by where the news comes from (perspective)
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button
+                  onClick={() => { setSelectedDomain(''); setLoading(true); }}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    !selectedDomain 
                       ? 'bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 ring-2 ring-argus-500' 
                       : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                 >
-                  {domain.name}
+                  🌍 All Sources
                 </button>
-              ))}
+                {domains.slice(0, 11).map((domain: Domain) => (
+                  <button
+                    key={domain.id}
+                    onClick={() => { setSelectedDomain(domain.slug); setLoading(true); }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
+                      selectedDomain === domain.slug
+                        ? 'bg-argus-100 dark:bg-argus-900/30 text-argus-700 dark:text-argus-300 ring-2 ring-argus-500' 
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {domain.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
           
           {/* Divider */}
           <div className="hidden lg:block w-px bg-slate-200 dark:bg-slate-700 self-stretch"></div>
@@ -376,30 +616,32 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        </div>
-        
-        {/* Current Filter Summary */}
-        {(selectedDomain || selectedTopic) && (
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <div className="text-sm">
-              <span className="text-slate-500">Showing: </span>
-              <span className="font-medium">
-                {selectedDomain && selectedTopic ? (
-                  <>{domains.find(d => d.slug === selectedDomain)?.name} sources reporting on {selectedTopic}</>
-                ) : selectedDomain ? (
-                  <>All articles from {domains.find(d => d.slug === selectedDomain)?.name} sources</>
-                ) : (
-                  <>All sources reporting on {selectedTopic}</>
-                )}
-              </span>
-            </div>
-            <button
-              onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setLoading(true); }}
-              className="text-sm text-red-500 hover:text-red-600 px-3 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              ✕ Clear filters
-            </button>
           </div>
+        
+          {/* Current Filter Summary - Simple Mode */}
+          {(selectedDomain || selectedTopic) && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="text-sm">
+                <span className="text-slate-500">Showing: </span>
+                <span className="font-medium">
+                  {selectedDomain && selectedTopic ? (
+                    <>{domains.find(d => d.slug === selectedDomain)?.name} sources reporting on {selectedTopic}</>
+                  ) : selectedDomain ? (
+                    <>All articles from {domains.find(d => d.slug === selectedDomain)?.name} sources</>
+                  ) : (
+                    <>All sources reporting on {selectedTopic}</>
+                  )}
+                </span>
+              </div>
+              <button
+                onClick={() => { setSelectedDomain(''); setSelectedTopic(''); setLoading(true); }}
+                className="text-sm text-red-500 hover:text-red-600 px-3 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                ✕ Clear filters
+              </button>
+            </div>
+          )}
+        </>
         )}
       </div>
 
