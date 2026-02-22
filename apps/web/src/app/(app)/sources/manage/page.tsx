@@ -35,6 +35,7 @@ interface SourceList {
   name: string;
   description: string;
   isPublic: boolean;
+  rssEnabled: boolean;
   itemCount: number;
 }
 
@@ -304,6 +305,38 @@ function SourceManagePage() {
     }
   };
   
+  // Toggle RSS for a list
+  const toggleRss = async (listId: string, currentValue: boolean) => {
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/${listId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ rssEnabled: !currentValue }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setSourceLists(sourceLists.map(l => 
+          l.id === listId ? { ...l, rssEnabled: !currentValue } : l
+        ));
+        showSuccess(data.data.rssEnabled ? 'RSS feed enabled!' : 'RSS feed disabled');
+      } else {
+        setError(data.error || 'Failed to update RSS setting');
+      }
+    } catch (err) {
+      setError('Failed to update RSS setting');
+    }
+  };
+
+  // Copy RSS URL to clipboard
+  const copyRssUrl = async (listId: string) => {
+    const url = `https://argus.vitalpoint.ai/api/rss/lists/${listId}`;
+    await navigator.clipboard.writeText(url);
+    showSuccess('RSS URL copied to clipboard!');
+  };
+
   // Delete list
   const confirmDeleteList = async () => {
     if (!deleteListId || !user) return;
@@ -714,6 +747,42 @@ function SourceManagePage() {
                       {list.description}
                     </p>
                   )}
+                  
+                  {/* RSS Feed Section */}
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3 mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">📡 RSS Feed</span>
+                      <button
+                        onClick={() => toggleRss(list.id, list.rssEnabled)}
+                        className={`w-10 h-5 rounded-full relative transition-colors ${
+                          list.rssEnabled ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-600'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                            list.rssEnabled ? 'left-5' : 'left-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {list.rssEnabled && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`https://argus.vitalpoint.ai/api/rss/lists/${list.id}`}
+                          className="flex-1 px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded truncate"
+                        />
+                        <button
+                          onClick={() => copyRssUrl(list.id)}
+                          className="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50 transition"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 text-sm">
                       {list.itemCount} source{list.itemCount !== 1 ? 's' : ''}
