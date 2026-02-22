@@ -130,6 +130,7 @@ export const content = pgTable('content', {
   sourceId: uuid('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
   domainId: uuid('domain_id').references(() => domains.id), // classified domain (source perspective)
   topics: jsonb('topics').notNull().default('[]'), // article topics - what it's about
+  locations: jsonb('locations').notNull().default('[]'), // ISO country codes mentioned in article
   summary: text('summary'), // AI-generated summary
   externalId: text('external_id').notNull(),
   title: text('title').notNull(),
