@@ -13,6 +13,9 @@ RUN npm install --include=dev
 # Install snarkjs for ZK proof support
 RUN npm install snarkjs @types/snarkjs 2>/dev/null || npm install snarkjs
 
+# Install leaflet types for map component
+RUN npm install @types/leaflet 2>/dev/null || true
+
 # Copy source and build
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
