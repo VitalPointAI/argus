@@ -434,7 +434,7 @@ briefingCronRoutes.post('/process', async (c) => {
         const [saved] = await db.insert(briefings).values({
           userId: profile.userId,
           profileId: profile.id,
-          type: 'executive',
+          type: 'morning',
           title: briefing.title,
           markdownContent: briefing.markdownContent,
           structuredData: briefing,
@@ -570,7 +570,7 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
     const [saved] = await db.insert(briefings).values({
       userId: profile.userId,
       profileId: profile.id,
-      type: 'executive',
+      type: 'morning',
       title: briefing.title,
       markdownContent: briefing.markdownContent,
       structuredData: briefing,

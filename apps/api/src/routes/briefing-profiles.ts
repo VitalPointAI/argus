@@ -263,6 +263,7 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
 
   try {
     console.log(`[Profiles] Generating briefing for profile: ${profile.name}`);
+    console.log(`[Profiles] Filter config:`, JSON.stringify(filterConfig));
     
     // Resolve source list to source IDs (handle both singular and plural)
     let sourceIds: string[] | undefined;

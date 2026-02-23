@@ -144,6 +144,7 @@ interface BriefingOptions {
  * Optionally filtered by user's domain preferences
  */
 async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
+  console.log(`[FetchArticles] OPTIONS:`, JSON.stringify({ topics: options.topics, sourceIds: options.sourceIds?.length, excludeTopics: options.excludeTopics }));
   const hoursBack = options.hoursBack || (options.type === 'morning' ? 14 : 10);
   const minConfidence = options.minConfidence || 45;
   const maxArticles = options.maxArticles || 100;
