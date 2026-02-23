@@ -145,15 +145,15 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
     
     const [recentCount] = await db.select({ count: sql<number>`count(*)::int` })
       .from(content)
-      .where(gte(content.fetchedAt, since));
-    console.log(`[FetchArticles] Articles since ${since.toISOString()}: ${recentCount?.count}`);
+      .where(gte(content.publishedAt, since));
+    console.log(`[FetchArticles] Articles published since ${since.toISOString()}: ${recentCount?.count}`);
   } catch (countError) {
     console.error('[FetchArticles] Count query failed:', countError);
   }
   
   // Build conditions
   const conditions = [
-    gte(content.fetchedAt, since),
+    gte(content.publishedAt, since),
   ];
   
   // Add source list filter if specified
