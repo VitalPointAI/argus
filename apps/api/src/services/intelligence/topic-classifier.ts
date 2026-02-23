@@ -77,8 +77,33 @@ Respond in JSON only:
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        let topics = (parsed.topics || []).filter((t: string) => KNOWN_TOPICS.includes(t)).slice(0, maxTopics);
+        
+        // Validate geographic topics against content to prevent misclassification
+        const textLower = `${title} ${truncatedBody}`.toLowerCase();
+        const geoValidation: Record<string, string[]> = {
+          'China': ['china', 'chinese', 'beijing', 'shanghai', 'hong kong', 'xi jinping', 'pla', 'ccp', 'renminbi', 'rmb'],
+          'Russia': ['russia', 'russian', 'moscow', 'putin', 'kremlin'],
+          'Ukraine': ['ukraine', 'ukrainian', 'kyiv', 'zelensky'],
+          'Taiwan': ['taiwan', 'taiwanese', 'taipei', 'tsmc'],
+          'North Korea': ['north korea', 'pyongyang', 'kim jong'],
+          'Iran': ['iran', 'iranian', 'tehran', 'khamenei'],
+          'Israel': ['israel', 'israeli', 'tel aviv', 'netanyahu'],
+          'Japan': ['japan', 'japanese', 'tokyo'],
+          'India': ['india', 'indian', 'delhi', 'modi'],
+          'Australia': ['australia', 'australian', 'canberra', 'sydney', 'melbourne'],
+          'Philippines': ['philippines', 'philippine', 'manila', 'marcos'],
+        };
+        
+        // Remove geographic topics that don't appear in the text
+        topics = topics.filter((topic: string) => {
+          const keywords = geoValidation[topic];
+          if (!keywords) return true; // Non-geographic topics pass through
+          return keywords.some(kw => textLower.includes(kw));
+        });
+        
         return {
-          topics: (parsed.topics || []).filter((t: string) => KNOWN_TOPICS.includes(t)).slice(0, maxTopics),
+          topics,
           summary: (parsed.summary || '').substring(0, 200),
         };
       }
