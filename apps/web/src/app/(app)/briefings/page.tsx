@@ -775,6 +775,44 @@ export default function BriefingsPage() {
                       </div>
                     )}
                   </div>
+                  
+                  {/* RSS Feed URL */}
+                  {(selectedProfile.filterConfig.topics?.length || 
+                    selectedProfile.filterConfig.excludeTopics?.length || 
+                    selectedProfile.filterConfig.domains?.length || 
+                    selectedProfile.filterConfig.excludeDomains?.length ||
+                    selectedProfile.filterConfig.topicQuery) && (
+                    <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-orange-600 dark:text-orange-400 font-medium">📡 RSS Feed:</span>
+                        <code className="flex-1 bg-white dark:bg-slate-800 px-2 py-1 rounded text-[10px] text-slate-600 dark:text-slate-400 overflow-x-auto whitespace-nowrap">
+                          {`${API_URL}/api/rss/filter?${[
+                            selectedProfile.filterConfig.topics?.length && `topics=${selectedProfile.filterConfig.topics.join(',')}`,
+                            selectedProfile.filterConfig.excludeTopics?.length && `excludeTopics=${selectedProfile.filterConfig.excludeTopics.join(',')}`,
+                            selectedProfile.filterConfig.domains?.length && `domains=${selectedProfile.filterConfig.domains.join(',')}`,
+                            selectedProfile.filterConfig.excludeDomains?.length && `excludeDomains=${selectedProfile.filterConfig.excludeDomains.join(',')}`,
+                            selectedProfile.filterConfig.topicQuery && `q=${encodeURIComponent(selectedProfile.filterConfig.topicQuery)}`,
+                          ].filter(Boolean).join('&')}`}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = `${API_URL}/api/rss/filter?${[
+                              selectedProfile.filterConfig.topics?.length && `topics=${selectedProfile.filterConfig.topics.join(',')}`,
+                              selectedProfile.filterConfig.excludeTopics?.length && `excludeTopics=${selectedProfile.filterConfig.excludeTopics.join(',')}`,
+                              selectedProfile.filterConfig.domains?.length && `domains=${selectedProfile.filterConfig.domains.join(',')}`,
+                              selectedProfile.filterConfig.excludeDomains?.length && `excludeDomains=${selectedProfile.filterConfig.excludeDomains.join(',')}`,
+                              selectedProfile.filterConfig.topicQuery && `q=${encodeURIComponent(selectedProfile.filterConfig.topicQuery)}`,
+                            ].filter(Boolean).join('&')}`;
+                            navigator.clipboard.writeText(url);
+                          }}
+                          className="px-2 py-1 bg-orange-100 dark:bg-orange-800/30 text-orange-600 dark:text-orange-400 rounded text-xs hover:bg-orange-200"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* History & Content */}
