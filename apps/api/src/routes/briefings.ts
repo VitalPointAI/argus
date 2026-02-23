@@ -903,3 +903,53 @@ briefingsRoutes.get('/stats/overview', async (c) => {
     },
   });
 });
+/**
+ * Public briefing view - accessible without authentication
+ * Used for webhook share links (Teams, Slack, etc.)
+ * Security: UUID is hard to guess, acts as implicit share token
+ */
+briefingsRoutes.get('/public/:id', async (c) => {
+  const id = c.req.param('id');
+
+  try {
+    const [briefing] = await db.select({
+      id: briefings.id,
+      title: briefings.title,
+      type: briefings.type,
+      content: briefings.content,
+      markdownContent: briefings.markdownContent,
+      structuredData: briefings.structuredData,
+      createdAt: briefings.createdAt,
+      profileId: briefings.profileId,
+    })
+      .from(briefings)
+      .where(eq(briefings.id, id))
+      .limit(1);
+
+    if (!briefing) {
+      return c.json({ success: false, error: 'Briefing not found' }, 404);
+    }
+
+    // Only allow public access for briefings with a profile (scheduled/webhook delivered)
+    // Direct user briefings remain private
+    if (!briefing.profileId) {
+      return c.json({ success: false, error: 'This briefing is private' }, 403);
+    }
+
+    return c.json({ 
+      success: true, 
+      data: {
+        id: briefing.id,
+        title: briefing.title,
+        type: briefing.type,
+        content: briefing.content || briefing.markdownContent,
+        structuredData: briefing.structuredData,
+        createdAt: briefing.createdAt,
+        isPublic: true,
+      },
+    });
+  } catch (error) {
+    console.error('Get public briefing error:', error);
+    return c.json({ success: false, error: 'Failed to fetch briefing' }, 500);
+  }
+});
