@@ -9,6 +9,7 @@
  * - TTS-ready format option
  */
 
+import { validateArticleContent } from './content-validator';
 import { db, content, sources, domains, sourceDomains } from '../../db';
 import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 
@@ -430,12 +431,62 @@ RULES:
 /**
  * Generate the full executive briefing
  */
+
+/**
+ * Validate article content and adjust confidence scores
+ * Penalizes articles with accuracy/temporal issues
+ */
+async function validateArticlesForAccuracy(articles: Article[]): Promise<Article[]> {
+  if (articles.length === 0) return articles;
+  
+  console.log(`[Validation] Validating ${articles.length} articles for content accuracy...`);
+  
+  const validated = await Promise.all(
+    articles.map(async (article) => {
+      try {
+        const result = await validateArticleContent(
+          article.body,
+          article.title,
+          article.publishedAt,
+          { useLLM: true, llmSampleRate: 0.2 }
+        );
+        
+        if (result.issues.length > 0) {
+          const penaltyPercent = result.reliabilityPenalty * 100;
+          const newConfidence = Math.max(10, article.confidenceScore - penaltyPercent);
+          
+          console.log(`[Validation] Penalized: "${article.title.substring(0, 40)}..." ${article.confidenceScore}% -> ${Math.round(newConfidence)}% (${result.issues.join(', ')})`);
+          
+          return {
+            ...article,
+            confidenceScore: Math.round(newConfidence),
+          };
+        }
+        
+        return article;
+      } catch (err) {
+        console.error(`[Validation] Error validating article: ${err}`);
+        return article;
+      }
+    })
+  );
+  
+  validated.sort((a, b) => b.confidenceScore - a.confidenceScore);
+  
+  const penalizedCount = articles.length - validated.filter(a => a.confidenceScore === articles.find(o => o.id === a.id)?.confidenceScore).length;
+  console.log(`[Validation] Complete: ${penalizedCount} articles penalized`);
+  
+  return validated;
+}
 export async function generateExecutiveBriefing(options: BriefingOptions): Promise<ExecutiveBriefing> {
   console.log(`[ExecBriefing] Starting generation with options:`, JSON.stringify(options));
   
   let articles: Article[];
   try {
     articles = await fetchArticles(options);
+    
+    // Validate content and adjust confidence scores for accuracy issues
+    articles = await validateArticlesForAccuracy(articles);
     console.log(`[ExecBriefing] Fetched ${articles.length} articles`);
   } catch (fetchError) {
     console.error('[ExecBriefing] Failed to fetch articles:', fetchError);
