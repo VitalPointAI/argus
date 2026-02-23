@@ -370,15 +370,18 @@ briefingsRoutes.post('/executive', async (c) => {
     
     if (filterUrl) {
       try {
+        console.log('[Briefing] Parsing filterUrl:', filterUrl);
         const url = new URL(filterUrl);
         const params = url.searchParams;
+        console.log('[Briefing] URL params:', Object.fromEntries(params.entries()));
         if (params.get('topics')) parsedFilters.topics = params.get('topics')!.split(',').map(t => t.trim());
         if (params.get('excludeTopics')) parsedFilters.excludeTopics = params.get('excludeTopics')!.split(',').map(t => t.trim());
         if (params.get('domains')) parsedFilters.domains = params.get('domains')!.split(',').map(t => t.trim());
         if (params.get('excludeDomains')) parsedFilters.excludeDomains = params.get('excludeDomains')!.split(',').map(t => t.trim());
         if (params.get('topicQuery')) parsedFilters.topicQuery = params.get('topicQuery')!;
+        console.log('[Briefing] Parsed filters from URL:', parsedFilters);
       } catch (e) {
-        console.warn('[Briefing] Failed to parse filter URL:', filterUrl);
+        console.warn('[Briefing] Failed to parse filter URL:', filterUrl, e);
       }
     }
     
