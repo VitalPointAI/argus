@@ -16,6 +16,7 @@ interface BriefingProfile {
     domains?: string[];
     excludeDomains?: string[];
     topicQuery?: string;
+    sourceListIds?: string[];
   };
   settings: {
     format?: 'executive' | 'summary';
@@ -30,6 +31,8 @@ interface BriefingProfile {
     timezone?: string;
     days?: string[];
     channels?: string[];
+    webhookUrl?: string;
+    webhookSecret?: string;
   };
   lastGeneratedAt: string | null;
   generationCount: number;
@@ -145,6 +148,14 @@ export default function BriefingsPage() {
   const [scheduleTimezone, setScheduleTimezone] = useState('America/New_York');
   const [scheduleDays, setScheduleDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [scheduleChannels, setScheduleChannels] = useState<string[]>(['web']);
+
+  // Source list selection for scheduled briefings
+  const [sourceLists, setSourceLists] = useState<any[]>([]);
+  const [selectedSourceListIds, setSelectedSourceListIds] = useState<string[]>([]);
+
+  // Webhook delivery
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
   const [rssCopied, setRssCopied] = useState(false);
 
   // Fetch profiles
@@ -287,6 +298,11 @@ export default function BriefingsPage() {
     setScheduleTimezone(profile.schedule?.timezone || 'America/New_York');
     setScheduleDays(profile.schedule?.days || ['mon', 'tue', 'wed', 'thu', 'fri']);
     setScheduleChannels(profile.schedule?.channels || ['web']);
+    // Load source list IDs from filterConfig
+    setSelectedSourceListIds(profile.filterConfig?.sourceListIds || []);
+    // Load webhook settings from schedule
+    setWebhookUrl(profile.schedule?.webhookUrl || '');
+    setWebhookSecret(profile.schedule?.webhookSecret || '');
     setShowScheduleEditor(true);
   };
 
@@ -306,6 +322,12 @@ export default function BriefingsPage() {
             timezone: scheduleTimezone,
             days: scheduleDays,
             channels: scheduleChannels,
+            webhookUrl: webhookUrl || undefined,
+            webhookSecret: webhookSecret || undefined,
+          },
+          filterConfig: {
+            ...selectedProfile.filterConfig,
+            sourceListIds: selectedSourceListIds.length > 0 ? selectedSourceListIds : undefined,
           },
         }),
       });
@@ -493,6 +515,22 @@ export default function BriefingsPage() {
     fetchProfileHistory(profile.id);
   };
 
+  
+  // Fetch user source lists
+  const fetchSourceLists = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/sources/lists/my`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSourceLists(data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch source lists:', error);
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -509,8 +547,9 @@ export default function BriefingsPage() {
     }
     fetchData();
     fetchProfiles();
+    fetchSourceLists();
     fetchCurrentExecutive();
-  }, [fetchProfiles]);
+  }, [fetchProfiles, fetchSourceLists]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -1318,6 +1357,67 @@ export default function BriefingsPage() {
                         <span className="text-sm text-slate-600 dark:text-slate-400">📱 Telegram (if configured)</span>
                       </label>
                     </div>
+                  </div>
+
+                  {/* Source Lists */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      📋 Source Lists (optional)
+                    </label>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                      Filter briefings to sources from specific lists
+                    </p>
+                    {sourceLists.length === 0 ? (
+                      <p className="text-sm text-slate-400 italic">No source lists created yet</p>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-600 rounded-lg p-2">
+                        {sourceLists.map((list) => (
+                          <label key={list.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSourceListIds.includes(list.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSourceListIds([...selectedSourceListIds, list.id]);
+                                } else {
+                                  setSelectedSourceListIds(selectedSourceListIds.filter(id => id !== list.id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-argus-600"
+                            />
+                            <span className="text-sm text-slate-600 dark:text-slate-400">
+                              {list.name} ({list.itemCount || 0} sources)
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Webhook Delivery */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      🔗 Webhook Delivery (optional)
+                    </label>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                      POST briefings to a custom endpoint
+                    </p>
+                    <input
+                      type="url"
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                      placeholder="https://your-server.com/webhook"
+                      className="w-full px-3 py-2 mb-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                    />
+                    {webhookUrl && (
+                      <input
+                        type="text"
+                        value={webhookSecret}
+                        onChange={(e) => setWebhookSecret(e.target.value)}
+                        placeholder="Webhook secret (for HMAC signature)"
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                      />
+                    )}
                   </div>
                 </>
               )}
