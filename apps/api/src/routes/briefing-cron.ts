@@ -66,21 +66,80 @@ const DAY_MAP: Record<string, number> = {
 /**
  * Send briefing to webhook URL
  */
+/**
+ * Send briefing to webhook URL
+ * Automatically detects Teams webhooks and formats as Adaptive Card
+ */
 async function sendWebhookBriefing(
   webhookUrl: string,
   payload: WebhookPayload,
   secret?: string
 ): Promise<{ success: boolean; error?: string; statusCode?: number }> {
   try {
-    const body = JSON.stringify(payload);
+    // Detect if this is a Microsoft Teams webhook
+    const isTeamsWebhook = webhookUrl.includes('webhook.office.com') || 
+                           webhookUrl.includes('microsoft.com') ||
+                           webhookUrl.includes('.logic.azure.com');
+    
+    let body: string;
+    
+    if (isTeamsWebhook) {
+      // Format as Teams Adaptive Card
+      const briefingContent = (payload.content || '').substring(0, 2000);
+      const teamsPayload = {
+        type: 'message',
+        attachments: [
+          {
+            contentType: 'application/vnd.microsoft.card.adaptive',
+            content: {
+              type: 'AdaptiveCard',
+              '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+              version: '1.4',
+              body: [
+                {
+                  type: 'TextBlock',
+                  size: 'Large',
+                  weight: 'Bolder',
+                  text: payload.title || payload.profileName,
+                  wrap: true
+                },
+                {
+                  type: 'TextBlock',
+                  text: `Profile: ${payload.profileName} | ${payload.generatedAt}`,
+                  size: 'Small',
+                  isSubtle: true,
+                  wrap: true
+                },
+                {
+                  type: 'TextBlock',
+                  text: briefingContent,
+                  wrap: true
+                }
+              ],
+              actions: [
+                {
+                  type: 'Action.OpenUrl',
+                  title: 'View Full Briefing',
+                  url: `https://argus.vitalpoint.ai/briefings/${payload.briefingId}`
+                }
+              ]
+            }
+          }
+        ]
+      };
+      body = JSON.stringify(teamsPayload);
+    } else {
+      // Generic JSON webhook
+      body = JSON.stringify(payload);
+    }
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': 'Argus-Briefing/1.0',
     };
     
-    // Add HMAC signature if secret provided
-    if (secret) {
+    // Add HMAC signature if secret provided (for non-Teams webhooks)
+    if (secret && !isTeamsWebhook) {
       const signature = crypto
         .createHmac('sha256', secret)
         .update(body)
@@ -95,6 +154,8 @@ async function sendWebhookBriefing(
     });
     
     if (!response.ok) {
+      const responseText = await response.text().catch(() => '');
+      console.error(`[Webhook] Error response: ${responseText}`);
       return {
         success: false,
         error: `Webhook returned ${response.status}: ${response.statusText}`,
@@ -102,7 +163,7 @@ async function sendWebhookBriefing(
       };
     }
     
-    console.log(`[Webhook] Delivered to ${webhookUrl}`);
+    console.log(`[Webhook] Delivered to ${webhookUrl} (Teams: ${isTeamsWebhook})`);
     return { success: true, statusCode: response.status };
     
   } catch (error) {
@@ -113,10 +174,6 @@ async function sendWebhookBriefing(
     };
   }
 }
-
-/**
- * Get source IDs from multiple source lists
- */
 async function getSourceIdsFromLists(sourceListIds: string[]): Promise<string[]> {
   if (!sourceListIds?.length) return [];
   
