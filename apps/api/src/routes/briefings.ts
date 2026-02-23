@@ -908,20 +908,17 @@ briefingsRoutes.get('/stats/overview', async (c) => {
  * Used for webhook share links (Teams, Slack, etc.)
  * Security: UUID is hard to guess, acts as implicit share token
  */
+
+/**
+ * Public briefing view - accessible without authentication
+ * Used for webhook share links (Teams, Slack, etc.)
+ */
 briefingsRoutes.get('/public/:id', async (c) => {
   const id = c.req.param('id');
 
   try {
-    const [briefing] = await db.select({
-      id: briefings.id,
-      title: briefings.title,
-      type: briefings.type,
-      content: briefings.content,
-      markdownContent: briefings.markdownContent,
-      structuredData: briefings.structuredData,
-      createdAt: briefings.createdAt,
-      profileId: briefings.profileId,
-    })
+    // Select all columns - let Drizzle handle it
+    const [briefing] = await db.select()
       .from(briefings)
       .where(eq(briefings.id, id))
       .limit(1);
@@ -931,7 +928,6 @@ briefingsRoutes.get('/public/:id', async (c) => {
     }
 
     // Only allow public access for briefings with a profile (scheduled/webhook delivered)
-    // Direct user briefings remain private
     if (!briefing.profileId) {
       return c.json({ success: false, error: 'This briefing is private' }, 403);
     }
@@ -942,8 +938,8 @@ briefingsRoutes.get('/public/:id', async (c) => {
         id: briefing.id,
         title: briefing.title,
         type: briefing.type,
-        content: briefing.content || briefing.markdownContent,
-        structuredData: briefing.structuredData,
+        content: briefing.content,
+        summary: briefing.summary,
         createdAt: briefing.createdAt,
         isPublic: true,
       },
