@@ -404,6 +404,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Filter Intelligence</h2>
           <button
+            type="button"
             onClick={() => {
               setAdvancedMode(!advancedMode);
               // Clear filters when switching modes
@@ -452,6 +453,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap gap-2">
                 {topics.slice(0, 20).map((topic) => (
                   <button
+                    type="button"
                     key={topic}
                     onClick={() => {
                       const newSet = new Set(selectedTopics);
@@ -470,6 +472,7 @@ export default function Dashboard() {
                 ))}
                 {topics.length > 20 && (
                   <button
+                    type="button"
                     onClick={() => setShowAllTopics(true)}
                     className="px-2 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-purple-600"
                   >
@@ -487,6 +490,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap gap-2">
                 {topics.slice(0, 20).map((topic) => (
                   <button
+                    type="button"
                     key={topic}
                     onClick={() => {
                       const newSet = new Set(excludedTopics);
@@ -514,6 +518,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap gap-2">
                 {domains.map((domain: Domain) => (
                   <button
+                    type="button"
                     key={domain.id}
                     onClick={() => {
                       const newSet = new Set(selectedDomains);
@@ -541,6 +546,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap gap-2">
                 {domains.map((domain: Domain) => (
                   <button
+                    type="button"
                     key={domain.id}
                     onClick={() => {
                       const newSet = new Set(excludedDomains);
@@ -581,6 +587,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => setShowRssUrl(!showRssUrl)}
                     className="px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium hover:bg-orange-200 dark:hover:bg-orange-800 transition flex items-center gap-1"
                   >
@@ -648,6 +655,7 @@ export default function Dashboard() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <button
+                  type="button"
                   onClick={() => setSelectedDomain('')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                     !selectedDomain 
@@ -659,6 +667,7 @@ export default function Dashboard() {
                 </button>
                 {domains.slice(0, 11).map((domain: Domain) => (
                   <button
+                    type="button"
                     key={domain.id}
                     onClick={() => setSelectedDomain(domain.slug)}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
@@ -684,6 +693,7 @@ export default function Dashboard() {
               <h3 className="font-semibold text-lg">Subject</h3>
               {topics.length > 20 && (
                 <button
+                  type="button"
                   onClick={() => setShowAllTopics(true)}
                   className="ml-auto text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400"
                 >
@@ -696,6 +706,7 @@ export default function Dashboard() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
+                type="button"
                 onClick={() => setSelectedTopic('')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                   !selectedTopic 
@@ -707,6 +718,7 @@ export default function Dashboard() {
               </button>
               {topics.slice(0, 19).map((topic) => (
                 <button
+                  type="button"
                   key={topic}
                   onClick={() => setSelectedTopic(topic)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition text-left ${
