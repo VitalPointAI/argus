@@ -68,8 +68,8 @@ app.route('/api/keys', apiKeysRoutes); // API key management
 app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/sources', ratingsRoutes); // Rating routes under /api/sources/:id/rate etc
-app.route('/api/briefings', briefingsRoutes);
 app.route('/api/briefings/profiles', briefingProfileRoutes);
+app.route('/api/briefings', briefingsRoutes);
 app.route('/api/ingestion', ingestionRoutes);
 app.route('/api/content', contentRoutes);
 app.route('/api/verification', verificationRoutes);
