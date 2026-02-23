@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db, briefingProfiles, briefings, users, sourceListItems } from '../db';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, inArray } from 'drizzle-orm';
 import { generateExecutiveBriefing } from '../services/intelligence/executive-briefing';
 
 interface FilterConfig {
@@ -10,6 +10,7 @@ interface FilterConfig {
   excludeDomains?: string[];
   topicQuery?: string;
   sourceListId?: string;
+  sourceListIds?: string[];
 }
 
 interface ProfileSettings {
@@ -263,14 +264,16 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
   try {
     console.log(`[Profiles] Generating briefing for profile: ${profile.name}`);
     
-    // Resolve source list to source IDs
+    // Resolve source list to source IDs (handle both singular and plural)
     let sourceIds: string[] | undefined;
-    if (filterConfig.sourceListId) {
+    const sourceListIds = filterConfig.sourceListIds || (filterConfig.sourceListId ? [filterConfig.sourceListId] : []);
+    if (sourceListIds.length > 0) {
+      
       const items = await db.select({ sourceId: sourceListItems.sourceId })
         .from(sourceListItems)
-        .where(eq(sourceListItems.sourceListId, filterConfig.sourceListId));
-      sourceIds = items.map(i => i.sourceId);
-      console.log(`[Profiles] Resolved ${sourceIds.length} sources from source list`);
+        .where(inArray(sourceListItems.sourceListId, sourceListIds));
+      sourceIds = [...new Set(items.map(i => i.sourceId))]; // Dedupe
+      console.log(`[Profiles] Resolved ${sourceIds.length} sources from ${sourceListIds.length} source lists`);
     }
     
     const briefing = await generateExecutiveBriefing({
