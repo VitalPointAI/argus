@@ -1,0 +1,77 @@
+name: Scheduled Briefing Generation
+
+on:
+  schedule:
+    # Run every 5 minutes to catch scheduled briefings
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger for testing
+    inputs:
+      profile_id:
+        description: 'Specific profile ID to trigger (optional)'
+        required: false
+        type: string
+
+jobs:
+  process-scheduled-briefings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Trigger Briefing Processor
+        if: ${{ !inputs.profile_id }}
+        run: |
+          echo "Processing all scheduled briefings..."
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.ARGUS_API_URL }}/api/briefings/cron/process" \
+            -H "Authorization: Bearer ${{ secrets.BRIEFING_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response: $body"
+          echo "HTTP Code: $http_code"
+          
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Cron processing failed with status $http_code"
+            exit 1
+          fi
+          
+          # Parse results
+          profiles_checked=$(echo "$body" | jq -r '.profilesChecked // 0')
+          results_count=$(echo "$body" | jq -r '.results | length // 0')
+          
+          echo "✅ Checked $profiles_checked profiles"
+          echo "📊 Generated $results_count briefings"
+          
+          # Log any errors
+          errors=$(echo "$body" | jq -r '.results[] | select(.status == "error") | "\(.profileName): \(.error)"')
+          if [ -n "$errors" ]; then
+            echo "::warning::Some briefings failed:"
+            echo "$errors"
+          fi
+
+      - name: Trigger Specific Profile
+        if: ${{ inputs.profile_id }}
+        run: |
+          echo "Triggering briefing for profile: ${{ inputs.profile_id }}"
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.ARGUS_API_URL }}/api/briefings/cron/trigger/${{ inputs.profile_id }}" \
+            -H "Authorization: Bearer ${{ secrets.BRIEFING_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response: $body"
+          echo "HTTP Code: $http_code"
+          
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Profile trigger failed with status $http_code"
+            exit 1
+          fi
+          
+          briefing_id=$(echo "$body" | jq -r '.briefingId')
+          profile_name=$(echo "$body" | jq -r '.profileName')
+          echo "✅ Generated briefing $briefing_id for profile: $profile_name"
