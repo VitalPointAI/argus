@@ -171,7 +171,14 @@ export default function BriefingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setExecutiveHistory(data.data || []);
+        const history = data.data || [];
+        setExecutiveHistory(history);
+        
+        // Auto-load the latest briefing if history exists
+        if (history.length > 0) {
+          const latest = history[0];
+          loadHistoricalBriefing(latest.id);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch profile history:', error);

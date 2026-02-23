@@ -641,9 +641,9 @@ function generateMarkdown(briefing: ExecutiveBriefing): string {
       md += `**Confidence: ${story.avgConfidence}%** | [Verify](${primaryArticle?.verificationUrl})\n\n`;
       md += `**Context:** ${story.context}\n\n`;
       md += `**Latest:** ${story.latestUpdate}\n\n`;
-      md += `**Sources:**\n`;
+      md += `**📰 Related Articles:**\n`;
       for (const a of story.articles) {
-        md += `- [${a.source}](${a.url}) (${a.confidenceScore}%) - [Read article →](${a.url})\n`;
+        md += `- [${a.title || a.source}](${a.url}) — *${a.source}* (${a.confidenceScore}% confidence)\n`;
       }
       md += `\n`;
     }
