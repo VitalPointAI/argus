@@ -307,40 +307,107 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
     
     if (schedule?.webhookUrl) {
       try {
-        const payload = {
-          type: 'briefing',
-          profileName: profile.name,
-          briefingId: saved.id,
-          title: briefing.title || profile.name,
-          content: briefing.markdownContent || '',
-          generatedAt: new Date().toISOString(),
-          source: 'manual',
-        };
+        const webhookUrl = schedule.webhookUrl;
+        
+        // Detect webhook type
+        const isDirectTeamsWebhook = webhookUrl.includes('webhook.office.com');
+        const isPowerAutomate = webhookUrl.includes('.logic.azure.com') || 
+                                webhookUrl.includes('powerplatform.com') ||
+                                webhookUrl.includes('flow.microsoft.com');
+        const isMicrosoftWebhook = isDirectTeamsWebhook || isPowerAutomate;
+        
+        const briefingContent = (briefing.markdownContent || '').substring(0, 2000);
+        let body: string;
+        
+        if (isMicrosoftWebhook) {
+          // Build Adaptive Card for Microsoft webhooks
+          const adaptiveCardContent = {
+            type: 'AdaptiveCard',
+            '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+            version: '1.4',
+            body: [
+              {
+                type: 'TextBlock',
+                size: 'Large',
+                weight: 'Bolder',
+                text: briefing.title || profile.name,
+                wrap: true
+              },
+              {
+                type: 'TextBlock',
+                text: `Profile: ${profile.name} | ${new Date().toISOString()}`,
+                size: 'Small',
+                isSubtle: true,
+                wrap: true
+              },
+              {
+                type: 'TextBlock',
+                text: briefingContent,
+                wrap: true
+              }
+            ],
+            actions: [
+              {
+                type: 'Action.OpenUrl',
+                title: 'View Full Briefing',
+                url: `https://argus.vitalpoint.ai/briefings/${saved.id}`
+              }
+            ]
+          };
+          
+          if (isPowerAutomate) {
+            // Power Automate expects just the card
+            body = JSON.stringify(adaptiveCardContent);
+            console.log('[Profiles] Using Power Automate format (raw adaptive card)');
+          } else {
+            // Direct Teams webhook expects message wrapper
+            body = JSON.stringify({
+              type: 'message',
+              attachments: [{
+                contentType: 'application/vnd.microsoft.card.adaptive',
+                content: adaptiveCardContent
+              }]
+            });
+            console.log('[Profiles] Using direct Teams format (message wrapper)');
+          }
+        } else {
+          // Generic JSON webhook
+          body = JSON.stringify({
+            type: 'briefing',
+            profileName: profile.name,
+            briefingId: saved.id,
+            title: briefing.title || profile.name,
+            content: briefing.markdownContent || '',
+            generatedAt: new Date().toISOString(),
+            source: 'manual',
+          });
+        }
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
         };
 
-        if (schedule.webhookSecret) {
+        if (schedule.webhookSecret && !isMicrosoftWebhook) {
           const crypto = await import('crypto');
           const signature = crypto.createHmac('sha256', schedule.webhookSecret)
-            .update(JSON.stringify(payload))
+            .update(body)
             .digest('hex');
           headers['X-Argus-Signature'] = signature;
         }
 
-        const response = await fetch(schedule.webhookUrl, {
+        const response = await fetch(webhookUrl, {
           method: 'POST',
           headers,
-          body: JSON.stringify(payload),
+          body,
         });
 
         if (response.ok) {
           webhookStatus = 'delivered';
-          console.log(`[Profiles] Webhook delivered to ${schedule.webhookUrl}`);
+          console.log(`[Profiles] Webhook delivered to ${webhookUrl.substring(0, 60)}...`);
         } else {
+          const errText = await response.text().catch(() => '');
           webhookStatus = `failed: ${response.status}`;
-          console.error(`[Profiles] Webhook failed: ${response.status}`);
+          console.error(`[Profiles] Webhook failed (${response.status}): ${errText.substring(0, 200)}`);
         }
       } catch (error) {
         webhookStatus = `error: ${error}`;

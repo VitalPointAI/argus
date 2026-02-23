@@ -96,6 +96,8 @@ async function sendWebhookBriefing(
     // Detect webhook type
     const isDirectTeamsWebhook = webhookUrl.includes('webhook.office.com');
     const isPowerAutomate = webhookUrl.includes('.logic.azure.com') || 
+                            webhookUrl.includes('powerplatform.com') ||
+                            webhookUrl.includes('flow.microsoft.com') || 
                             webhookUrl.includes('prod-') && webhookUrl.includes('.azure.com');
     const isMicrosoftWebhook = isDirectTeamsWebhook || isPowerAutomate;
     
