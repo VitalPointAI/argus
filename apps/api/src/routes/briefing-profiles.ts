@@ -263,6 +263,16 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
   try {
     console.log(`[Profiles] Generating briefing for profile: ${profile.name}`);
     
+    // Resolve source list to source IDs
+    let sourceIds: string[] | undefined;
+    if (filterConfig.sourceListId) {
+      const items = await db.select({ sourceId: sourceListItems.sourceId })
+        .from(sourceListItems)
+        .where(eq(sourceListItems.sourceListId, filterConfig.sourceListId));
+      sourceIds = items.map(i => i.sourceId);
+      console.log(`[Profiles] Resolved ${sourceIds.length} sources from source list`);
+    }
+    
     const briefing = await generateExecutiveBriefing({
       type: 'morning',
       hoursBack: settings.hoursBack || 14,
@@ -275,6 +285,7 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
       domainSlugs: filterConfig.domains,
       excludeDomainSlugs: filterConfig.excludeDomains,
       topicQuery: filterConfig.topicQuery,
+      sourceIds,
     });
 
     // Save the briefing with profile reference
