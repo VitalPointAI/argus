@@ -35,6 +35,7 @@ interface ProfileSchedule {
   channels?: string[];
   // Multiple webhooks support
   webhooks?: WebhookConfig[];
+  webhooksEnabled?: boolean; // Master toggle to disable all webhooks
   // Legacy single webhook (backwards compatibility)
   webhookUrl?: string;
   webhookSecret?: string;
@@ -215,6 +216,12 @@ async function sendToAllWebhooks(
   schedule: ProfileSchedule,
   payload: WebhookPayload
 ): Promise<{ results: WebhookResult[]; summary: string }> {
+  // Check master toggle
+  if (schedule.webhooksEnabled === false) {
+    console.log('[Webhook] Webhooks disabled for this profile');
+    return { results: [], summary: 'disabled' };
+  }
+
   const results: WebhookResult[] = [];
   
   // Collect all webhooks to send to

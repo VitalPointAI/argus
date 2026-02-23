@@ -42,6 +42,7 @@ interface BriefingProfile {
     webhookUrl?: string;
     webhooks?: WebhookConfig[];
     webhookSecret?: string;
+    webhooksEnabled?: boolean;
   };
   lastGeneratedAt: string | null;
   generationCount: number;
@@ -164,6 +165,7 @@ export default function BriefingsPage() {
 
   // Webhook delivery (multiple)
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [webhooksEnabled, setWebhooksEnabled] = useState(true);
   
   // Add a new webhook
   const addWebhook = () => {
@@ -344,6 +346,7 @@ export default function BriefingsPage() {
     } else {
       setWebhooks([]);
     }
+    setWebhooksEnabled(profile.schedule?.webhooksEnabled !== false);
     setShowScheduleEditor(true);
   };
 
@@ -364,6 +367,7 @@ export default function BriefingsPage() {
             days: scheduleDays,
             channels: scheduleChannels,
             webhooks: webhooks.filter(w => w.url).length > 0 ? webhooks.filter(w => w.url) : undefined,
+            webhooksEnabled: webhooksEnabled,
           },
           filterConfig: {
             ...selectedProfile.filterConfig,
@@ -1450,6 +1454,24 @@ export default function BriefingsPage() {
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                       POST briefings to custom endpoints (Teams, Slack, etc.)
                     </p>
+                    
+                    {webhooks.length > 0 && (
+                      <div className="flex items-center gap-2 mb-3 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                        <input
+                          type="checkbox"
+                          id="webhooksEnabled"
+                          checked={webhooksEnabled}
+                          onChange={(e) => setWebhooksEnabled(e.target.checked)}
+                          className="rounded border-slate-300 dark:border-slate-600"
+                        />
+                        <label htmlFor="webhooksEnabled" className="text-sm text-slate-600 dark:text-slate-400">
+                          Enable webhook delivery
+                        </label>
+                        {!webhooksEnabled && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400">(disabled for testing)</span>
+                        )}
+                      </div>
+                    )}
                     
                     {webhooks.length === 0 ? (
                       <p className="text-sm text-slate-400 dark:text-slate-500 italic">
