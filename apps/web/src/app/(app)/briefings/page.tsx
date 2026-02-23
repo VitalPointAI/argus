@@ -145,6 +145,7 @@ export default function BriefingsPage() {
   const [scheduleTimezone, setScheduleTimezone] = useState('America/New_York');
   const [scheduleDays, setScheduleDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [scheduleChannels, setScheduleChannels] = useState<string[]>(['web']);
+  const [rssCopied, setRssCopied] = useState(false);
 
   // Fetch profiles
   const fetchProfiles = useCallback(async () => {
@@ -805,10 +806,16 @@ export default function BriefingsPage() {
                               selectedProfile.filterConfig.topicQuery && `q=${encodeURIComponent(selectedProfile.filterConfig.topicQuery)}`,
                             ].filter(Boolean).join('&')}`;
                             navigator.clipboard.writeText(url);
+                            setRssCopied(true);
+                            setTimeout(() => setRssCopied(false), 2000);
                           }}
-                          className="px-2 py-1 bg-orange-100 dark:bg-orange-800/30 text-orange-600 dark:text-orange-400 rounded text-xs hover:bg-orange-200"
+                          className={`px-2 py-1 rounded text-xs transition-colors ${
+                            rssCopied 
+                              ? 'bg-green-100 dark:bg-green-800/30 text-green-600 dark:text-green-400' 
+                              : 'bg-orange-100 dark:bg-orange-800/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200'
+                          }`}
                         >
-                          Copy
+                          {rssCopied ? '✓ Copied!' : 'Copy'}
                         </button>
                       </div>
                     </div>

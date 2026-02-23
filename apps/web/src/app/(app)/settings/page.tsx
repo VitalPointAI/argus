@@ -15,6 +15,7 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
   const router = useRouter();
   const [nearBalance, setNearBalance] = useState<string | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [accountIdCopied, setAccountIdCopied] = useState(false);
 
   useEffect(() => {
     if (user.nearAccountId) {
@@ -105,11 +106,19 @@ function HumintSettings({ user }: { user: { codename: string; nearAccountId?: st
                     {user.nearAccountId}
                   </code>
                   <button
-                    onClick={() => navigator.clipboard.writeText(user.nearAccountId!)}
-                    className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
-                    title="Copy"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.nearAccountId!);
+                      setAccountIdCopied(true);
+                      setTimeout(() => setAccountIdCopied(false), 2000);
+                    }}
+                    className={`p-2 transition ${
+                      accountIdCopied 
+                        ? 'text-green-500' 
+                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                    title={accountIdCopied ? 'Copied!' : 'Copy'}
                   >
-                    📋
+                    {accountIdCopied ? '✓' : '📋'}
                   </button>
                 </div>
               </div>
