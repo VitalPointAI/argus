@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db, briefings, users, sourceListItems } from '../db';
+import { db, briefings, users, sourceListItems, briefingProfiles } from '../db';
 import { eq, desc, sql, and } from 'drizzle-orm';
 
 // Helper to get source IDs from user's active source list
@@ -28,6 +28,53 @@ import { generateBriefingAudio, getStatus as getTTSStatus, getVoices } from '../
 export const briefingsRoutes = new Hono();
 
 // Debug endpoint to check article fetching (placed first to avoid route conflicts)
+
+// Webhook delivery helper for manual briefing generation
+async function sendManualWebhook(
+  webhookUrl: string,
+  briefingData: { id: string; title: string; content: string; profileName: string },
+  webhookSecret?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const payload = {
+      type: 'briefing',
+      profileName: briefingData.profileName,
+      briefingId: briefingData.id,
+      title: briefingData.title,
+      content: briefingData.content,
+      generatedAt: new Date().toISOString(),
+      source: 'manual',
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (webhookSecret) {
+      const crypto = await import('crypto');
+      const signature = crypto.createHmac('sha256', webhookSecret)
+        .update(JSON.stringify(payload))
+        .digest('hex');
+      headers['X-Argus-Signature'] = signature;
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: 'Webhook returned ' + response.status };
+    }
+    console.log('[Webhook] Manual briefing delivered to ' + webhookUrl);
+    return { success: true };
+  } catch (error) {
+    console.error('[Webhook] Failed:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
 briefingsRoutes.get('/debug/articles', async (c) => {
   try {
     const hoursBack = parseInt(c.req.query('hoursBack') || '24');
@@ -463,12 +510,38 @@ briefingsRoutes.post('/executive', async (c) => {
 
       console.log(`[Briefing] Saved with ID: ${saved.id}`);
 
+      // Check for webhook delivery (if profileId provided)
+      let webhookStatus = 'not_configured';
+      const profileId = body.profileId;
+      if (profileId) {
+        const [profile] = await db.select()
+          .from(briefingProfiles)
+          .where(eq(briefingProfiles.id, profileId))
+          .limit(1);
+        
+        if (profile?.schedule?.webhookUrl) {
+          const webhookResult = await sendManualWebhook(
+            profile.schedule.webhookUrl,
+            {
+              id: saved.id,
+              title: briefing.title || 'Executive Briefing',
+              content: briefing.markdownContent || '',
+              profileName: profile.name,
+            },
+            profile.schedule.webhookSecret
+          );
+          webhookStatus = webhookResult.success ? 'delivered' : webhookResult.error || 'failed';
+          console.log(`[Briefing] Webhook status: ${webhookStatus}`);
+        }
+      }
+
       return c.json({ 
         success: true, 
         data: {
           ...briefing,
           saved: true,
           briefingId: saved.id,
+          webhookStatus,
         }
       });
     }

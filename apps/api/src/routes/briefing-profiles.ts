@@ -301,6 +301,53 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
 
     console.log(`[Profiles] Saved briefing ${saved.id} for profile ${profile.name}`);
 
+    // Webhook delivery (if configured on profile)
+    let webhookStatus = 'not_configured';
+    const schedule = profile.schedule as { webhookUrl?: string; webhookSecret?: string } | null;
+    
+    if (schedule?.webhookUrl) {
+      try {
+        const payload = {
+          type: 'briefing',
+          profileName: profile.name,
+          briefingId: saved.id,
+          title: briefing.title || profile.name,
+          content: briefing.markdownContent || '',
+          generatedAt: new Date().toISOString(),
+          source: 'manual',
+        };
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        if (schedule.webhookSecret) {
+          const crypto = await import('crypto');
+          const signature = crypto.createHmac('sha256', schedule.webhookSecret)
+            .update(JSON.stringify(payload))
+            .digest('hex');
+          headers['X-Argus-Signature'] = signature;
+        }
+
+        const response = await fetch(schedule.webhookUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          webhookStatus = 'delivered';
+          console.log(`[Profiles] Webhook delivered to ${schedule.webhookUrl}`);
+        } else {
+          webhookStatus = `failed: ${response.status}`;
+          console.error(`[Profiles] Webhook failed: ${response.status}`);
+        }
+      } catch (error) {
+        webhookStatus = `error: ${error}`;
+        console.error(`[Profiles] Webhook error:`, error);
+      }
+    }
+
     return c.json({ 
       success: true, 
       data: {
@@ -309,6 +356,7 @@ briefingProfileRoutes.post('/:id/generate', async (c) => {
         briefingId: saved.id,
         profileId: profile.id,
         profileName: profile.name,
+        webhookStatus,
       }
     });
   } catch (error) {
