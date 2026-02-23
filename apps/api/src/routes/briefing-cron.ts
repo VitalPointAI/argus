@@ -93,58 +93,68 @@ async function sendWebhookBriefing(
   secret?: string
 ): Promise<{ success: boolean; error?: string; statusCode?: number }> {
   try {
-    // Detect if this is a Microsoft Teams webhook
-    const isTeamsWebhook = webhookUrl.includes('webhook.office.com') || 
-                           webhookUrl.includes('microsoft.com') ||
-                           webhookUrl.includes('.logic.azure.com');
+    // Detect webhook type
+    const isDirectTeamsWebhook = webhookUrl.includes('webhook.office.com');
+    const isPowerAutomate = webhookUrl.includes('.logic.azure.com') || 
+                            webhookUrl.includes('prod-') && webhookUrl.includes('.azure.com');
+    const isMicrosoftWebhook = isDirectTeamsWebhook || isPowerAutomate;
     
     let body: string;
     
-    if (isTeamsWebhook) {
-      // Format as Teams Adaptive Card
+    if (isMicrosoftWebhook) {
+      // Build Adaptive Card content
       const briefingContent = (payload.content || '').substring(0, 2000);
-      const teamsPayload = {
-        type: 'message',
-        attachments: [
+      const adaptiveCardContent = {
+        type: 'AdaptiveCard',
+        '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+        version: '1.4',
+        body: [
           {
-            contentType: 'application/vnd.microsoft.card.adaptive',
-            content: {
-              type: 'AdaptiveCard',
-              '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
-              version: '1.4',
-              body: [
-                {
-                  type: 'TextBlock',
-                  size: 'Large',
-                  weight: 'Bolder',
-                  text: payload.title || payload.profileName,
-                  wrap: true
-                },
-                {
-                  type: 'TextBlock',
-                  text: `Profile: ${payload.profileName} | ${payload.generatedAt}`,
-                  size: 'Small',
-                  isSubtle: true,
-                  wrap: true
-                },
-                {
-                  type: 'TextBlock',
-                  text: briefingContent,
-                  wrap: true
-                }
-              ],
-              actions: [
-                {
-                  type: 'Action.OpenUrl',
-                  title: 'View Full Briefing',
-                  url: `https://argus.vitalpoint.ai/briefings/${payload.briefingId}`
-                }
-              ]
-            }
+            type: 'TextBlock',
+            size: 'Large',
+            weight: 'Bolder',
+            text: payload.title || payload.profileName,
+            wrap: true
+          },
+          {
+            type: 'TextBlock',
+            text: `Profile: ${payload.profileName} | ${payload.generatedAt}`,
+            size: 'Small',
+            isSubtle: true,
+            wrap: true
+          },
+          {
+            type: 'TextBlock',
+            text: briefingContent,
+            wrap: true
+          }
+        ],
+        actions: [
+          {
+            type: 'Action.OpenUrl',
+            title: 'View Full Briefing',
+            url: `https://argus.vitalpoint.ai/briefings/${payload.briefingId}`
           }
         ]
       };
-      body = JSON.stringify(teamsPayload);
+      
+      if (isPowerAutomate) {
+        // Power Automate / Logic Apps expects just the card
+        body = JSON.stringify(adaptiveCardContent);
+        console.log(`[Webhook] Using Power Automate format (raw adaptive card)`);
+      } else {
+        // Direct Teams webhook expects message wrapper
+        body = JSON.stringify({
+          type: 'message',
+          attachments: [
+            {
+              contentType: 'application/vnd.microsoft.card.adaptive',
+              content: adaptiveCardContent
+            }
+          ]
+        });
+        console.log(`[Webhook] Using direct Teams webhook format (message wrapper)`);
+      }
     } else {
       // Generic JSON webhook
       body = JSON.stringify(payload);
@@ -155,14 +165,16 @@ async function sendWebhookBriefing(
       'User-Agent': 'Argus-Briefing/1.0',
     };
     
-    // Add HMAC signature if secret provided (for non-Teams webhooks)
-    if (secret && !isTeamsWebhook) {
+    // Add HMAC signature if secret provided (for non-Microsoft webhooks)
+    if (secret && !isMicrosoftWebhook) {
       const signature = crypto
         .createHmac('sha256', secret)
         .update(body)
         .digest('hex');
       headers['X-Argus-Signature'] = `sha256=${signature}`;
     }
+    
+    console.log(`[Webhook] Sending to ${webhookUrl.substring(0, 60)}...`);
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -172,7 +184,7 @@ async function sendWebhookBriefing(
     
     if (!response.ok) {
       const responseText = await response.text().catch(() => '');
-      console.error(`[Webhook] Error response: ${responseText}`);
+      console.error(`[Webhook] Error response (${response.status}): ${responseText.substring(0, 500)}`);
       return {
         success: false,
         error: `Webhook returned ${response.status}: ${response.statusText}`,
@@ -180,17 +192,18 @@ async function sendWebhookBriefing(
       };
     }
     
-    console.log(`[Webhook] Delivered to ${webhookUrl} (Teams: ${isTeamsWebhook})`);
+    console.log(`[Webhook] Delivered successfully (${response.status})`);
     return { success: true, statusCode: response.status };
     
   } catch (error) {
-    console.error(`[Webhook] Failed to deliver to ${webhookUrl}:`, error);
+    console.error(`[Webhook] Failed to deliver:`, error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
 }
+
 
 /**
  * Send briefing to all configured webhooks
@@ -402,6 +415,7 @@ briefingCronRoutes.post('/process', async (c) => {
           hoursBack: settings.hoursBack || 24,
           minConfidence: settings.minConfidence || 0.3,
           maxArticles: settings.maxArticles || 50,
+          timezone: schedule.timezone || 'America/New_York',
         });
         
         // Save briefing

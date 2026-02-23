@@ -122,6 +122,7 @@ interface BriefingOptions {
   domainSlugs?: string[]; // Domain slugs to include (source perspective)
   excludeDomainSlugs?: string[]; // Domain slugs to exclude
   topicQuery?: string; // Free-text search in articles
+  timezone?: string; // User's timezone for time-of-day title
 }
 
 /**
@@ -492,16 +493,20 @@ export async function generateExecutiveBriefing(options: BriefingOptions): Promi
   const now = new Date();
   const briefingId = `briefing-${now.getTime()}`;
   
-  const typeLabels = {
+  const timezone = options.timezone || 'America/New_York';
+  const timeOfDay = getTimeOfDayLabel(timezone);
+  
+  const typeLabels: Record<string, string> = {
     morning: 'Morning Intelligence Briefing',
-    evening: 'Evening Intelligence Update',
+    afternoon: 'Afternoon Intelligence Update',
+    evening: 'Evening Intelligence Briefing',
     weekly: 'Weekly Strategic Summary',
   };
 
   const briefing: ExecutiveBriefing = {
     id: briefingId,
-    title: typeLabels[options.type],
-    subtitle: formatDate(now),
+    title: options.type === 'weekly' ? typeLabels.weekly : typeLabels[timeOfDay],
+    subtitle: formatDateInTimezone(now, timezone),
     generatedAt: now,
     readTimeMinutes,
     sections,
@@ -542,6 +547,53 @@ function formatDate(date: Date): string {
     timeZoneName: 'short',
   });
 }
+
+/**
+ * Get time of day label based on hour in user's timezone
+ */
+function getTimeOfDayLabel(timezone: string = 'America/New_York'): 'morning' | 'afternoon' | 'evening' {
+  const now = new Date();
+  let hour: number;
+  
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find(p => p.type === 'hour');
+    hour = parseInt(hourPart?.value || '12', 10);
+  } catch {
+    hour = now.getUTCHours();
+  }
+  
+  if (hour >= 5 && hour < 12) {
+    return 'morning';
+  } else if (hour >= 12 && hour < 17) {
+    return 'afternoon';
+  } else {
+    return 'evening';
+  }
+}
+
+/**
+ * Format date in user's timezone
+ */
+function formatDateInTimezone(date: Date, timezone: string = 'America/New_York'): string {
+  try {
+    return date.toLocaleDateString('en-US', {
+      timeZone: timezone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch {
+    return formatDate(date);
+  }
+}
+
 
 /**
  * Generate confidence badge HTML
