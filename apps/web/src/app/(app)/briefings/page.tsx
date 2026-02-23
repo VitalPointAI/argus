@@ -74,10 +74,13 @@ function FilterBadges({ filterConfig }: { filterConfig: BriefingProfile['filterC
     badges.push({ label: `Topics: ${filterConfig.topics.join(', ')}`, color: 'blue' });
   }
   if (filterConfig.excludeTopics?.length) {
-    badges.push({ label: `Exclude: ${filterConfig.excludeTopics.join(', ')}`, color: 'red' });
+    badges.push({ label: `❌ Topics: ${filterConfig.excludeTopics.join(', ')}`, color: 'red' });
   }
   if (filterConfig.domains?.length) {
     badges.push({ label: `Sources: ${filterConfig.domains.join(', ')}`, color: 'green' });
+  }
+  if (filterConfig.excludeDomains?.length) {
+    badges.push({ label: `❌ Sources: ${filterConfig.excludeDomains.join(', ')}`, color: 'red' });
   }
   if (filterConfig.topicQuery) {
     badges.push({ label: `Search: "${filterConfig.topicQuery}"`, color: 'purple' });
