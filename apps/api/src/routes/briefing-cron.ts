@@ -47,6 +47,7 @@ interface ProfileFilterConfig {
   domains?: string[];
   excludeDomains?: string[];
   topicQuery?: string;
+  sourceListId?: string; // Single source list (legacy)
   sourceListIds?: string[]; // Multiple source lists (OR logic)
 }
 
@@ -407,9 +408,11 @@ briefingCronRoutes.post('/process', async (c) => {
         
         // Resolve source list IDs to source IDs
         let sourceIds: string[] | undefined;
-        if (filterConfig.sourceListIds?.length) {
-          sourceIds = await getSourceIdsFromLists(filterConfig.sourceListIds);
-          console.log(`[Cron] Resolved ${sourceIds.length} sources from ${filterConfig.sourceListIds.length} source lists`);
+        // Handle both singular (legacy) and plural source list IDs
+        const sourceListIds = filterConfig.sourceListIds || (filterConfig.sourceListId ? [filterConfig.sourceListId] : []);
+        if (sourceListIds.length > 0) {
+          sourceIds = await getSourceIdsFromLists(sourceListIds);
+          console.log(`[Cron] Resolved ${sourceIds.length} sources from ${sourceListIds.length} source lists`);
         }
         
         // Generate briefing
@@ -545,8 +548,10 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
     
     // Resolve source list IDs
     let sourceIds: string[] | undefined;
-    if (filterConfig.sourceListIds?.length) {
-      sourceIds = await getSourceIdsFromLists(filterConfig.sourceListIds);
+    // Handle both singular (legacy) and plural source list IDs
+        const sourceListIds = filterConfig.sourceListIds || (filterConfig.sourceListId ? [filterConfig.sourceListId] : []);
+        if (sourceListIds.length > 0) {
+      sourceIds = await getSourceIdsFromLists(sourceListIds);
     }
     
     const briefing = await generateExecutiveBriefing({
