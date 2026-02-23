@@ -41,6 +41,7 @@ import { searchRoutes } from './routes/search';
 import { rssRoutes } from './routes/rss';
 import mapRoutes from './routes/map';
 import { briefingProfileRoutes } from './routes/briefing-profiles';
+import { briefingCronRoutes } from './routes/briefing-cron';
 // TODO: Fix near-api-js ESM/CJS compatibility with Node 22
 // import nearRegistryRoutes from './routes/near-registry';
 import { initPhantomAuth } from './services/auth/phantom-auth';
@@ -69,6 +70,7 @@ app.route('/api/domains', domainsRoutes);
 app.route('/api/sources', sourcesRoutes);
 app.route('/api/sources', ratingsRoutes); // Rating routes under /api/sources/:id/rate etc
 app.route('/api/briefings/profiles', briefingProfileRoutes);
+app.route('/api/briefings/cron', briefingCronRoutes); // Cron-triggered briefing generation
 app.route('/api/briefings', briefingsRoutes);
 app.route('/api/ingestion', ingestionRoutes);
 app.route('/api/content', contentRoutes);

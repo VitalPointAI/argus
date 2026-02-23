@@ -134,6 +134,14 @@ export default function BriefingsPage() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'quick' | 'profiles'>('profiles');
+  
+  // Schedule editing
+  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(['05:00', '18:00']);
+  const [scheduleTimezone, setScheduleTimezone] = useState('America/New_York');
+  const [scheduleDays, setScheduleDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
+  const [scheduleChannels, setScheduleChannels] = useState<string[]>(['web']);
 
   // Fetch profiles
   const fetchProfiles = useCallback(async () => {
@@ -259,6 +267,81 @@ export default function BriefingsPage() {
     } catch (error) {
       console.error('Failed to delete profile:', error);
     }
+  };
+
+  // Open schedule editor for a profile
+  const openScheduleEditor = (profile: BriefingProfile) => {
+    setScheduleEnabled(profile.schedule?.enabled || false);
+    setScheduleTimes(profile.schedule?.times || ['05:00', '18:00']);
+    setScheduleTimezone(profile.schedule?.timezone || 'America/New_York');
+    setScheduleDays(profile.schedule?.days || ['mon', 'tue', 'wed', 'thu', 'fri']);
+    setScheduleChannels(profile.schedule?.channels || ['web']);
+    setShowScheduleEditor(true);
+  };
+
+  // Save schedule for profile
+  const saveSchedule = async () => {
+    if (!selectedProfile) return;
+    
+    try {
+      const res = await fetch(`${API_URL}/api/briefings/profiles/${selectedProfile.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          schedule: {
+            enabled: scheduleEnabled,
+            times: scheduleTimes,
+            timezone: scheduleTimezone,
+            days: scheduleDays,
+            channels: scheduleChannels,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        const updated = data.data;
+        setProfiles(profiles.map(p => p.id === updated.id ? updated : p));
+        setSelectedProfile(updated);
+        setShowScheduleEditor(false);
+      } else {
+        setExecutiveError(data.error || 'Failed to save schedule');
+      }
+    } catch (error) {
+      console.error('Failed to save schedule:', error);
+      setExecutiveError('Failed to save schedule');
+    }
+  };
+
+  // Toggle a day in schedule
+  const toggleScheduleDay = (day: string) => {
+    if (scheduleDays.includes(day)) {
+      setScheduleDays(scheduleDays.filter(d => d !== day));
+    } else {
+      setScheduleDays([...scheduleDays, day]);
+    }
+  };
+
+  // Add a time to schedule
+  const addScheduleTime = () => {
+    if (scheduleTimes.length < 4) {
+      setScheduleTimes([...scheduleTimes, '12:00']);
+    }
+  };
+
+  // Remove a time from schedule
+  const removeScheduleTime = (index: number) => {
+    if (scheduleTimes.length > 1) {
+      setScheduleTimes(scheduleTimes.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a time in schedule
+  const updateScheduleTime = (index: number, value: string) => {
+    const newTimes = [...scheduleTimes];
+    newTimes[index] = value;
+    setScheduleTimes(newTimes);
   };
 
   // Generate briefing for profile
@@ -647,6 +730,13 @@ export default function BriefingsPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => openScheduleEditor(selectedProfile)}
+                        className="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium text-sm transition-colors flex items-center gap-1"
+                      >
+                        <span>📅</span>
+                        <span className="hidden sm:inline">Schedule</span>
+                      </button>
+                      <button
                         onClick={() => generateForProfile(selectedProfile)}
                         disabled={executiveLoading}
                         className="px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
@@ -1023,6 +1113,179 @@ export default function BriefingsPage() {
           </span>
         </div>
       </div>
+
+      {/* Schedule Editor Modal */}
+      {showScheduleEditor && selectedProfile && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  📅 Schedule: {selectedProfile.name}
+                </h3>
+                <button
+                  onClick={() => setShowScheduleEditor(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Enable/Disable */}
+              <div className="mb-6">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={scheduleEnabled}
+                    onChange={(e) => setScheduleEnabled(e.target.checked)}
+                    className="w-5 h-5 rounded border-slate-300 text-argus-600 focus:ring-argus-500"
+                  />
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    Enable automatic briefing generation
+                  </span>
+                </label>
+              </div>
+
+              {scheduleEnabled && (
+                <>
+                  {/* Delivery Times */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Delivery Times
+                    </label>
+                    <div className="space-y-2">
+                      {scheduleTimes.map((time, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => updateScheduleTime(index, e.target.value)}
+                            className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                          />
+                          {scheduleTimes.length > 1 && (
+                            <button
+                              onClick={() => removeScheduleTime(index)}
+                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {scheduleTimes.length < 4 && (
+                        <button
+                          onClick={addScheduleTime}
+                          className="text-sm text-argus-600 hover:text-argus-700 dark:text-argus-400"
+                        >
+                          + Add another time
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timezone */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Timezone
+                    </label>
+                    <select
+                      value={scheduleTimezone}
+                      onChange={(e) => setScheduleTimezone(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    >
+                      <option value="America/New_York">Eastern (ET)</option>
+                      <option value="America/Chicago">Central (CT)</option>
+                      <option value="America/Denver">Mountain (MT)</option>
+                      <option value="America/Los_Angeles">Pacific (PT)</option>
+                      <option value="UTC">UTC</option>
+                      <option value="Europe/London">London (GMT/BST)</option>
+                      <option value="Europe/Paris">Paris (CET)</option>
+                      <option value="Asia/Tokyo">Tokyo (JST)</option>
+                    </select>
+                  </div>
+
+                  {/* Days */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Active Days
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => (
+                        <button
+                          key={day}
+                          onClick={() => toggleScheduleDay(day)}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                            scheduleDays.includes(day)
+                              ? 'bg-argus-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          {day.charAt(0).toUpperCase() + day.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Delivery Channels */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Delivery Channels
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleChannels.includes('web')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setScheduleChannels([...scheduleChannels, 'web']);
+                            } else {
+                              setScheduleChannels(scheduleChannels.filter(c => c !== 'web'));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-argus-600"
+                        />
+                        <span className="text-sm text-slate-600 dark:text-slate-400">🌐 Web (save to history)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleChannels.includes('telegram')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setScheduleChannels([...scheduleChannels, 'telegram']);
+                            } else {
+                              setScheduleChannels(scheduleChannels.filter(c => c !== 'telegram'));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-argus-600"
+                        />
+                        <span className="text-sm text-slate-600 dark:text-slate-400">📱 Telegram (if configured)</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setShowScheduleEditor(false)}
+                  className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveSchedule}
+                  className="flex-1 px-4 py-2 bg-argus-600 hover:bg-argus-700 text-white rounded-lg font-medium"
+                >
+                  Save Schedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
