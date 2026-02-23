@@ -4,7 +4,7 @@
  * Endpoint to be called by external cron (e.g., GitHub Actions, cron job)
  * to process scheduled briefing profiles.
  * 
- * Supports delivery via: Web, Telegram, Email, Webhook
+ * Supports delivery via: Web, Telegram, Email, Webhook (multiple)
  */
 
 import { Hono } from 'hono';
@@ -18,14 +18,26 @@ const CRON_SECRET = process.env.CRON_SECRET || process.env.BRIEFING_CRON_SECRET;
 
 export const briefingCronRoutes = new Hono();
 
+// Individual webhook configuration
+interface WebhookConfig {
+  id: string;           // UUID for identification
+  name: string;         // User-friendly name (e.g., "Teams - Security", "Slack - Alerts")
+  url: string;          // Webhook URL
+  secret?: string;      // Optional HMAC secret
+  enabled: boolean;     // Toggle individual webhooks
+}
+
 interface ProfileSchedule {
   enabled?: boolean;
   times?: string[];
   timezone?: string;
   days?: string[];
   channels?: string[];
-  webhookUrl?: string;      // Profile-level webhook
-  webhookSecret?: string;   // Optional HMAC secret for webhook
+  // Multiple webhooks support
+  webhooks?: WebhookConfig[];
+  // Legacy single webhook (backwards compatibility)
+  webhookUrl?: string;
+  webhookSecret?: string;
 }
 
 interface ProfileFilterConfig {
@@ -58,16 +70,21 @@ interface WebhookPayload {
   filterConfig?: ProfileFilterConfig;
 }
 
+interface WebhookResult {
+  name: string;
+  url: string;
+  success: boolean;
+  error?: string;
+  statusCode?: number;
+}
+
 // Map day abbreviations to JS day numbers (0 = Sunday)
 const DAY_MAP: Record<string, number> = {
   'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6,
 };
 
 /**
- * Send briefing to webhook URL
- */
-/**
- * Send briefing to webhook URL
+ * Send briefing to a single webhook URL
  * Automatically detects Teams webhooks and formats as Adaptive Card
  */
 async function sendWebhookBriefing(
@@ -174,6 +191,76 @@ async function sendWebhookBriefing(
     };
   }
 }
+
+/**
+ * Send briefing to all configured webhooks
+ * Handles both new webhooks array and legacy single webhook
+ */
+async function sendToAllWebhooks(
+  schedule: ProfileSchedule,
+  payload: WebhookPayload
+): Promise<{ results: WebhookResult[]; summary: string }> {
+  const results: WebhookResult[] = [];
+  
+  // Collect all webhooks to send to
+  const webhooksToSend: Array<{ name: string; url: string; secret?: string }> = [];
+  
+  // New format: webhooks array
+  if (schedule.webhooks?.length) {
+    for (const wh of schedule.webhooks) {
+      if (wh.enabled && wh.url) {
+        webhooksToSend.push({ name: wh.name, url: wh.url, secret: wh.secret });
+      }
+    }
+  }
+  
+  // Legacy format: single webhookUrl (backwards compatibility)
+  if (schedule.webhookUrl && !schedule.webhooks?.length) {
+    webhooksToSend.push({ 
+      name: 'Default Webhook', 
+      url: schedule.webhookUrl, 
+      secret: schedule.webhookSecret 
+    });
+  }
+  
+  if (webhooksToSend.length === 0) {
+    return { results: [], summary: 'not_configured' };
+  }
+  
+  // Send to all webhooks in parallel
+  const promises = webhooksToSend.map(async (wh) => {
+    const result = await sendWebhookBriefing(wh.url, payload, wh.secret);
+    return {
+      name: wh.name,
+      url: wh.url,
+      success: result.success,
+      error: result.error,
+      statusCode: result.statusCode,
+    };
+  });
+  
+  const allResults = await Promise.all(promises);
+  results.push(...allResults);
+  
+  // Generate summary
+  const succeeded = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+  
+  let summary: string;
+  if (failed === 0) {
+    summary = `delivered (${succeeded}/${results.length})`;
+  } else if (succeeded === 0) {
+    summary = `all_failed (0/${results.length})`;
+  } else {
+    summary = `partial (${succeeded}/${results.length})`;
+  }
+  
+  return { results, summary };
+}
+
+/**
+ * Get source IDs from multiple source lists
+ */
 async function getSourceIdsFromLists(sourceListIds: string[]): Promise<string[]> {
   if (!sourceListIds?.length) return [];
   
@@ -211,26 +298,28 @@ function shouldRunNow(schedule: ProfileSchedule, nowUtc: Date): boolean {
       parseInt(get('minute'))
     );
   } catch {
-    console.warn(`[Cron] Invalid timezone: ${tz}, falling back to UTC`);
+    console.warn(`[Cron] Invalid timezone ${tz}, defaulting to UTC`);
     localTime = nowUtc;
   }
   
-  // Check day
-  const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][localTime.getDay()];
-  if (!schedule.days.includes(dayName)) {
+  // Check day of week
+  const currentDay = localTime.getDay();
+  const scheduledDays = schedule.days.map(d => DAY_MAP[d.toLowerCase()]).filter(d => d !== undefined);
+  if (!scheduledDays.includes(currentDay)) {
     return false;
   }
   
-  // Check time (within 5 min window)
-  const currentHHMM = `${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}`;
-  const currentMinutes = localTime.getHours() * 60 + localTime.getMinutes();
+  // Check time (with 30-minute window)
+  const currentHour = localTime.getHours();
+  const currentMinute = localTime.getMinutes();
+  const currentTotalMinutes = currentHour * 60 + currentMinute;
   
-  for (const schedTime of schedule.times) {
-    const [h, m] = schedTime.split(':').map(Number);
-    const schedMinutes = h * 60 + m;
-    const diff = Math.abs(currentMinutes - schedMinutes);
-    // Allow 5 minute window (in case cron runs slightly off)
-    if (diff <= 5 || diff >= (24 * 60 - 5)) {
+  for (const timeStr of schedule.times) {
+    const [hour, minute] = timeStr.split(':').map(Number);
+    const scheduledTotalMinutes = hour * 60 + (minute || 0);
+    
+    // Match within 30-minute window (allows for cron running every 30 min)
+    if (Math.abs(currentTotalMinutes - scheduledTotalMinutes) <= 30) {
       return true;
     }
   }
@@ -239,80 +328,90 @@ function shouldRunNow(schedule: ProfileSchedule, nowUtc: Date): boolean {
 }
 
 /**
- * Process all scheduled briefings
- * Called by external cron every 5-10 minutes
+ * Main cron endpoint - processes all due schedules
  */
 briefingCronRoutes.post('/process', async (c) => {
-  // Verify cron secret
   const authHeader = c.req.header('Authorization');
   const providedSecret = authHeader?.replace('Bearer ', '') || c.req.query('secret');
   
-  if (!CRON_SECRET) {
-    console.warn('[Cron] No CRON_SECRET configured, skipping auth check');
-  } else if (providedSecret !== CRON_SECRET) {
+  if (CRON_SECRET && providedSecret !== CRON_SECRET) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   
   const nowUtc = new Date();
-  console.log(`[Cron] Processing scheduled briefings at ${nowUtc.toISOString()}`);
+  console.log(`[Cron] Processing at ${nowUtc.toISOString()}`);
   
   try {
-    // Get all profiles with enabled schedules
-    const profiles = await db.select()
+    // Get all enabled profiles with their users
+    const profiles = await db.select({
+      id: briefingProfiles.id,
+      name: briefingProfiles.name,
+      userId: briefingProfiles.userId,
+      filterConfig: briefingProfiles.filterConfig,
+      settings: briefingProfiles.settings,
+      schedule: briefingProfiles.schedule,
+      user: {
+        telegramChatId: users.telegramChatId,
+        email: users.email,
+      },
+    })
       .from(briefingProfiles)
+      .leftJoin(users, eq(briefingProfiles.userId, users.id))
       .where(sql`(${briefingProfiles.schedule}->>'enabled')::boolean = true`);
     
-    console.log(`[Cron] Found ${profiles.length} profiles with enabled schedules`);
+    console.log(`[Cron] Found ${profiles.length} enabled profiles`);
     
-    const results: { profileId: string; profileName: string; status: string; error?: string; webhookStatus?: string }[] = [];
+    const results: Array<{
+      profileId: string;
+      profileName: string;
+      status: string;
+      webhookStatus?: string;
+      webhookResults?: WebhookResult[];
+      error?: string;
+    }> = [];
     
     for (const profile of profiles) {
       const schedule = profile.schedule as ProfileSchedule;
       
       if (!shouldRunNow(schedule, nowUtc)) {
-        continue;
+        continue; // Skip - not due
       }
       
-      console.log(`[Cron] Processing profile: ${profile.name} (${profile.id})`);
+      console.log(`[Cron] Processing profile: ${profile.name}`);
       
       try {
         const filterConfig = profile.filterConfig as ProfileFilterConfig;
         const settings = profile.settings as ProfileSettings;
         
-        // Get source IDs from source lists if specified
-        const sourceIds = filterConfig.sourceListIds?.length 
-          ? await getSourceIdsFromLists(filterConfig.sourceListIds)
-          : undefined;
-        
-        if (sourceIds?.length) {
-          console.log(`[Cron] Using ${sourceIds.length} sources from ${filterConfig.sourceListIds?.length} source lists`);
+        // Resolve source list IDs to source IDs
+        let sourceIds: string[] | undefined;
+        if (filterConfig.sourceListIds?.length) {
+          sourceIds = await getSourceIdsFromLists(filterConfig.sourceListIds);
+          console.log(`[Cron] Resolved ${sourceIds.length} sources from ${filterConfig.sourceListIds.length} source lists`);
         }
         
         // Generate briefing
         const briefing = await generateExecutiveBriefing({
-          type: 'morning',
-          hoursBack: settings.hoursBack || 14,
-          minConfidence: settings.minConfidence || 45,
-          maxArticles: settings.maxArticles || 100,
-          includeTTS: settings.includeTTS || false,
+          userId: profile.userId,
           topics: filterConfig.topics,
           excludeTopics: filterConfig.excludeTopics,
-          domainSlugs: filterConfig.domains,
-          excludeDomainSlugs: filterConfig.excludeDomains,
+          domains: filterConfig.domains,
+          excludeDomains: filterConfig.excludeDomains,
           topicQuery: filterConfig.topicQuery,
-          sourceIds: sourceIds,
+          sourceIds,
+          hoursBack: settings.hoursBack || 24,
+          minConfidence: settings.minConfidence || 0.3,
+          maxArticles: settings.maxArticles || 50,
         });
         
         // Save briefing
         const [saved] = await db.insert(briefings).values({
           userId: profile.userId,
           profileId: profile.id,
-          type: 'morning',
-          title: `${profile.name} - ${nowUtc.toLocaleDateString()}`,
-          content: briefing.markdownContent || '',
-          summary: (briefing.markdownContent || '').substring(0, 500),
-          changes: [],
-          forecasts: [],
+          type: 'executive',
+          title: briefing.title,
+          markdownContent: briefing.markdownContent,
+          structuredData: briefing,
           contentIds: [],
           deliveryChannels: schedule.channels || ['web'],
         }).returning();
@@ -327,30 +426,24 @@ briefingCronRoutes.post('/process', async (c) => {
         
         console.log(`[Cron] Generated briefing ${saved.id} for profile ${profile.name}`);
         
-        let webhookStatus = 'not_configured';
+        // Webhook delivery (multiple)
+        const webhookPayload: WebhookPayload = {
+          type: 'briefing',
+          profileId: profile.id,
+          profileName: profile.name,
+          briefingId: saved.id,
+          title: saved.title || profile.name,
+          content: briefing.markdownContent || '',
+          summary: (briefing.markdownContent || '').substring(0, 500),
+          generatedAt: new Date().toISOString(),
+          articleCount: briefing.summary?.totalStories,
+          filterConfig: filterConfig,
+        };
         
-        // Webhook delivery
-        if (schedule.webhookUrl) {
-          const webhookResult = await sendWebhookBriefing(schedule.webhookUrl, {
-            type: 'briefing',
-            profileId: profile.id,
-            profileName: profile.name,
-            briefingId: saved.id,
-            title: saved.title || profile.name,
-            content: briefing.markdownContent || '',
-            summary: (briefing.markdownContent || '').substring(0, 500),
-            generatedAt: new Date().toISOString(),
-            articleCount: briefing.summary?.totalStories,
-            filterConfig: filterConfig,
-          }, schedule.webhookSecret);
-          
-          if (webhookResult.success) {
-            webhookStatus = 'delivered';
-            console.log(`[Cron] Webhook delivered for profile ${profile.name}`);
-          } else {
-            webhookStatus = `failed: ${webhookResult.error}`;
-            console.error(`[Cron] Webhook failed for profile ${profile.name}: ${webhookResult.error}`);
-          }
+        const { results: webhookResults, summary: webhookStatus } = await sendToAllWebhooks(schedule, webhookPayload);
+        
+        if (webhookResults.length > 0) {
+          console.log(`[Cron] Webhook delivery for ${profile.name}: ${webhookStatus}`);
         }
         
         // TODO: Handle telegram delivery
@@ -363,6 +456,7 @@ briefingCronRoutes.post('/process', async (c) => {
           profileName: profile.name,
           status: 'generated',
           webhookStatus,
+          webhookResults: webhookResults.length > 0 ? webhookResults : undefined,
         });
         
       } catch (err) {
@@ -380,6 +474,7 @@ briefingCronRoutes.post('/process', async (c) => {
       success: true,
       processedAt: nowUtc.toISOString(),
       profilesChecked: profiles.length,
+      profilesProcessed: results.length,
       results,
     });
     
@@ -393,7 +488,7 @@ briefingCronRoutes.post('/process', async (c) => {
 });
 
 /**
- * Manual trigger for a specific profile (for testing)
+ * Manual trigger for a specific profile
  */
 briefingCronRoutes.post('/trigger/:profileId', async (c) => {
   const authHeader = c.req.header('Authorization');
@@ -406,10 +501,16 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
   const profileId = c.req.param('profileId');
   
   try {
-    const [profile] = await db.select()
+    const [profile] = await db.select({
+      id: briefingProfiles.id,
+      name: briefingProfiles.name,
+      userId: briefingProfiles.userId,
+      filterConfig: briefingProfiles.filterConfig,
+      settings: briefingProfiles.settings,
+      schedule: briefingProfiles.schedule,
+    })
       .from(briefingProfiles)
-      .where(eq(briefingProfiles.id, profileId))
-      .limit(1);
+      .where(eq(briefingProfiles.id, profileId));
     
     if (!profile) {
       return c.json({ success: false, error: 'Profile not found' }, 404);
@@ -419,34 +520,32 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
     const settings = profile.settings as ProfileSettings;
     const schedule = profile.schedule as ProfileSchedule;
     
-    // Get source IDs from source lists if specified
-    const sourceIds = filterConfig.sourceListIds?.length 
-      ? await getSourceIdsFromLists(filterConfig.sourceListIds)
-      : undefined;
+    // Resolve source list IDs
+    let sourceIds: string[] | undefined;
+    if (filterConfig.sourceListIds?.length) {
+      sourceIds = await getSourceIdsFromLists(filterConfig.sourceListIds);
+    }
     
     const briefing = await generateExecutiveBriefing({
-      type: 'morning',
-      hoursBack: settings.hoursBack || 14,
-      minConfidence: settings.minConfidence || 45,
-      maxArticles: settings.maxArticles || 100,
-      includeTTS: settings.includeTTS || false,
+      userId: profile.userId,
       topics: filterConfig.topics,
       excludeTopics: filterConfig.excludeTopics,
-      domainSlugs: filterConfig.domains,
-      excludeDomainSlugs: filterConfig.excludeDomains,
+      domains: filterConfig.domains,
+      excludeDomains: filterConfig.excludeDomains,
       topicQuery: filterConfig.topicQuery,
-      sourceIds: sourceIds,
+      sourceIds,
+      hoursBack: settings.hoursBack || 24,
+      minConfidence: settings.minConfidence || 0.3,
+      maxArticles: settings.maxArticles || 50,
     });
     
     const [saved] = await db.insert(briefings).values({
       userId: profile.userId,
       profileId: profile.id,
-      type: 'morning',
-      title: `${profile.name} - ${new Date().toLocaleDateString()}`,
-      content: briefing.markdownContent || '',
-      summary: (briefing.markdownContent || '').substring(0, 500),
-      changes: [],
-      forecasts: [],
+      type: 'executive',
+      title: briefing.title,
+      markdownContent: briefing.markdownContent,
+      structuredData: briefing,
       contentIds: [],
       deliveryChannels: schedule.channels || ['web'],
     }).returning();
@@ -458,31 +557,28 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
       })
       .where(eq(briefingProfiles.id, profile.id));
     
-    let webhookStatus = 'not_configured';
+    // Webhook delivery (multiple)
+    const webhookPayload: WebhookPayload = {
+      type: 'briefing',
+      profileId: profile.id,
+      profileName: profile.name,
+      briefingId: saved.id,
+      title: saved.title || profile.name,
+      content: briefing.markdownContent || '',
+      summary: (briefing.markdownContent || '').substring(0, 500),
+      generatedAt: new Date().toISOString(),
+      articleCount: briefing.summary?.totalStories,
+      filterConfig: filterConfig,
+    };
     
-    // Webhook delivery
-    if (schedule.webhookUrl) {
-      const webhookResult = await sendWebhookBriefing(schedule.webhookUrl, {
-        type: 'briefing',
-        profileId: profile.id,
-        profileName: profile.name,
-        briefingId: saved.id,
-        title: saved.title || profile.name,
-        content: briefing.markdownContent || '',
-        summary: (briefing.markdownContent || '').substring(0, 500),
-        generatedAt: new Date().toISOString(),
-        articleCount: briefing.summary?.totalStories,
-        filterConfig: filterConfig,
-      }, schedule.webhookSecret);
-      
-      webhookStatus = webhookResult.success ? 'delivered' : `failed: ${webhookResult.error}`;
-    }
+    const { results: webhookResults, summary: webhookStatus } = await sendToAllWebhooks(schedule, webhookPayload);
     
     return c.json({
       success: true,
       briefingId: saved.id,
       profileName: profile.name,
       webhookStatus,
+      webhookResults: webhookResults.length > 0 ? webhookResults : undefined,
     });
     
   } catch (error) {
@@ -517,20 +613,36 @@ briefingCronRoutes.get('/status', async (c) => {
       .from(briefingProfiles)
       .where(sql`(${briefingProfiles.schedule}->>'enabled')::boolean = true`);
     
+    const now = new Date();
+    
     return c.json({
       success: true,
-      enabledProfiles: profiles.length,
-      profiles: profiles.map(p => ({
-        id: p.id,
-        name: p.name,
-        schedule: p.schedule,
-        filterConfig: p.filterConfig,
-        lastGenerated: p.lastGeneratedAt,
-        totalGenerated: p.generationCount,
-      })),
+      checkedAt: now.toISOString(),
+      profiles: profiles.map(p => {
+        const schedule = p.schedule as ProfileSchedule;
+        const webhookCount = schedule.webhooks?.filter(w => w.enabled).length || 
+                            (schedule.webhookUrl ? 1 : 0);
+        return {
+          id: p.id,
+          name: p.name,
+          enabled: schedule.enabled,
+          times: schedule.times,
+          timezone: schedule.timezone,
+          days: schedule.days,
+          channels: schedule.channels,
+          webhookCount,
+          lastGeneratedAt: p.lastGeneratedAt,
+          generationCount: p.generationCount,
+          wouldRunNow: shouldRunNow(schedule, now),
+        };
+      }),
     });
     
   } catch (error) {
-    return c.json({ success: false, error: String(error) }, 500);
+    console.error('[Cron] Status check failed:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Status check failed',
+    }, 500);
   }
 });

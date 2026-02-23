@@ -7,6 +7,14 @@ import { getConfidenceDisplay } from '@/lib/confidence';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
+
+interface WebhookConfig {
+  id: string;
+  name: string;
+  url: string;
+  secret?: string;
+  enabled: boolean;
+}
 interface BriefingProfile {
   id: string;
   name: string;
@@ -32,6 +40,7 @@ interface BriefingProfile {
     days?: string[];
     channels?: string[];
     webhookUrl?: string;
+    webhooks?: WebhookConfig[];
     webhookSecret?: string;
   };
   lastGeneratedAt: string | null;
@@ -153,9 +162,29 @@ export default function BriefingsPage() {
   const [sourceLists, setSourceLists] = useState<any[]>([]);
   const [selectedSourceListIds, setSelectedSourceListIds] = useState<string[]>([]);
 
-  // Webhook delivery
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [webhookSecret, setWebhookSecret] = useState('');
+  // Webhook delivery (multiple)
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  
+  // Add a new webhook
+  const addWebhook = () => {
+    setWebhooks([...webhooks, {
+      id: crypto.randomUUID(),
+      name: `Webhook ${webhooks.length + 1}`,
+      url: '',
+      secret: '',
+      enabled: true,
+    }]);
+  };
+  
+  // Update a webhook
+  const updateWebhook = (id: string, field: keyof WebhookConfig, value: string | boolean) => {
+    setWebhooks(webhooks.map(w => w.id === id ? { ...w, [field]: value } : w));
+  };
+  
+  // Remove a webhook
+  const removeWebhook = (id: string) => {
+    setWebhooks(webhooks.filter(w => w.id !== id));
+  };
   const [rssCopied, setRssCopied] = useState(false);
 
   // Fetch profiles
@@ -300,9 +329,21 @@ export default function BriefingsPage() {
     setScheduleChannels(profile.schedule?.channels || ['web']);
     // Load source list IDs from filterConfig
     setSelectedSourceListIds(profile.filterConfig?.sourceListIds || []);
-    // Load webhook settings from schedule
-    setWebhookUrl(profile.schedule?.webhookUrl || '');
-    setWebhookSecret(profile.schedule?.webhookSecret || '');
+    // Load webhooks - support both new array and legacy single webhook
+    if (profile.schedule?.webhooks?.length) {
+      setWebhooks(profile.schedule.webhooks);
+    } else if (profile.schedule?.webhookUrl) {
+      // Convert legacy single webhook to array format
+      setWebhooks([{
+        id: crypto.randomUUID(),
+        name: 'Default Webhook',
+        url: profile.schedule.webhookUrl,
+        secret: profile.schedule.webhookSecret || '',
+        enabled: true,
+      }]);
+    } else {
+      setWebhooks([]);
+    }
     setShowScheduleEditor(true);
   };
 
@@ -322,8 +363,7 @@ export default function BriefingsPage() {
             timezone: scheduleTimezone,
             days: scheduleDays,
             channels: scheduleChannels,
-            webhookUrl: webhookUrl || undefined,
-            webhookSecret: webhookSecret || undefined,
+            webhooks: webhooks.filter(w => w.url).length > 0 ? webhooks.filter(w => w.url) : undefined,
           },
           filterConfig: {
             ...selectedProfile.filterConfig,
@@ -1394,29 +1434,70 @@ export default function BriefingsPage() {
                     )}
                   </div>
 
-                  {/* Webhook Delivery */}
+                  {/* Webhook Delivery (Multiple) */}
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      🔗 Webhook Delivery (optional)
-                    </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                      POST briefings to a custom endpoint
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                        🔗 Webhook Delivery
+                      </label>
+                      <button
+                        onClick={addWebhook}
+                        className="text-xs px-2 py-1 bg-argus-100 dark:bg-argus-900 text-argus-700 dark:text-argus-300 rounded hover:bg-argus-200 dark:hover:bg-argus-800"
+                      >
+                        + Add Webhook
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      POST briefings to custom endpoints (Teams, Slack, etc.)
                     </p>
-                    <input
-                      type="url"
-                      value={webhookUrl}
-                      onChange={(e) => setWebhookUrl(e.target.value)}
-                      placeholder="https://your-server.com/webhook"
-                      className="w-full px-3 py-2 mb-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
-                    />
-                    {webhookUrl && (
-                      <input
-                        type="text"
-                        value={webhookSecret}
-                        onChange={(e) => setWebhookSecret(e.target.value)}
-                        placeholder="Secret key (optional - for HMAC signature)"
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
-                      />
+                    
+                    {webhooks.length === 0 ? (
+                      <p className="text-sm text-slate-400 dark:text-slate-500 italic">
+                        No webhooks configured. Click &quot;Add Webhook&quot; to add one.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {webhooks.map((webhook, idx) => (
+                          <div key={webhook.id} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                            <div className="flex items-center gap-2 mb-2">
+                              <input
+                                type="checkbox"
+                                checked={webhook.enabled}
+                                onChange={(e) => updateWebhook(webhook.id, 'enabled', e.target.checked)}
+                                className="rounded border-slate-300 dark:border-slate-600"
+                              />
+                              <input
+                                type="text"
+                                value={webhook.name}
+                                onChange={(e) => updateWebhook(webhook.id, 'name', e.target.value)}
+                                placeholder="Webhook name"
+                                className="flex-1 px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                              />
+                              <button
+                                onClick={() => removeWebhook(webhook.id)}
+                                className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                title="Remove webhook"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <input
+                              type="url"
+                              value={webhook.url}
+                              onChange={(e) => updateWebhook(webhook.id, 'url', e.target.value)}
+                              placeholder="https://webhook.office.com/... or https://hooks.slack.com/..."
+                              className="w-full px-2 py-1 mb-2 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={webhook.secret || ''}
+                              onChange={(e) => updateWebhook(webhook.id, 'secret', e.target.value)}
+                              placeholder="Secret key (optional)"
+                              className="w-full px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </>
