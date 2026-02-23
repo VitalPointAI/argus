@@ -4,7 +4,7 @@
  * Produces structured, readable intelligence briefings with:
  * - Clear sections by domain/topic
  * - Context + latest updates for each story
- * - Confidence scores and verification links
+ * - Confidence levels (High/Medium/Low) and verification links
  * - Article citations
  * - TTS-ready format option
  */
@@ -15,6 +15,16 @@ import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 
 const NEARAI_API_KEY = process.env.NEARAI_API_KEY || process.env.NEAR_AI_API_KEY;
 const ARGUS_BASE_URL = process.env.ARGUS_BASE_URL || 'https://argus.vitalpoint.ai';
+
+/**
+ * Convert confidence score to human-readable label
+ * High >= 80, Medium 60-79, Low < 60
+ */
+function getConfidenceLabel(score: number): string {
+  if (score >= 80) return 'High';
+  if (score >= 60) return 'Medium';
+  return 'Low';
+}
 
 /**
  * Strip HTML tags from text and clean up whitespace
@@ -59,9 +69,11 @@ interface StoryCluster {
     source: string;
     url: string;
     confidenceScore: number;
+    confidenceLabel: string;
     verificationUrl: string;
   }[];
   avgConfidence: number;
+  confidenceLabel: string;
   deepVerified: boolean;
 }
 
@@ -83,6 +95,7 @@ interface ExecutiveBriefing {
     totalArticles: number;
     totalStories: number;
     avgConfidence: number;
+    confidenceLabel: string;
     topDomains: string[];
   };
   // For TTS
@@ -278,6 +291,7 @@ async function clusterIntoStories(articles: Article[], domain: string): Promise<
       const sentences = cleanBody.split(/[.!?]+/).filter(s => s.trim().length > 20);
       const contextSentences = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
       const latestSentences = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+      const label = getConfidenceLabel(a.confidenceScore);
       
       return {
         id: `story-${domain}-${i}`,
@@ -291,17 +305,20 @@ async function clusterIntoStories(articles: Article[], domain: string): Promise<
           source: a.sourceName,
           url: a.url,
           confidenceScore: a.confidenceScore,
+          confidenceLabel: label,
           verificationUrl: `${ARGUS_BASE_URL}/verify?url=${encodeURIComponent(a.url)}`,
         }],
         avgConfidence: a.confidenceScore,
+        confidenceLabel: label,
         deepVerified: false,
       };
     });
   }
 
-  const articleList = articles.slice(0, 15).map((a, i) => 
-    `[${i + 1}] "${a.title}" (${a.sourceName}, ${a.confidenceScore}% confidence)\nContent: ${stripHtml(a.body).substring(0, 400)}...\nURL: ${a.url}`
-  ).join('\n\n');
+  const articleList = articles.slice(0, 15).map((a, i) => {
+    const label = getConfidenceLabel(a.confidenceScore);
+    return `[${i + 1}] "${a.title}" (${a.sourceName}, ${label} confidence)\nContent: ${stripHtml(a.body).substring(0, 400)}...\nURL: ${a.url}`;
+  }).join('\n\n');
 
   const prompt = `You are an intelligence analyst creating an executive briefing.
 
@@ -392,9 +409,11 @@ RULES:
           source: a.sourceName,
           url: a.url,
           confidenceScore: a.confidenceScore,
+          confidenceLabel: getConfidenceLabel(a.confidenceScore),
           verificationUrl: `${ARGUS_BASE_URL}/verify?url=${encodeURIComponent(a.url)}`,
         })),
         avgConfidence: avgConf,
+        confidenceLabel: getConfidenceLabel(avgConf),
         deepVerified: false,
       };
     });
@@ -406,6 +425,7 @@ RULES:
       const sentences = cleanBody.split(/[.!?]+/).filter(s => s.trim().length > 20);
       const contextSentences = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ').trim();
       const latestSentences = sentences.slice(Math.ceil(sentences.length / 2)).join('. ').trim();
+      const label = getConfidenceLabel(a.confidenceScore);
       
       return {
         id: `story-${domain}-${i}`,
@@ -419,9 +439,11 @@ RULES:
           source: a.sourceName,
           url: a.url,
           confidenceScore: a.confidenceScore,
+          confidenceLabel: label,
           verificationUrl: `${ARGUS_BASE_URL}/verify?url=${encodeURIComponent(a.url)}`,
         }],
         avgConfidence: a.confidenceScore,
+        confidenceLabel: label,
         deepVerified: false,
       };
     });
@@ -455,7 +477,7 @@ async function validateArticlesForAccuracy(articles: Article[]): Promise<Article
           const penaltyPercent = result.reliabilityPenalty * 100;
           const newConfidence = Math.max(10, article.confidenceScore - penaltyPercent);
           
-          console.log(`[Validation] Penalized: "${article.title.substring(0, 40)}..." ${article.confidenceScore}% -> ${Math.round(newConfidence)}% (${result.issues.join(', ')})`);
+          console.log(`[Validation] Penalized: "${article.title.substring(0, 40)}..." ${getConfidenceLabel(article.confidenceScore)} -> ${getConfidenceLabel(Math.round(newConfidence))} (${result.issues.join(', ')})`);
           
           return {
             ...article,
@@ -565,6 +587,7 @@ export async function generateExecutiveBriefing(options: BriefingOptions): Promi
       totalArticles: articles.length,
       totalStories,
       avgConfidence,
+      confidenceLabel: getConfidenceLabel(avgConfidence),
       topDomains: sortedDomains.slice(0, 5).map(([d]) => d),
     },
     htmlContent: '',
@@ -650,14 +673,15 @@ function formatDateInTimezone(date: Date, timezone: string = 'America/New_York')
  * Generate confidence badge HTML
  */
 function confidenceBadge(score: number, articleId?: string): string {
-  const color = score >= 75 ? 'green' : score >= 60 ? 'yellow' : 'red';
+  const label = getConfidenceLabel(score);
+  const color = score >= 80 ? 'green' : score >= 60 ? 'yellow' : 'red';
   const colors = {
     green: 'bg-green-100 text-green-800',
     yellow: 'bg-yellow-100 text-yellow-800',
     red: 'bg-red-100 text-red-800',
   };
   const link = articleId ? `href="${ARGUS_BASE_URL}/article/${articleId}#verification"` : '';
-  return `<a ${link} class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${colors[color]} hover:opacity-80">${score}% verified</a>`;
+  return `<a ${link} class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${colors[color]} hover:opacity-80">${label} confidence</a>`;
 }
 
 /**
@@ -672,7 +696,7 @@ function generateHTML(briefing: ExecutiveBriefing): string {
     <div class="flex items-center gap-4 mt-3 text-sm text-slate-600">
       <span>📊 ${briefing.summary.totalStories} stories from ${briefing.summary.totalArticles} sources</span>
       <span>⏱️ ${briefing.readTimeMinutes} min read</span>
-      <span>✅ ${briefing.summary.avgConfidence}% avg confidence</span>
+      <span>✅ ${briefing.summary.confidenceLabel} confidence</span>
     </div>
   </header>
 `;
@@ -704,7 +728,7 @@ function generateHTML(briefing: ExecutiveBriefing): string {
       <div class="text-sm text-slate-500">
         <span class="font-medium">Sources:</span>
         ${story.articles.map(a => 
-          `<a href="${a.url}" target="_blank" class="text-argus-600 hover:underline ml-2">${a.source} (${a.confidenceScore}%)</a>`
+          `<a href="${a.url}" target="_blank" class="text-argus-600 hover:underline ml-2">${a.source} (${a.confidenceLabel})</a>`
         ).join(', ')}
         <a href="${story.articles[0]?.verificationUrl}" class="ml-3 text-argus-600 hover:underline">🔍 Verify</a>
       </div>
@@ -727,7 +751,7 @@ function generateMarkdown(briefing: ExecutiveBriefing): string {
 
 *${briefing.subtitle}*
 
-📊 ${briefing.summary.totalStories} stories • ⏱️ ${briefing.readTimeMinutes} min read • ✅ ${briefing.summary.avgConfidence}% avg confidence
+📊 ${briefing.summary.totalStories} stories • ⏱️ ${briefing.readTimeMinutes} min read • ✅ ${briefing.summary.confidenceLabel} confidence
 
 ---
 
@@ -741,12 +765,12 @@ function generateMarkdown(briefing: ExecutiveBriefing): string {
       
       const primaryArticle = story.articles[0];
       md += `### ${sigMarker} ${story.headline}\n\n`;
-      md += `**Confidence: ${story.avgConfidence}%** | [Verify](${primaryArticle?.verificationUrl})\n\n`;
+      md += `**Confidence: ${story.confidenceLabel}** | [Verify](${primaryArticle?.verificationUrl})\n\n`;
       md += `**Context:** ${story.context}\n\n`;
       md += `**Latest:** ${story.latestUpdate}\n\n`;
       md += `**📰 Related Articles:**\n`;
       for (const a of story.articles) {
-        md += `- [${a.title || a.source}](${a.url}) — *${a.source}* (${a.confidenceScore}% confidence)\n`;
+        md += `- [${a.title || a.source}](${a.url}) — *${a.source}* (${a.confidenceLabel})\n`;
       }
       md += `\n`;
     }
@@ -792,12 +816,12 @@ function generateTTSScript(briefing: ExecutiveBriefing): string {
       lines.push('');
       
       // Confidence
-      if (story.avgConfidence >= 75) {
-        lines.push(`This story is verified with ${story.avgConfidence}% confidence across ${story.articles.length} sources.`);
+      if (story.avgConfidence >= 80) {
+        lines.push(`This story has high confidence and is verified across ${story.articles.length} sources.`);
       } else if (story.avgConfidence >= 60) {
-        lines.push(`Confidence level: ${story.avgConfidence}%. We recommend verifying with additional sources.`);
+        lines.push(`Confidence level: medium. We recommend verifying with additional sources.`);
       } else {
-        lines.push(`Note: This is an emerging story with ${story.avgConfidence}% confidence. Treat as preliminary.`);
+        lines.push(`Note: This is an emerging story with low confidence. Treat as preliminary.`);
       }
       lines.push('');
       
@@ -818,4 +842,4 @@ function generateTTSScript(briefing: ExecutiveBriefing): string {
   return lines.join('\n');
 }
 
-export { BriefingOptions, ExecutiveBriefing, BriefingSection, StoryCluster };
+export { BriefingOptions, ExecutiveBriefing, BriefingSection, StoryCluster, getConfidenceLabel };

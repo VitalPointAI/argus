@@ -34,6 +34,16 @@ interface BriefingOptions {
 }
 
 /**
+ * Convert confidence score to human-readable label
+ * High >= 80, Medium 60-79, Low < 60
+ */
+function getConfidenceLabel(score: number): string {
+  if (score >= 80) return 'High';
+  if (score >= 60) return 'Medium';
+  return 'Low';
+}
+
+/**
  * Fetch top articles for briefing
  */
 async function fetchTopArticles(options: BriefingOptions): Promise<Article[]> {
@@ -98,7 +108,8 @@ function buildBriefingPrompt(articles: Article[], options: BriefingOptions): str
           const bodyPreview = a.body ? a.body.substring(0, 500).replace(/\n+/g, ' ').trim() : '';
           const content = bodyPreview ? `\n  Content: ${bodyPreview}...` : '';
           const urlInfo = a.url ? `\n  URL: ${a.url}` : '';
-          return `- "${a.title}" (${a.source}, ${a.confidenceScore}% confidence)${urlInfo}${content}`;
+          const confidence = getConfidenceLabel(a.confidenceScore);
+          return `- "${a.title}" (${a.source}, ${confidence} confidence)${urlInfo}${content}`;
         })
         .join('\n\n');
       return `## ${domain}\n${articleList}`;
@@ -119,7 +130,7 @@ STRICT RULES - FOLLOW EXACTLY:
 2. NEVER add speculation, interpretation, or your own analysis
 3. NEVER infer or assume anything not explicitly stated
 4. Include source name in parentheses for EVERY claim
-5. If confidence < 70%, mark explicitly as [UNVERIFIED]
+5. If confidence is Low, mark explicitly as [UNVERIFIED]
 6. Use exact wording from sources where possible
 7. If sources conflict, report BOTH views with sources
 
@@ -133,14 +144,14 @@ FORMAT EXACTLY AS:
 **VERIFIED INTELLIGENCE BRIEFING**
 Type: ${options.type}
 Sources: ${articles.length} articles
-Confidence: [calculate average]%
+Confidence: [High/Medium/Low based on source quality]
 
-**VERIFIED DEVELOPMENTS**
-• [Exact claim from article] (Source Name) [confidence%]
-• [Exact claim from article] (Source Name) [confidence%]
+**VERIFIED DEVELOPMENTS** (High/Medium confidence)
+• [Exact claim from article] (Source Name) [High/Medium/Low]
+• [Exact claim from article] (Source Name) [High/Medium/Low]
 
-**UNVERIFIED REPORTS** (confidence < 70%)
-• ⚠ [Claim] (Source) [confidence%]
+**UNVERIFIED REPORTS** (Low confidence)
+• ⚠ [Claim] (Source) [Low]
 
 **CITATIONS**
 • "Article Title" - Source - URL
@@ -326,31 +337,33 @@ export async function generateLLMBriefing(options: BriefingOptions): Promise<{
 function generateFallbackBriefing(articles: Article[], options: BriefingOptions): string {
   const grouped = groupByDomain(articles);
   const timestamp = new Date().toISOString();
-  const sources = [...new Set(articles.map(a => a.source))];
+  const sourcesList = [...new Set(articles.map(a => a.source))];
   const avgConfidence = articles.length > 0
     ? Math.round(articles.reduce((sum, a) => sum + a.confidenceScore, 0) / articles.length)
     : 0;
+  const overallLabel = getConfidenceLabel(avgConfidence);
   
   const lines = [
     '---',
     '**VERIFIED INTELLIGENCE BRIEFING**',
     `Generated: ${timestamp}`,
-    `Sources: ${articles.length} articles from ${sources.length} sources`,
-    `Overall Confidence: ${avgConfidence}%`,
+    `Sources: ${articles.length} articles from ${sourcesList.length} sources`,
+    `Overall Confidence: ${overallLabel}`,
     '',
     '**KEY DEVELOPMENTS** (by domain)',
     '',
   ];
   
   for (const [domain, domainArticles] of Object.entries(grouped)) {
-    const verified = domainArticles.filter(a => a.confidenceScore >= 70);
-    const unverified = domainArticles.filter(a => a.confidenceScore < 70);
+    const verified = domainArticles.filter(a => a.confidenceScore >= 60);
+    const unverified = domainArticles.filter(a => a.confidenceScore < 60);
     
     if (verified.length > 0) {
       lines.push(`**${domain}** [${verified.length} verified]`);
       verified.slice(0, 3).forEach(a => {
         const urlLink = a.url ? `\n  📎 ${a.url}` : '';
-        lines.push(`• ${a.title} (${a.source}) [${a.confidenceScore}%]${urlLink}`);
+        const label = getConfidenceLabel(a.confidenceScore);
+        lines.push(`• ${a.title} (${a.source}) [${label}]${urlLink}`);
       });
       lines.push('');
     }
@@ -359,7 +372,7 @@ function generateFallbackBriefing(articles: Article[], options: BriefingOptions)
       lines.push(`**${domain}** [UNVERIFIED]`);
       unverified.slice(0, 2).forEach(a => {
         const urlLink = a.url ? `\n  📎 ${a.url}` : '';
-        lines.push(`• ⚠ ${a.title} (${a.source}) [${a.confidenceScore}%]${urlLink}`);
+        lines.push(`• ⚠ ${a.title} (${a.source}) [Low]${urlLink}`);
       });
       lines.push('');
     }
@@ -410,7 +423,8 @@ export async function generateFactCheckedBriefing(options: BriefingOptions): Pro
     source: a.source,
     domain: a.domain,
     confidenceScore: a.confidenceScore,
-    verificationStatus: a.confidenceScore >= 70 ? 'verified' : 'unverified',
+    confidenceLabel: getConfidenceLabel(a.confidenceScore),
+    verificationStatus: a.confidenceScore >= 60 ? 'verified' : 'unverified',
   }));
 
   const avgConfidence = Math.round(
@@ -431,4 +445,4 @@ export async function generateFactCheckedBriefing(options: BriefingOptions): Pro
   };
 }
 
-export { fetchTopArticles, groupByDomain };
+export { fetchTopArticles, groupByDomain, getConfidenceLabel };
