@@ -172,10 +172,13 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
       // Fetch full content if configured
       const articleBody = await getArticleContent(item, config);
       
-      // Classify article into a domain (source perspective)
+      // Classify article into a domain (source perspective) - uses keyword matching, no LLM
       const domainId = await classifyArticleDomain(item.title, articleBody);
       
-      // Classify article topics (what it's about) using LLM
+      // DISABLED: LLM topic classification - too expensive (~2400 calls/day)
+      // Topics will be classified on-demand during briefing generation instead
+      // To re-enable, uncomment the block below:
+      /*
       let topics: string[] = [];
       let summary: string | null = null;
       try {
@@ -185,6 +188,9 @@ export async function ingestRSSSource(sourceId: string): Promise<number> {
       } catch (err) {
         console.warn(`[RSS] Topic classification failed for ${item.title}:`, err);
       }
+      */
+      const topics: string[] = [];
+      const summary: string | null = null;
 
       await db.insert(content).values({
         sourceId: source.id,
