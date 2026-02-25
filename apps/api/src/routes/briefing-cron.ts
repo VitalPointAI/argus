@@ -366,6 +366,7 @@ briefingCronRoutes.post('/process', async (c) => {
   
   try {
     // Get all enabled profiles with their users
+    // Note: telegramChatId is stored in users.preferences->telegram->chatId, not a column
     const profiles = await db.select({
       id: briefingProfiles.id,
       name: briefingProfiles.name,
@@ -374,7 +375,7 @@ briefingCronRoutes.post('/process', async (c) => {
       settings: briefingProfiles.settings,
       schedule: briefingProfiles.schedule,
       user: {
-        telegramChatId: users.telegramChatId,
+        preferences: users.preferences,
         email: users.email,
       },
     })
