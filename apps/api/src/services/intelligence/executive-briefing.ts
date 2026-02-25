@@ -10,6 +10,7 @@
  */
 
 import { validateArticleContent } from './content-validator';
+import { classifyArticleTopics } from './topic-classifier';
 import { db, content, sources, domains, sourceDomains } from '../../db';
 import { eq, desc, gte, and, sql, inArray } from 'drizzle-orm';
 
@@ -55,6 +56,7 @@ interface Article {
   publishedAt: Date;
   confidenceScore: number;
   hasDeepVerification?: boolean;
+  topics?: string[]; // On-demand classified topics
 }
 
 interface StoryCluster {
@@ -183,21 +185,16 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
     conditions.push(inArray(content.domainId, options.domainIds));
   }
   
-  // Custom filter: topics (include - OR logic)
-  if (options.topics && options.topics.length > 0) {
-    console.log(`[FetchArticles] Filtering by topics: ${options.topics.join(', ')}`);
-    const topicConditions = options.topics.map(t => 
-      sql`${content.topics} @> ${JSON.stringify([t])}::jsonb`
-    );
-    conditions.push(sql`(${sql.join(topicConditions, sql` OR `)})`);
-  }
+  // NOTE: Topic filtering now happens AFTER fetching via on-demand classification
+  // This saves ~2400 LLM calls/day by not classifying during RSS ingestion
+  // We'll classify only the articles needed for this briefing
+  const needsTopicFilter = (options.topics && options.topics.length > 0) || 
+                           (options.excludeTopics && options.excludeTopics.length > 0);
   
-  // Custom filter: excludeTopics (NOT logic)
-  if (options.excludeTopics && options.excludeTopics.length > 0) {
-    console.log(`[FetchArticles] Excluding topics: ${options.excludeTopics.join(', ')}`);
-    for (const t of options.excludeTopics) {
-      conditions.push(sql`NOT (${content.topics} @> ${JSON.stringify([t])}::jsonb)`);
-    }
+  if (needsTopicFilter) {
+    console.log(`[FetchArticles] Topic filter requested - will classify on-demand after fetch`);
+    console.log(`[FetchArticles] Include topics: ${options.topics?.join(', ') || 'none'}`);
+    console.log(`[FetchArticles] Exclude topics: ${options.excludeTopics?.join(', ') || 'none'}`);
   }
   
   // Custom filter: domainSlugs (source perspective - OR logic)
@@ -261,7 +258,7 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
     
     console.log(`[FetchArticles] After diversity filter: ${diverseArticles.length} articles (from ${Object.keys(sourceCount).length} sources)`);
 
-    return diverseArticles.map(a => ({
+    let mappedArticles = diverseArticles.map(a => ({
       id: a.id,
       title: a.title,
       body: a.body || '',
@@ -272,7 +269,61 @@ async function fetchArticles(options: BriefingOptions): Promise<Article[]> {
       domainSlug: a.domainSlug || 'other',
       publishedAt: a.publishedAt,
       confidenceScore: a.confidenceScore || 50,
+      topics: [] as string[], // Will be populated by on-demand classification if needed
     }));
+
+    // ON-DEMAND TOPIC CLASSIFICATION
+    // Only classify if topic filtering is requested - saves LLM calls
+    if (needsTopicFilter && mappedArticles.length > 0) {
+      console.log(`[FetchArticles] Running on-demand topic classification for ${mappedArticles.length} articles...`);
+      
+      // Classify articles in parallel (with concurrency limit)
+      const CONCURRENCY = 5;
+      const classified: typeof mappedArticles = [];
+      
+      for (let i = 0; i < mappedArticles.length; i += CONCURRENCY) {
+        const batch = mappedArticles.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(
+          batch.map(async (article) => {
+            try {
+              const result = await classifyArticleTopics(article.title, article.body);
+              return { ...article, topics: result.topics };
+            } catch (err) {
+              console.warn(`[FetchArticles] Classification failed for "${article.title.substring(0, 30)}...":`, err);
+              return { ...article, topics: [] };
+            }
+          })
+        );
+        classified.push(...results);
+      }
+      
+      console.log(`[FetchArticles] Classified ${classified.length} articles`);
+      
+      // Apply topic filters
+      let filteredArticles = classified;
+      
+      // Include filter (OR logic)
+      if (options.topics && options.topics.length > 0) {
+        const includeTopics = options.topics.map(t => t.toLowerCase());
+        filteredArticles = filteredArticles.filter(a => 
+          a.topics.some(t => includeTopics.includes(t.toLowerCase()))
+        );
+        console.log(`[FetchArticles] After include filter (${options.topics.join(', ')}): ${filteredArticles.length} articles`);
+      }
+      
+      // Exclude filter
+      if (options.excludeTopics && options.excludeTopics.length > 0) {
+        const excludeTopics = options.excludeTopics.map(t => t.toLowerCase());
+        filteredArticles = filteredArticles.filter(a => 
+          !a.topics.some(t => excludeTopics.includes(t.toLowerCase()))
+        );
+        console.log(`[FetchArticles] After exclude filter: ${filteredArticles.length} articles`);
+      }
+      
+      mappedArticles = filteredArticles;
+    }
+
+    return mappedArticles;
   } catch (queryError) {
     console.error('[FetchArticles] Query failed:', queryError);
     throw queryError;
