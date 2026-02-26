@@ -437,8 +437,8 @@ briefingCronRoutes.post('/process', async (c) => {
           profileId: profile.id,
           type: 'morning',
           title: briefing.title,
-          markdownContent: briefing.markdownContent,
-          structuredData: briefing,
+          content: briefing.markdownContent || '',
+          summary: briefing.summary?.keyDevelopments?.join('\n\n') || briefing.markdownContent?.substring(0, 500) || 'No summary available',
           contentIds: [],
           deliveryChannels: schedule.channels || ['web'],
         }).returning();
@@ -573,8 +573,8 @@ briefingCronRoutes.post('/trigger/:profileId', async (c) => {
       profileId: profile.id,
       type: 'morning',
       title: briefing.title,
-      markdownContent: briefing.markdownContent,
-      structuredData: briefing,
+      content: briefing.markdownContent || '',
+      summary: briefing.summary?.keyDevelopments?.join('\n\n') || briefing.markdownContent?.substring(0, 500) || 'No summary available',
       contentIds: [],
       deliveryChannels: schedule.channels || ['web'],
     }).returning();
