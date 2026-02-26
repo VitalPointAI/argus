@@ -109,6 +109,7 @@ verificationRoutes.post('/deep', async (c) => {
     return c.json({
       success: true,
       data: {
+        contentId: item.id, // Include contentId for deep verification
         url: item.url,
         title: item.title,
         confidence: item.confidenceScore || 50,
