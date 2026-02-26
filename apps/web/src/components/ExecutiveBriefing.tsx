@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getConfidenceDisplay } from '@/lib/confidence';
-import VerifyModal from './VerifyModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://argus.vitalpoint.ai';
 
@@ -333,13 +333,14 @@ function MarkdownRenderer({ content, onVerify }: { content: string; onVerify?: (
 }
 
 export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideGenerateCard }: Props) {
+  const router = useRouter();
   const [playingAudio, setPlayingAudio] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [verifyModalUrl, setVerifyModalUrl] = useState<string | null>(null);
   
+  // Navigate to the new verify page instead of opening modal
   const handleVerify = (url: string) => {
-    setVerifyModalUrl(url);
+    router.push(`/verify?url=${encodeURIComponent(url)}`);
   };
 
   const handlePlayAudio = async () => {
@@ -546,15 +547,6 @@ export default function ExecutiveBriefing({ briefing, onGenerate, loading, hideG
           </p>
         </footer>
       </div>
-
-      {/* Verify Modal */}
-      {verifyModalUrl && (
-        <VerifyModal 
-          url={verifyModalUrl} 
-          isOpen={true} 
-          onClose={() => setVerifyModalUrl(null)} 
-        />
-      )}
     </div>
   );
 }
