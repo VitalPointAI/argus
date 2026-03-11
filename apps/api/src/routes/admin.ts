@@ -509,3 +509,183 @@ adminRoutes.post('/settings', async (c) => {
     return c.json({ success: false, error: 'Failed to update settings' }, 500);
   }
 });
+
+// ============ LLM Configuration ============
+
+/**
+ * GET /admin/llm/config - Get LLM configuration
+ */
+adminRoutes.get('/llm/config', async (c) => {
+  try {
+    const settings = await db.select().from(platformSettings);
+    
+    // Extract LLM-related settings
+    const config: Record<string, any> = {
+      provider: 'near-ai',
+      model: 'deepseek-ai/DeepSeek-V3.1',
+      apiKeyMasked: '',
+      oauthConnected: false,
+    };
+    
+    for (const s of settings) {
+      if (s.key === 'llm_provider') config.provider = s.value;
+      if (s.key === 'llm_model') config.model = s.value;
+      if (s.key === 'llm_api_key' && s.value) {
+        // Mask the API key
+        const key = s.value;
+        config.apiKeyMasked = key.slice(0, 8) + '...' + key.slice(-4);
+      }
+      if (s.key === 'anthropic_oauth_token' && s.value) {
+        config.oauthConnected = true;
+      }
+    }
+    
+    return c.json({ success: true, data: config });
+  } catch (error) {
+    console.error('Get LLM config error:', error);
+    return c.json({ success: false, error: 'Failed to fetch LLM config' }, 500);
+  }
+});
+
+/**
+ * PUT /admin/llm/config - Update LLM configuration
+ */
+adminRoutes.put('/llm/config', async (c) => {
+  try {
+    const adminUser = c.get('adminUser');
+    const body = await c.req.json();
+    const { provider, model, apiKey, useOAuth } = body;
+    
+    const updates: Array<{ key: string; value: string }> = [];
+    
+    if (provider) updates.push({ key: 'llm_provider', value: provider });
+    if (model) updates.push({ key: 'llm_model', value: model });
+    if (apiKey) updates.push({ key: 'llm_api_key', value: apiKey });
+    if (typeof useOAuth === 'boolean') {
+      updates.push({ key: 'llm_use_oauth', value: String(useOAuth) });
+    }
+    
+    for (const { key, value } of updates) {
+      const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+      
+      if (existing.length > 0) {
+        await db.update(platformSettings)
+          .set({ value, updatedBy: adminUser.id, updatedAt: new Date() })
+          .where(eq(platformSettings.key, key));
+      } else {
+        await db.insert(platformSettings).values({ key, value, updatedBy: adminUser.id });
+      }
+    }
+    
+    return c.json({ success: true, message: 'LLM configuration updated' });
+  } catch (error) {
+    console.error('Update LLM config error:', error);
+    return c.json({ success: false, error: 'Failed to update LLM config' }, 500);
+  }
+});
+
+// ============ OAuth Endpoints ============
+
+/**
+ * GET /admin/oauth/status - Get OAuth connection status
+ */
+adminRoutes.get('/oauth/status', async (c) => {
+  try {
+    const settings = await db.select().from(platformSettings);
+    
+    let connected = false;
+    let tokenExpiresAt = null;
+    let provider = 'anthropic';
+    
+    for (const s of settings) {
+      if (s.key === 'anthropic_oauth_token' && s.value) {
+        connected = true;
+      }
+      if (s.key === 'anthropic_oauth_expires') {
+        tokenExpiresAt = s.value;
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      data: { connected, tokenExpiresAt, provider } 
+    });
+  } catch (error) {
+    console.error('OAuth status error:', error);
+    return c.json({ success: false, error: 'Failed to fetch OAuth status' }, 500);
+  }
+});
+
+/**
+ * POST /admin/oauth/token - Save a manually pasted OAuth token
+ */
+adminRoutes.post('/oauth/token', async (c) => {
+  try {
+    const adminUser = c.get('adminUser');
+    const body = await c.req.json();
+    const { token } = body;
+    
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      return c.json({ success: false, error: 'Token is required' }, 400);
+    }
+    
+    // Save the OAuth token
+    const key = 'anthropic_oauth_token';
+    const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+    
+    if (existing.length > 0) {
+      await db.update(platformSettings)
+        .set({ value: token.trim(), updatedBy: adminUser.id, updatedAt: new Date() })
+        .where(eq(platformSettings.key, key));
+    } else {
+      await db.insert(platformSettings).values({ key, value: token.trim(), updatedBy: adminUser.id });
+    }
+    
+    // Also set use_oauth to true
+    const oauthKey = 'llm_use_oauth';
+    const oauthExisting = await db.select().from(platformSettings).where(eq(platformSettings.key, oauthKey));
+    if (oauthExisting.length > 0) {
+      await db.update(platformSettings)
+        .set({ value: 'true', updatedBy: adminUser.id, updatedAt: new Date() })
+        .where(eq(platformSettings.key, oauthKey));
+    } else {
+      await db.insert(platformSettings).values({ key: oauthKey, value: 'true', updatedBy: adminUser.id });
+    }
+    
+    console.log('[OAuth] Anthropic token saved by admin:', adminUser.email);
+    
+    return c.json({ success: true, message: 'OAuth token saved' });
+  } catch (error) {
+    console.error('Save OAuth token error:', error);
+    return c.json({ success: false, error: 'Failed to save OAuth token' }, 500);
+  }
+});
+
+/**
+ * POST /admin/oauth/disconnect - Disconnect OAuth
+ */
+adminRoutes.post('/oauth/disconnect', async (c) => {
+  try {
+    const adminUser = c.get('adminUser');
+    
+    // Remove the OAuth token
+    await db.delete(platformSettings).where(eq(platformSettings.key, 'anthropic_oauth_token'));
+    await db.delete(platformSettings).where(eq(platformSettings.key, 'anthropic_oauth_expires'));
+    
+    // Set use_oauth to false
+    const oauthKey = 'llm_use_oauth';
+    const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, oauthKey));
+    if (existing.length > 0) {
+      await db.update(platformSettings)
+        .set({ value: 'false', updatedBy: adminUser.id, updatedAt: new Date() })
+        .where(eq(platformSettings.key, oauthKey));
+    }
+    
+    console.log('[OAuth] Anthropic disconnected by admin:', adminUser.email);
+    
+    return c.json({ success: true, message: 'OAuth disconnected' });
+  } catch (error) {
+    console.error('Disconnect OAuth error:', error);
+    return c.json({ success: false, error: 'Failed to disconnect OAuth' }, 500);
+  }
+});

@@ -31,6 +31,19 @@ interface User {
   createdAt: string;
 }
 
+interface LLMConfig {
+  provider: 'near-ai' | 'anthropic';
+  model: string;
+  apiKeyMasked: string;
+  oauthConnected: boolean;
+}
+
+interface OAuthStatus {
+  connected: boolean;
+  tokenExpiresAt: string | null;
+  provider: string;
+}
+
 export default function AdminPage() {
   const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -42,6 +55,22 @@ export default function AdminPage() {
   const [actionMessage, setActionMessage] = useState('');
   const [platformSettings, setPlatformSettings] = useState<Record<string, any>>({});
   const [savingSettings, setSavingSettings] = useState(false);
+  
+  // LLM Config state
+  const [llmConfig, setLlmConfig] = useState<LLMConfig>({
+    provider: 'near-ai',
+    model: 'deepseek-ai/DeepSeek-V3.1',
+    apiKeyMasked: '',
+    oauthConnected: false,
+  });
+  const [oauthStatus, setOauthStatus] = useState<OAuthStatus>({
+    connected: false,
+    tokenExpiresAt: null,
+    provider: 'anthropic',
+  });
+  const [newApiKey, setNewApiKey] = useState('');
+  const [newOAuthToken, setNewOAuthToken] = useState('');
+  const [savingLLM, setSavingLLM] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -63,10 +92,12 @@ export default function AdminPage() {
     try {
       const fetchOpts = { credentials: 'include' as RequestCredentials };
       
-      const [statsRes, usersRes, settingsRes] = await Promise.all([
+      const [statsRes, usersRes, settingsRes, llmRes, oauthRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/stats`, fetchOpts),
         fetch(`${API_URL}/api/admin/users`, fetchOpts),
         fetch(`${API_URL}/api/admin/settings`, fetchOpts),
+        fetch(`${API_URL}/api/admin/llm/config`, fetchOpts),
+        fetch(`${API_URL}/api/admin/oauth/status`, fetchOpts),
       ]);
 
       if (!statsRes.ok || !usersRes.ok) {
@@ -86,6 +117,22 @@ export default function AdminPage() {
           settings[key] = (val as any).value;
         }
         setPlatformSettings(settings);
+      }
+      
+      // Load LLM config
+      if (llmRes.ok) {
+        const llmData = await llmRes.json();
+        if (llmData.success) {
+          setLlmConfig(llmData.data);
+        }
+      }
+      
+      // Load OAuth status
+      if (oauthRes.ok) {
+        const oauthData = await oauthRes.json();
+        if (oauthData.success) {
+          setOauthStatus(oauthData.data);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load admin data');
@@ -135,6 +182,103 @@ export default function AdminPage() {
       }
     } catch {
       setActionMessage('Failed to delete user');
+    }
+  };
+
+  const saveLLMConfig = async () => {
+    setSavingLLM(true);
+    try {
+      const body: Record<string, any> = {
+        provider: llmConfig.provider,
+        model: llmConfig.model,
+      };
+      if (newApiKey) {
+        body.apiKey = newApiKey;
+      }
+      
+      const res = await fetch(`${API_URL}/api/admin/llm/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('LLM configuration saved');
+        setNewApiKey('');
+        // Refresh config
+        const llmRes = await fetch(`${API_URL}/api/admin/llm/config`, { credentials: 'include' });
+        if (llmRes.ok) {
+          const llmData = await llmRes.json();
+          if (llmData.success) setLlmConfig(llmData.data);
+        }
+      } else {
+        setActionMessage(`Error: ${data.error}`);
+      }
+    } catch {
+      setActionMessage('Failed to save LLM config');
+    } finally {
+      setSavingLLM(false);
+      setTimeout(() => setActionMessage(''), 3000);
+    }
+  };
+
+  const saveOAuthToken = async () => {
+    if (!newOAuthToken.trim()) {
+      setActionMessage('Error: Please enter an OAuth token');
+      return;
+    }
+    
+    setSavingLLM(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token: newOAuthToken }),
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('OAuth token saved successfully');
+        setNewOAuthToken('');
+        setOauthStatus({ ...oauthStatus, connected: true });
+        setLlmConfig({ ...llmConfig, oauthConnected: true });
+      } else {
+        setActionMessage(`Error: ${data.error}`);
+      }
+    } catch {
+      setActionMessage('Failed to save OAuth token');
+    } finally {
+      setSavingLLM(false);
+      setTimeout(() => setActionMessage(''), 3000);
+    }
+  };
+
+  const disconnectOAuth = async () => {
+    if (!confirm('Disconnect Anthropic OAuth? You will need to reconnect or use an API key.')) return;
+    
+    setSavingLLM(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/oauth/disconnect`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('OAuth disconnected');
+        setOauthStatus({ ...oauthStatus, connected: false });
+        setLlmConfig({ ...llmConfig, oauthConnected: false });
+      } else {
+        setActionMessage(`Error: ${data.error}`);
+      }
+    } catch {
+      setActionMessage('Failed to disconnect OAuth');
+    } finally {
+      setSavingLLM(false);
+      setTimeout(() => setActionMessage(''), 3000);
     }
   };
 
@@ -355,6 +499,149 @@ export default function AdminPage() {
           <div className="space-y-4 sm:space-y-6">
             <h2 className="text-lg font-semibold">Platform Settings</h2>
             
+            {/* LLM Configuration */}
+            <div className="bg-slate-800 rounded-lg p-4 sm:p-6">
+              <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
+                🤖 LLM Configuration
+              </h3>
+              
+              <div className="space-y-4">
+                {/* Provider Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Provider
+                  </label>
+                  <select
+                    value={llmConfig.provider}
+                    onChange={(e) => setLlmConfig(prev => ({
+                      ...prev,
+                      provider: e.target.value as 'near-ai' | 'anthropic',
+                      model: e.target.value === 'near-ai' ? 'deepseek-ai/DeepSeek-V3.1' : 'claude-sonnet-4-20250514',
+                    }))}
+                    className="w-full max-w-xs px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                  >
+                    <option value="near-ai">Near AI Cloud (DeepSeek V3.1)</option>
+                    <option value="anthropic">Anthropic (Claude)</option>
+                  </select>
+                </div>
+                
+                {/* Model Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Model
+                  </label>
+                  <input
+                    type="text"
+                    value={llmConfig.model}
+                    onChange={(e) => setLlmConfig(prev => ({
+                      ...prev,
+                      model: e.target.value
+                    }))}
+                    placeholder={llmConfig.provider === 'near-ai' ? 'deepseek-ai/DeepSeek-V3.1' : 'claude-sonnet-4-20250514'}
+                    className="w-full max-w-md px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                  />
+                  {llmConfig.provider === 'anthropic' && (
+                    <p className="text-slate-400 text-sm mt-1">
+                      e.g., claude-sonnet-4-20250514, claude-opus-4-20250514
+                    </p>
+                  )}
+                </div>
+                
+                {/* API Key (for both providers) */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    API Key
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="password"
+                      value={newApiKey}
+                      onChange={(e) => setNewApiKey(e.target.value)}
+                      placeholder={llmConfig.apiKeyMasked || 'Enter new API key'}
+                      className="w-full max-w-md px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                    />
+                    {llmConfig.apiKeyMasked && (
+                      <span className="text-slate-400 text-sm self-center">
+                        Current: {llmConfig.apiKeyMasked}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {llmConfig.provider === 'near-ai' 
+                      ? 'Get API key from cloud.near.ai'
+                      : 'Get API key from console.anthropic.com'}
+                  </p>
+                </div>
+                
+                {/* Anthropic OAuth Section */}
+                {llmConfig.provider === 'anthropic' && (
+                  <div className="mt-6 pt-4 border-t border-slate-700">
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <span className="text-orange-400">⚡</span>
+                      Anthropic OAuth (Optional)
+                    </h4>
+                    
+                    {oauthStatus.connected ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                          <span className="text-green-400 font-medium">OAuth Connected</span>
+                        </div>
+                        {oauthStatus.tokenExpiresAt && (
+                          <p className="text-slate-400 text-sm">
+                            Expires: {new Date(oauthStatus.tokenExpiresAt).toLocaleString()}
+                          </p>
+                        )}
+                        <button
+                          onClick={disconnectOAuth}
+                          disabled={savingLLM}
+                          className="px-4 py-2 bg-red-900 hover:bg-red-800 rounded text-sm text-red-300 disabled:opacity-50"
+                        >
+                          Disconnect OAuth
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-slate-400 text-sm">
+                          Paste an OAuth token from <code className="bg-slate-700 px-1 rounded">claude login</code> or <code className="bg-slate-700 px-1 rounded">claude setup-token</code>
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="password"
+                            value={newOAuthToken}
+                            onChange={(e) => setNewOAuthToken(e.target.value)}
+                            placeholder="sk-ant-oat-..."
+                            className="w-full max-w-md px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white font-mono text-sm"
+                          />
+                          <button
+                            onClick={saveOAuthToken}
+                            disabled={savingLLM || !newOAuthToken.trim()}
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded text-sm disabled:opacity-50"
+                          >
+                            Save Token
+                          </button>
+                        </div>
+                        <p className="text-slate-500 text-xs">
+                          OAuth tokens start with <code className="bg-slate-700 px-1 rounded">sk-ant-oat</code> and don&apos;t auto-renew.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Save LLM Config Button */}
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <button
+                    onClick={saveLLMConfig}
+                    disabled={savingLLM}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50"
+                  >
+                    {savingLLM ? 'Saving...' : 'Save LLM Configuration'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            
             {/* Marketplace Settings */}
             <div className="bg-slate-800 rounded-lg p-4 sm:p-6">
               <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
@@ -479,7 +766,7 @@ export default function AdminPage() {
                   disabled={savingSettings}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50"
                 >
-                  {savingSettings ? 'Saving...' : 'Save Settings'}
+                  {savingSettings ? 'Saving...' : 'Save Marketplace Settings'}
                 </button>
               </div>
             </div>
